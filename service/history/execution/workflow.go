@@ -27,6 +27,9 @@ import (
 	"fmt"
 
 	"github.com/uber/cadence/common/cluster"
+	"github.com/uber/cadence/common/log"
+	"github.com/uber/cadence/common/log/tag"
+	"github.com/uber/cadence/common/metrics"
 	"github.com/uber/cadence/common/persistence"
 	"github.com/uber/cadence/common/types"
 )
@@ -36,7 +39,7 @@ const (
 	IdentityHistoryService = "history-service"
 	// WorkflowTerminationIdentity is the component which decides to terminate the workflow
 	WorkflowTerminationIdentity = "worker-service"
-	// WorkflowTerminationReason is the reason for terminating workflow due to version conflit
+	// WorkflowTerminationReason is the reason for terminating workflow due to version conflict
 	WorkflowTerminationReason = "Terminate Workflow Due To Version Conflict."
 )
 
@@ -56,10 +59,12 @@ type (
 	workflowImpl struct {
 		clusterMetadata cluster.Metadata
 
-		ctx          context.Context
-		context      Context
-		mutableState MutableState
-		releaseFn    ReleaseFunc
+		ctx           context.Context
+		context       Context
+		mutableState  MutableState
+		releaseFn     ReleaseFunc
+		logger        log.Logger
+		metricsClient metrics.Client
 	}
 )
 
@@ -70,15 +75,19 @@ func NewWorkflow(
 	context Context,
 	mutableState MutableState,
 	releaseFn ReleaseFunc,
+	logger log.Logger,
+	metricsClient metrics.Client,
 ) Workflow {
 
 	return &workflowImpl{
 		ctx:             ctx,
 		clusterMetadata: clusterMetadata,
 
-		context:      context,
-		mutableState: mutableState,
-		releaseFn:    releaseFn,
+		context:       context,
+		mutableState:  mutableState,
+		releaseFn:     releaseFn,
+		logger:        logger,
+		metricsClient: metricsClient,
 	}
 }
 
@@ -189,7 +198,7 @@ func (r *workflowImpl) SuppressBy(
 	currentCluster := r.clusterMetadata.GetCurrentClusterName()
 
 	if currentCluster == lastWriteCluster {
-		return TransactionPolicyActive, r.terminateWorkflow(lastWriteVersion, incomingLastWriteVersion)
+		return TransactionPolicyActive, r.terminateWorkflow(lastWriteVersion, incomingLastWriteVersion, r.logger, r.metricsClient)
 	}
 	return TransactionPolicyPassive, r.zombiefyWorkflow()
 }
@@ -251,6 +260,8 @@ func (r *workflowImpl) failDecision(
 func (r *workflowImpl) terminateWorkflow(
 	lastWriteVersion int64,
 	incomingLastWriteVersion int64,
+	logger log.Logger,
+	metricsClient metrics.Client,
 ) error {
 
 	eventBatchFirstEventID := r.GetMutableState().GetNextEventID()
@@ -269,6 +280,19 @@ func (r *workflowImpl) terminateWorkflow(
 		[]byte(fmt.Sprintf("terminated by version: %v", incomingLastWriteVersion)),
 		WorkflowTerminationIdentity,
 	)
+
+	domainName := r.mutableState.GetDomainEntry().GetInfo().Name
+
+	logger.Info(
+		"Workflow execution terminated.",
+		tag.WorkflowDomainName(domainName),
+		tag.WorkflowID(r.mutableState.GetExecutionInfo().WorkflowID),
+		tag.WorkflowRunID(r.mutableState.GetExecutionInfo().RunID),
+		tag.WorkflowTerminationReason(WorkflowTerminationReason),
+	)
+
+	scopeWithDomainTag := metricsClient.Scope(metrics.HistoryTerminateWorkflowExecutionScope).Tagged(metrics.DomainTag(domainName))
+	scopeWithDomainTag.IncCounter(metrics.WorkflowTerminateCounterPerDomain)
 
 	return err
 }

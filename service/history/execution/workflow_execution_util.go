@@ -20,7 +20,12 @@
 
 package execution
 
-import "github.com/uber/cadence/common/types"
+import (
+	"github.com/uber/cadence/common/log"
+	"github.com/uber/cadence/common/log/tag"
+	"github.com/uber/cadence/common/metrics"
+	"github.com/uber/cadence/common/types"
+)
 
 // TerminateWorkflow is a helper function to terminate workflow
 func TerminateWorkflow(
@@ -29,6 +34,8 @@ func TerminateWorkflow(
 	terminateReason string,
 	terminateDetails []byte,
 	terminateIdentity string,
+	logger log.Logger,
+	metricsClient metrics.Client,
 ) error {
 
 	if decision, ok := mutableState.GetInFlightDecision(); ok {
@@ -47,5 +54,19 @@ func TerminateWorkflow(
 		terminateDetails,
 		terminateIdentity,
 	)
+
+	domainName := mutableState.GetDomainEntry().GetInfo().Name
+
+	logger.Info(
+		"Workflow execution terminated.",
+		tag.WorkflowDomainName(domainName),
+		tag.WorkflowID(mutableState.GetExecutionInfo().WorkflowID),
+		tag.WorkflowRunID(mutableState.GetExecutionInfo().RunID),
+		tag.WorkflowTerminationReason(terminateReason),
+	)
+
+	scopeWithDomainTag := metricsClient.Scope(metrics.HistoryTerminateWorkflowExecutionScope).Tagged(metrics.DomainTag(domainName))
+	scopeWithDomainTag.IncCounter(metrics.WorkflowTerminateCounterPerDomain)
+
 	return err
 }

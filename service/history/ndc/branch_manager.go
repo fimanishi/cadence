@@ -173,6 +173,8 @@ func (r *branchManagerImpl) flushBufferedEvents(
 		r.context,
 		r.mutableState,
 		execution.NoopReleaseFn,
+		r.logger,
+		r.shard.GetMetricsClient(),
 	)
 	if err := targetWorkflow.FlushBufferedEvents(); err != nil {
 		return 0, nil, err

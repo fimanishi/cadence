@@ -572,6 +572,8 @@ Update_History_Loop:
 					common.FailureReasonTransactionSizeExceedsLimit,
 					[]byte(updateErr.Error()),
 					execution.IdentityHistoryService,
+					handler.logger,
+					handler.metricsClient,
 				); err != nil {
 					return nil, err
 				}
