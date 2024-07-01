@@ -193,7 +193,6 @@ type (
 		task replicationTask,
 		transactionManager transactionManager,
 		clusterMetadata cluster.Metadata,
-		metricsClient metrics.Client,
 	) error
 
 	applyNonStartEventsMissingMutableStateFn func(
@@ -445,8 +444,6 @@ func applyStartEvents(
 			context,
 			mutableState,
 			releaseFn,
-			logger,
-			shard.GetMetricsClient(),
 		),
 	)
 	if err != nil {
@@ -554,8 +551,6 @@ func applyNonStartEventsToCurrentBranch(
 		context,
 		mutableState,
 		releaseFn,
-		logger,
-		shard.GetMetricsClient(),
 	)
 
 	var newWorkflow execution.Workflow
@@ -578,8 +573,6 @@ func applyNonStartEventsToCurrentBranch(
 			newContext,
 			newMutableState,
 			execution.NoopReleaseFn,
-			logger,
-			shard.GetMetricsClient(),
 		)
 	}
 
@@ -630,7 +623,6 @@ func applyNonStartEventsToNoneCurrentBranch(
 		task,
 		r.transactionManager,
 		r.clusterMetadata,
-		r.metricsClient,
 	)
 }
 
@@ -643,7 +635,6 @@ func applyNonStartEventsToNoneCurrentBranchWithoutContinueAsNew(
 	task replicationTask,
 	transactionManager transactionManager,
 	clusterMetadata cluster.Metadata,
-	metricsClient metrics.Client,
 ) error {
 
 	versionHistoryItem := persistence.NewVersionHistoryItem(
@@ -671,8 +662,6 @@ func applyNonStartEventsToNoneCurrentBranchWithoutContinueAsNew(
 			context,
 			mutableState,
 			releaseFn,
-			task.getLogger(),
-			metricsClient,
 		),
 		&persistence.WorkflowEvents{
 			DomainID:    task.getDomainID(),
@@ -826,8 +815,6 @@ func applyNonStartEventsResetWorkflow(
 		context,
 		mutableState,
 		execution.NoopReleaseFn,
-		logger,
-		shard.GetMetricsClient(),
 	)
 
 	err = transactionManager.createWorkflow(

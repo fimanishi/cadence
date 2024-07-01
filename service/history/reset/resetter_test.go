@@ -31,7 +31,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/cache"
 	"github.com/uber/cadence/common/collection"
 	"github.com/uber/cadence/common/definition"
 	"github.com/uber/cadence/common/log"
@@ -362,20 +361,6 @@ func (s *workflowResetterSuite) TestTerminateWorkflow() {
 		([]byte)(nil),
 		execution.IdentityHistoryService,
 	).Return(&types.HistoryEvent{}, nil).Times(1)
-	executionInfo := &persistence.WorkflowExecutionInfo{
-		WorkflowID: s.workflowID,
-		RunID:      s.resetRunID,
-	}
-	mutableState.EXPECT().GetExecutionInfo().Return(executionInfo).Times(2)
-	domainCacheEntry := cache.NewDomainCacheEntryForTest(
-		&persistence.DomainInfo{Name: constants.TestDomainName},
-		&persistence.DomainConfig{},
-		false,
-		&persistence.DomainReplicationConfig{},
-		1,
-		common.Int64Ptr(1),
-	)
-	mutableState.EXPECT().GetDomainEntry().Return(domainCacheEntry).Times(1)
 
 	err := s.workflowResetter.terminateWorkflow(mutableState, terminateReason)
 	s.NoError(err)

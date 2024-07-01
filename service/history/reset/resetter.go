@@ -371,8 +371,6 @@ func (r *workflowResetterImpl) replayResetWorkflow(
 		resetContext,
 		resetMutableState,
 		execution.NoopReleaseFn,
-		r.logger,
-		r.shard.GetMetricsClient(),
 	), nil
 }
 
@@ -448,8 +446,6 @@ func (r *workflowResetterImpl) terminateWorkflow(
 		terminateReason,
 		nil,
 		execution.IdentityHistoryService,
-		r.logger,
-		r.shard.GetMetricsClient(),
 	)
 }
 

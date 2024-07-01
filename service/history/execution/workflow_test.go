@@ -22,7 +22,6 @@ package execution
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"runtime"
 	"testing"
@@ -31,16 +30,10 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/uber-go/tally"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/cache"
 	"github.com/uber/cadence/common/cluster"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/metrics"
 	"github.com/uber/cadence/common/persistence"
 	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/constants"
 )
 
 type (
@@ -51,9 +44,6 @@ type (
 		controller       *gomock.Controller
 		mockContext      *MockContext
 		mockMutableState *MockMutableState
-		logger           log.Logger
-		metricsClient    metrics.Client
-		testScope        tally.TestScope
 
 		domainID   string
 		workflowID string
@@ -72,9 +62,6 @@ func (s *workflowSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.mockContext = NewMockContext(s.controller)
 	s.mockMutableState = NewMockMutableState(s.controller)
-	s.logger = log.NewNoop()
-	s.testScope = tally.NewTestScope("test", nil)
-	s.metricsClient = metrics.NewClient(s.testScope, metrics.History)
 
 	s.domainID = uuid.New()
 	s.workflowID = "some random workflow ID"
@@ -102,8 +89,6 @@ func (s *workflowSuite) TestGetMethods() {
 		s.mockContext,
 		s.mockMutableState,
 		NoopReleaseFn,
-		s.logger,
-		s.metricsClient,
 	)
 
 	s.Equal(s.mockContext, nDCWorkflow.GetContext())
@@ -183,8 +168,6 @@ func (s *workflowSuite) TestSuppressWorkflowBy_Error() {
 		s.mockContext,
 		s.mockMutableState,
 		NoopReleaseFn,
-		s.logger,
-		s.metricsClient,
 	)
 
 	incomingMockContext := NewMockContext(s.controller)
@@ -195,8 +178,6 @@ func (s *workflowSuite) TestSuppressWorkflowBy_Error() {
 		incomingMockContext,
 		incomingMockMutableState,
 		NoopReleaseFn,
-		s.logger,
-		s.metricsClient,
 	)
 
 	// cannot suppress by older workflow
@@ -237,23 +218,12 @@ func (s *workflowSuite) TestSuppressWorkflowBy_Terminate() {
 		RunID:           s.runID,
 		LastEventTaskID: lastEventTaskID,
 	}).AnyTimes()
-	domainCacheEntry := cache.NewDomainCacheEntryForTest(
-		&persistence.DomainInfo{Name: constants.TestDomainName},
-		&persistence.DomainConfig{},
-		false,
-		&persistence.DomainReplicationConfig{},
-		1,
-		common.Int64Ptr(1),
-	)
-	s.mockMutableState.EXPECT().GetDomainEntry().Return(domainCacheEntry).Times(1)
 	nDCWorkflow := NewWorkflow(
 		context.Background(),
 		cluster.TestActiveClusterMetadata,
 		s.mockContext,
 		s.mockMutableState,
 		NoopReleaseFn,
-		s.logger,
-		s.metricsClient,
 	)
 
 	incomingRunID := uuid.New()
@@ -267,8 +237,6 @@ func (s *workflowSuite) TestSuppressWorkflowBy_Terminate() {
 		incomingMockContext,
 		incomingMockMutableState,
 		NoopReleaseFn,
-		s.logger,
-		s.metricsClient,
 	)
 	incomingMockMutableState.EXPECT().GetLastWriteVersion().Return(incomingLastEventVersion, nil).AnyTimes()
 	incomingMockMutableState.EXPECT().GetExecutionInfo().Return(&persistence.WorkflowExecutionInfo{
@@ -314,9 +282,6 @@ func (s *workflowSuite) TestSuppressWorkflowBy_Terminate() {
 	policy, err = nDCWorkflow.SuppressBy(incomingNDCWorkflow)
 	s.NoError(err)
 	s.Equal(TransactionPolicyActive, policy)
-	countersSnapshot := s.testScope.Snapshot().Counters()
-	s.Contains(countersSnapshot, fmt.Sprintf("test.workflow_terminate_counter_per_domain+domain=%v,operation=TerminateWorkflowExecution", constants.TestDomainName))
-	s.Equal(int64(1), countersSnapshot[fmt.Sprintf("test.workflow_terminate_counter_per_domain+domain=%v,operation=TerminateWorkflowExecution", constants.TestDomainName)].Value())
 }
 
 func (s *workflowSuite) TestSuppressWorkflowBy_Zombiefy() {
@@ -338,8 +303,6 @@ func (s *workflowSuite) TestSuppressWorkflowBy_Zombiefy() {
 		s.mockContext,
 		s.mockMutableState,
 		NoopReleaseFn,
-		s.logger,
-		s.metricsClient,
 	)
 
 	incomingRunID := uuid.New()
@@ -353,8 +316,6 @@ func (s *workflowSuite) TestSuppressWorkflowBy_Zombiefy() {
 		incomingMockContext,
 		incomingMockMutableState,
 		NoopReleaseFn,
-		s.logger,
-		s.metricsClient,
 	)
 	incomingMockMutableState.EXPECT().GetLastWriteVersion().Return(incomingLastEventVersion, nil).AnyTimes()
 	incomingMockMutableState.EXPECT().GetExecutionInfo().Return(&persistence.WorkflowExecutionInfo{
@@ -389,8 +350,6 @@ func (s *workflowSuite) TestRevive_Zombie_Error() {
 		s.mockContext,
 		s.mockMutableState,
 		NoopReleaseFn,
-		s.logger,
-		s.metricsClient,
 	)
 	err := nDCWorkflow.Revive()
 	s.Error(err)
@@ -407,8 +366,6 @@ func (s *workflowSuite) TestRevive_Zombie_Success() {
 		s.mockContext,
 		s.mockMutableState,
 		NoopReleaseFn,
-		s.logger,
-		s.metricsClient,
 	)
 	err := nDCWorkflow.Revive()
 	s.NoError(err)
@@ -423,8 +380,6 @@ func (s *workflowSuite) TestRevive_NonZombie_Success() {
 		s.mockContext,
 		s.mockMutableState,
 		NoopReleaseFn,
-		s.logger,
-		s.metricsClient,
 	)
 	err := nDCWorkflow.Revive()
 	s.NoError(err)
@@ -455,8 +410,6 @@ func (s *workflowSuite) TestFlushBufferedEvents_Success() {
 		s.mockContext,
 		s.mockMutableState,
 		NoopReleaseFn,
-		s.logger,
-		s.metricsClient,
 	)
 	err := nDCWorkflow.FlushBufferedEvents()
 	s.NoError(err)
@@ -472,8 +425,6 @@ func (s *workflowSuite) TestFlushBufferedEvents_NoBuffer_Success() {
 		s.mockContext,
 		s.mockMutableState,
 		NoopReleaseFn,
-		s.logger,
-		s.metricsClient,
 	)
 	err := nDCWorkflow.FlushBufferedEvents()
 	s.NoError(err)
@@ -496,8 +447,6 @@ func (s *workflowSuite) TestFlushBufferedEvents_NoDecision_Success() {
 		s.mockContext,
 		s.mockMutableState,
 		NoopReleaseFn,
-		s.logger,
-		s.metricsClient,
 	)
 	err := nDCWorkflow.FlushBufferedEvents()
 	s.NoError(err)

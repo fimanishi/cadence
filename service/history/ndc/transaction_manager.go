@@ -467,7 +467,7 @@ func (r *transactionManagerImpl) loadNDCWorkflow(
 		release(err)
 		return nil, err
 	}
-	return execution.NewWorkflow(ctx, r.clusterMetadata, context, msBuilder, release, r.logger, r.metricsClient), nil
+	return execution.NewWorkflow(ctx, r.clusterMetadata, context, msBuilder, release), nil
 }
 
 func (r *transactionManagerImpl) isWorkflowCurrent(

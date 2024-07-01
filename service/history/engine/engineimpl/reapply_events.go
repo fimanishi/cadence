@@ -140,8 +140,6 @@ func (e *historyEngineImpl) ReapplyEvents(
 						wfContext,
 						mutableState,
 						execution.NoopReleaseFn,
-						e.logger,
-						e.metricsClient,
 					),
 					ndc.EventsReapplicationResetWorkflowReason,
 					toReapplyEvents,

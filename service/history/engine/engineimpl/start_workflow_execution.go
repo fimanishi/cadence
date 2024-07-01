@@ -614,8 +614,6 @@ UpdateWorkflowLoop:
 			TerminateIfRunningReason,
 			getTerminateIfRunningDetails(workflowExecution.GetRunID()),
 			execution.IdentityHistoryService,
-			e.logger,
-			e.metricsClient,
 		); err != nil {
 			if err == workflow.ErrStaleState {
 				// Handler detected that cached workflow mutable could potentially be stale

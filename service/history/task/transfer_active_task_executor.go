@@ -1227,7 +1227,6 @@ func (t *transferActiveTaskExecutor) processResetWorkflow(
 		currentContext,
 		currentMutableState,
 		logger,
-		t.metricsClient,
 	)
 }
 
@@ -1837,7 +1836,6 @@ func (t *transferActiveTaskExecutor) resetWorkflow(
 	currentContext execution.Context,
 	currentMutableState execution.MutableState,
 	logger log.Logger,
-	metricsClient metrics.Client,
 ) error {
 
 	var err error
@@ -1881,8 +1879,6 @@ func (t *transferActiveTaskExecutor) resetWorkflow(
 			currentContext,
 			currentMutableState,
 			execution.NoopReleaseFn, // this is fine since caller will defer on release
-			logger,
-			metricsClient,
 		),
 		reason,
 		nil,

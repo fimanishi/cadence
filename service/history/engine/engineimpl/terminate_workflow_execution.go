@@ -97,8 +97,6 @@ func (e *historyEngineImpl) TerminateWorkflowExecution(
 				request.GetReason(),
 				request.GetDetails(),
 				request.GetIdentity(),
-				e.logger,
-				e.metricsClient,
 			)
 		})
 }
