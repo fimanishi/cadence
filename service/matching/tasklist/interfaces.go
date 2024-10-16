@@ -21,6 +21,8 @@
 // SOFTWARE.
 
 //go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interfaces_mock.go github.com/uber/cadence/service/matching/tasklist Manager
+//go:generate mockgen -source $GOFILE -destination task_completer_mock.go -package tasklist github.com/uber/cadence/service/matching/tasklist TaskCompleter
+
 package tasklist
 
 import (
@@ -56,5 +58,10 @@ type (
 		String() string
 		GetTaskListKind() types.TaskListKind
 		TaskListID() *Identifier
+	}
+
+	TaskCompleter interface {
+		completeTaskIfStarted(ctx context.Context, task *InternalTask) error
+		isTaskStarted(task *InternalTask, workflowExecutionResponse *types.DescribeWorkflowExecutionResponse) (bool, error)
 	}
 )

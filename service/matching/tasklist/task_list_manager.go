@@ -33,6 +33,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/uber/cadence/client/history"
 	"github.com/uber/cadence/client/matching"
 	"github.com/uber/cadence/common"
 	"github.com/uber/cadence/common/backoff"
@@ -119,8 +120,9 @@ type (
 		startWG              sync.WaitGroup // ensures that background processes do not start until setup is ready
 		stopped              int32
 		closeCallback        func(Manager)
-
-		qpsTracker stats.QPSTracker
+		qpsTracker           stats.QPSTracker
+		historyService       history.Client
+		taskCompleter        TaskCompleter
 	}
 )
 
@@ -145,6 +147,7 @@ func NewManager(
 	config *config.Config,
 	timeSource clock.TimeSource,
 	createTime time.Time,
+	historyService history.Client,
 ) (Manager, error) {
 	domainName, err := domainCache.GetDomainName(taskList.GetDomainID())
 	if err != nil {
@@ -180,6 +183,7 @@ func NewManager(
 		scope:               scope,
 		timeSource:          timeSource,
 		closeCallback:       closeCallback,
+		historyService:      historyService,
 	}
 
 	tlMgr.pollerHistory = poller.NewPollerHistory(func() {
@@ -204,6 +208,7 @@ func NewManager(
 	tlMgr.matcher = newTaskMatcher(taskListConfig, fwdr, tlMgr.scope, isolationGroups, tlMgr.logger, taskList, *taskListKind)
 	tlMgr.taskWriter = newTaskWriter(tlMgr)
 	tlMgr.taskReader = newTaskReader(tlMgr, isolationGroups)
+	tlMgr.taskCompleter = newTaskCompleter(tlMgr, historyServiceOperationRetryPolicy)
 	tlMgr.startWG.Add(1)
 	return tlMgr, nil
 }
@@ -219,22 +224,19 @@ func (c *taskListManagerImpl) Start() error {
 		return err
 	}
 	c.taskReader.Start()
-	c.qpsTracker.Start()
 
 	return nil
 }
 
-// Stop stops task list manager and calls Stop on all background child objects
+// Stops pump that fills up taskBuffer from persistence.
 func (c *taskListManagerImpl) Stop() {
 	if !atomic.CompareAndSwapInt32(&c.stopped, 0, 1) {
 		return
 	}
 	c.closeCallback(c)
-	c.qpsTracker.Stop()
 	c.liveness.Stop()
 	c.taskWriter.Stop()
 	c.taskReader.Stop()
-	c.matcher.DisconnectBlockedPollers()
 	c.logger.Info("Task list manager state changed", tag.LifeCycleStopped)
 }
 
@@ -266,8 +268,6 @@ func (c *taskListManagerImpl) AddTask(ctx context.Context, params AddTaskParams)
 	if params.ForwardedFrom == "" {
 		// request sent by history service
 		c.liveness.MarkAlive()
-		c.qpsTracker.ReportCounter(1)
-		c.scope.UpdateGauge(metrics.EstimatedAddTaskQPSGauge, c.qpsTracker.QPS())
 	}
 	var syncMatch bool
 	e := event.E{
@@ -338,6 +338,20 @@ func (c *taskListManagerImpl) AddTask(ctx context.Context, params AddTaskParams)
 // up the task or if rate limit is exceeded, this method will return error. Task
 // *will not* be persisted to db
 func (c *taskListManagerImpl) DispatchTask(ctx context.Context, task *InternalTask) error {
+	// optional configuration to enable clean up of standby tasks that have already been started
+	if c.config.EnableStandByTaskCompletion() {
+		// add a timer to measure latency in case the task is in the active side
+
+		if err := c.taskCompleter.completeTaskIfStarted(ctx, task); err != nil {
+			if errors.Is(err, errDomainIsActive) {
+				return c.matcher.MustOffer(ctx, task)
+			}
+			return err
+		}
+
+		return nil
+	}
+
 	return c.matcher.MustOffer(ctx, task)
 }
 
@@ -797,6 +811,9 @@ func newTaskListConfig(id *Identifier, cfg *config.Config, domainName string) *c
 		TaskDispatchRPS:           cfg.TaskDispatchRPS,
 		TaskDispatchRPSTTL:        cfg.TaskDispatchRPSTTL,
 		MaxTimeBetweenTaskDeletes: cfg.MaxTimeBetweenTaskDeletes,
+		EnableStandByTaskCompletion: func() bool {
+			return cfg.EnableStandByTaskCompletion(domainName, taskListName, taskType)
+		},
 	}
 }
 

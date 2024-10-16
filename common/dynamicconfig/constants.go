@@ -1643,6 +1643,12 @@ const (
 	// Value type: Bool
 	// Default value: false
 	MatchingEnableTasklistGuardAgainstOwnershipShardLoss
+	// MatchingEnableStandbyTaskCompletion is to enable completion of tasks in the domain's passive side
+	// KeyName: matching.enableStandbyTaskCompletion
+	// Value type: Bool
+	// Default value: false
+	// Allowed filters: DomainName,TasklistName,TasklistType
+	MatchingEnableStandbyTaskCompletion
 
 	// key for history
 
@@ -3998,6 +4004,12 @@ var BoolKeys = map[BoolKey]DynamicBool{
 	MatchingEnableTasklistGuardAgainstOwnershipShardLoss: {
 		KeyName:      "matching.enableTasklistGuardAgainstOwnershipLoss",
 		Description:  "allows guards to ensure that tasklists don't continue processing if there's signal that they've lost ownership",
+		DefaultValue: false,
+	},
+	MatchingEnableStandbyTaskCompletion: {
+		KeyName:      "matching.enableStandbyTaskCompletion",
+		Filters:      []Filter{DomainName, TaskListName, TaskType},
+		Description:  "MatchingEnableStandbyTaskCompletion is to enable completion of tasks in the domain's passive side",
 		DefaultValue: false,
 	},
 	EventsCacheGlobalEnable: {

@@ -23,6 +23,7 @@ package tasklist
 import (
 	"context"
 	"errors"
+	"github.com/uber/cadence/service/history/constants"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -34,6 +35,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/uber-go/tally"
 
+	"github.com/uber/cadence/client/history"
 	"github.com/uber/cadence/common"
 	"github.com/uber/cadence/common/cache"
 	"github.com/uber/cadence/common/clock"
@@ -173,6 +175,7 @@ func createTestTaskListManagerWithConfig(t *testing.T, logger log.Logger, contro
 	mockDomainCache := cache.NewMockDomainCache(controller)
 	mockDomainCache.EXPECT().GetDomainByID(gomock.Any()).Return(cache.CreateDomainCacheEntry("domainName"), nil).AnyTimes()
 	mockDomainCache.EXPECT().GetDomainName(gomock.Any()).Return("domainName", nil).AnyTimes()
+	mockHistoryService := history.NewMockClient(controller)
 	tl := "tl"
 	dID := "domain"
 	tlID, err := NewIdentifier(dID, tl, persistence.TaskListTypeActivity)
@@ -180,7 +183,7 @@ func createTestTaskListManagerWithConfig(t *testing.T, logger log.Logger, contro
 		panic(err)
 	}
 	tlKind := types.TaskListKindNormal
-	tlMgr, err := NewManager(mockDomainCache, logger, metrics.NewClient(tally.NoopScope, metrics.Matching), tm, cluster.GetTestClusterMetadata(true), mockPartitioner, nil, func(Manager) {}, tlID, &tlKind, cfg, clock.NewRealTimeSource(), time.Now())
+	tlMgr, err := NewManager(mockDomainCache, logger, metrics.NewClient(tally.NoopScope, metrics.Matching), tm, cluster.GetTestClusterMetadata(true), mockPartitioner, nil, func(Manager) {}, tlID, &tlKind, cfg, clock.NewRealTimeSource(), time.Now(), mockHistoryService)
 	if err != nil {
 		logger.Fatal("error when createTestTaskListManager", tag.Error(err))
 	}
@@ -562,6 +565,7 @@ func TestTaskListManagerGetTaskBatch(t *testing.T) {
 	mockDomainCache := cache.NewMockDomainCache(controller)
 	mockDomainCache.EXPECT().GetDomainByID(gomock.Any()).Return(cache.CreateDomainCacheEntry("domainName"), nil).AnyTimes()
 	mockDomainCache.EXPECT().GetDomainName(gomock.Any()).Return("domainName", nil).AnyTimes()
+	mockHistoryService := history.NewMockClient(controller)
 	logger := testlogger.New(t)
 	timeSource := clock.NewRealTimeSource()
 	tm := NewTestTaskManager(t, logger, timeSource)
@@ -582,6 +586,7 @@ func TestTaskListManagerGetTaskBatch(t *testing.T) {
 		cfg,
 		timeSource,
 		timeSource.Now(),
+		mockHistoryService,
 	)
 	assert.NoError(t, err)
 	tlm := tlMgr.(*taskListManagerImpl)
@@ -652,6 +657,7 @@ func TestTaskListManagerGetTaskBatch(t *testing.T) {
 		cfg,
 		timeSource,
 		timeSource.Now(),
+		mockHistoryService,
 	)
 	assert.NoError(t, err)
 	tlm = tlMgr.(*taskListManagerImpl)
@@ -685,6 +691,7 @@ func TestTaskListReaderPumpAdvancesAckLevelAfterEmptyReads(t *testing.T) {
 	mockDomainCache := cache.NewMockDomainCache(controller)
 	mockDomainCache.EXPECT().GetDomainByID(gomock.Any()).Return(cache.CreateDomainCacheEntry("domainName"), nil).AnyTimes()
 	mockDomainCache.EXPECT().GetDomainName(gomock.Any()).Return("domainName", nil).AnyTimes()
+	mockHistoryService := history.NewMockClient(controller)
 
 	logger := testlogger.New(t)
 	timeSource := clock.NewRealTimeSource()
@@ -707,6 +714,7 @@ func TestTaskListReaderPumpAdvancesAckLevelAfterEmptyReads(t *testing.T) {
 		cfg,
 		timeSource,
 		timeSource.Now(),
+		mockHistoryService,
 	)
 	require.NoError(t, err)
 	tlm := tlMgr.(*taskListManagerImpl)
@@ -817,6 +825,7 @@ func TestTaskExpiryAndCompletion(t *testing.T) {
 			mockDomainCache := cache.NewMockDomainCache(controller)
 			mockDomainCache.EXPECT().GetDomainByID(gomock.Any()).Return(cache.CreateDomainCacheEntry("domainName"), nil).AnyTimes()
 			mockDomainCache.EXPECT().GetDomainName(gomock.Any()).Return("domainName", nil).AnyTimes()
+			mockHistoryService := history.NewMockClient(controller)
 			logger := testlogger.New(t)
 			timeSource := clock.NewRealTimeSource()
 			tm := NewTestTaskManager(t, logger, timeSource)
@@ -842,6 +851,7 @@ func TestTaskExpiryAndCompletion(t *testing.T) {
 				cfg,
 				timeSource,
 				timeSource.Now(),
+				mockHistoryService,
 			)
 			assert.NoError(t, err)
 			tlm := tlMgr.(*taskListManagerImpl)
@@ -927,4 +937,28 @@ func TestTaskListManagerImpl_HasPollerAfter(t *testing.T) {
 
 func getIsolationgroupsHelper() []string {
 	return []string{"datacenterA", "datacenterB"}
+}
+
+func TestDispatchTask(t *testing.T) {
+	controller := gomock.NewController(t)
+	logger := testlogger.New(t)
+
+	tlm := createTestTaskListManager(t, logger, controller)
+
+	task := &InternalTask{
+		Event: &genericTaskInfo{
+			TaskInfo: &persistence.TaskInfo{
+				DomainID:   constants.TestDomainID,
+				WorkflowID: constants.TestWorkflowID,
+				RunID:      constants.TestRunID,
+			},
+		},
+	}
+
+	taskCompleterMock := NewMockTaskCompleter(controller)
+	tlm.taskCompleter = taskCompleterMock
+
+	err := tlm.DispatchTask(context.Background(), task)
+
+	assert.NoError(t, err)
 }
