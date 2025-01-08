@@ -154,7 +154,7 @@ func (tc *taskCompleterImpl) CompleteTaskIfStarted(ctx context.Context, task *In
 
 	err := tc.throttleRetry.Do(ctx, op)
 
-	if !errors.Is(err, errDomainIsActive) && !errors.Is(err, errTaskNotStarted) {
+	if err != nil && !errors.Is(err, errDomainIsActive) && !errors.Is(err, errTaskNotStarted) {
 		tc.scope.IncCounter(metrics.StandbyClusterTasksCompletionFailurePerTaskList)
 		tc.logger.Error("Error completing task on domain's standby cluster", tag.Error(err))
 	}
