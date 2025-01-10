@@ -170,15 +170,15 @@ func (tc *taskCompleterImpl) isTaskStarted(task *InternalTask, workflowExecution
 	// taskType can only be Activity or Decision, leaving the default case for future proofing
 	switch tc.taskListID.taskType {
 	case persistence.TaskListTypeActivity:
-		return isActivityTaskStarted(task, workflowExecutionResponse), nil
+		return isActivityTaskStarted(task, workflowExecutionResponse, tc.logger), nil
 	case persistence.TaskListTypeDecision:
-		return isDecisionTaskStarted(task, workflowExecutionResponse), nil
+		return isDecisionTaskStarted(task, workflowExecutionResponse, tc.logger), nil
 	default:
 		return false, errTaskTypeNotSupported
 	}
 }
 
-func isDecisionTaskStarted(task *InternalTask, workflowExecutionResponse *types.DescribeWorkflowExecutionResponse) bool {
+func isDecisionTaskStarted(task *InternalTask, workflowExecutionResponse *types.DescribeWorkflowExecutionResponse, logger log.Logger) bool {
 	// if there is no pending decision task, that means that this task has been already started
 	if workflowExecutionResponse.PendingDecision == nil {
 		return true
@@ -189,16 +189,25 @@ func isDecisionTaskStarted(task *InternalTask, workflowExecutionResponse *types.
 		return true
 	}
 
+	logger.Debug(fmt.Sprintf("Decision task not started. TaskID: %v, ScheduleID: %v, PendingDecisionScheduleID: %v, PendingDecisionState: %v",
+		task.Event.TaskID, task.Event.ScheduleID, workflowExecutionResponse.PendingDecision.ScheduleID, *workflowExecutionResponse.PendingDecision.State),
+		tag.WorkflowID(task.Event.WorkflowID), tag.WorkflowRunID(task.Event.RunID))
+
 	return false
 }
 
-func isActivityTaskStarted(task *InternalTask, workflowExecutionResponse *types.DescribeWorkflowExecutionResponse) bool {
+func isActivityTaskStarted(task *InternalTask, workflowExecutionResponse *types.DescribeWorkflowExecutionResponse, logger log.Logger) bool {
 	// if the scheduleID is different from all pending tasks' scheduleID or the pending activity has PendingActivityStateStarted, then the activity task with the task's scheduleID has already been started
 	for _, pendingActivity := range workflowExecutionResponse.PendingActivities {
 		if task.Event.ScheduleID == pendingActivity.ScheduleID {
 			if *pendingActivity.State == types.PendingActivityStateStarted {
 				return true
 			}
+
+			logger.Debug(fmt.Sprintf("Activity task not started. TaskID: %v, ScheduleID: %v, PendingActivityState: %v",
+				task.Event.TaskID, task.Event.ScheduleID, *pendingActivity.State),
+				tag.WorkflowID(task.Event.WorkflowID), tag.WorkflowRunID(task.Event.RunID))
+
 			return false
 		}
 	}
