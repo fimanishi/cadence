@@ -189,9 +189,14 @@ func isDecisionTaskStarted(task *InternalTask, workflowExecutionResponse *types.
 		return true
 	}
 
-	logger.Debug(fmt.Sprintf("Decision task not started. TaskID: %v, ScheduleID: %v, PendingDecisionScheduleID: %v, PendingDecisionState: %v",
-		task.Event.TaskID, task.Event.ScheduleID, workflowExecutionResponse.PendingDecision.ScheduleID, *workflowExecutionResponse.PendingDecision.State),
-		tag.WorkflowID(task.Event.WorkflowID), tag.WorkflowRunID(task.Event.RunID))
+	logger.Debug("Decision task not started.",
+		tag.WorkflowID(task.Event.WorkflowID),
+		tag.WorkflowRunID(task.Event.RunID),
+		tag.MatchingTaskID(task.Event.TaskID),
+		tag.MatchingTaskScheduleID(task.Event.ScheduleID),
+		tag.WorkflowScheduleID(workflowExecutionResponse.PendingDecision.ScheduleID),
+		tag.DecisionTaskState(int32(*workflowExecutionResponse.PendingDecision.State)),
+	)
 
 	return false
 }
@@ -204,9 +209,14 @@ func isActivityTaskStarted(task *InternalTask, workflowExecutionResponse *types.
 				return true
 			}
 
-			logger.Debug(fmt.Sprintf("Activity task not started. TaskID: %v, ScheduleID: %v, PendingActivityState: %v",
-				task.Event.TaskID, task.Event.ScheduleID, *pendingActivity.State),
-				tag.WorkflowID(task.Event.WorkflowID), tag.WorkflowRunID(task.Event.RunID))
+			logger.Debug("Activity task not started.",
+				tag.WorkflowID(task.Event.WorkflowID),
+				tag.WorkflowRunID(task.Event.RunID),
+				tag.MatchingTaskID(task.Event.TaskID),
+				tag.MatchingTaskScheduleID(task.Event.ScheduleID),
+				tag.WorkflowScheduleID(pendingActivity.ScheduleID),
+				tag.ActivityTaskState(int32(*pendingActivity.State)),
+			)
 
 			return false
 		}
