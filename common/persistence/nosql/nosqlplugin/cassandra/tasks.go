@@ -444,7 +444,7 @@ PopulateTasks:
 		}
 
 		// Extract the TTL value
-		ttlValue, ttlExists := task["task"].(map[string]interface{})["ttl"]
+		ttlValue, ttlExists := task["ttl"]
 
 		// Check if TTL is null or an integer
 		var ttl *int
