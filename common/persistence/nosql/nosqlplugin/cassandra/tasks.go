@@ -419,7 +419,7 @@ func (db *cdb) GetTasksCount(ctx context.Context, filter *nosqlplugin.TasksFilte
 
 // SelectTasks return tasks that associated to a tasklist
 func (db *cdb) SelectTasks(ctx context.Context, filter *nosqlplugin.TasksFilter) ([]*nosqlplugin.TaskRow, error) {
-	// Reading tasklist tasks need to be quorum level consistent, otherwise we could loose task
+	// Reading tasklist tasks need to be quorum level consistent, otherwise we could lose tasks
 	query := db.session.Query(templateGetTasksQuery,
 		filter.DomainID,
 		filter.TaskListName,
@@ -442,8 +442,25 @@ PopulateTasks:
 		if !ok { // no tasks, but static column record returned
 			continue
 		}
+
+		// Extract the TTL value
+		ttlValue, ttlExists := task["task"].(map[string]interface{})["ttl"]
+
+		// Check if TTL is null or an integer
+		var ttl *int
+		if ttlExists && ttlValue != nil {
+			if ttlInt, ok := ttlValue.(int); ok {
+				ttl = &ttlInt // TTL is an integer
+			}
+		}
+
 		t := createTaskInfo(task["task"].(map[string]interface{}))
 		t.TaskID = taskID.(int64)
+
+		if ttl != nil {
+			t.Expiry = db.timeSrc.Now().Add(time.Duration(*ttl) * time.Second)
+		}
+
 		response = append(response, t)
 		if len(response) == filter.BatchSize {
 			break PopulateTasks
