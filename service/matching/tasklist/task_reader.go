@@ -372,36 +372,20 @@ func (tr *taskReader) completeTask(task *persistence.TaskInfo, err error) {
 		// again the underlying reason for failing to start will be resolved.
 		// Note that RecordTaskStarted only fails after retrying for a long time, so a single task will not be
 		// re-written to persistence frequently.
-
-		reAddTask := true
-
-		if !task.Expiry.IsZero() {
-			scheduleToStartTimeoutSeconds := int32(task.Expiry.Sub(tr.timeSource.Now()).Seconds())
-
-			if scheduleToStartTimeoutSeconds > 0 {
-				task.ScheduleToStartTimeoutSeconds = scheduleToStartTimeoutSeconds
-			} else {
-				reAddTask = false
-			}
+		op := func() error {
+			_, err := tr.taskWriter.appendTask(task)
+			return err
 		}
-
-		// we don't add the task to persistence if it's already expired
-		if reAddTask {
-			op := func() error {
-				_, err := tr.taskWriter.appendTask(task)
-				return err
-			}
-			err = tr.throttleRetry.Do(context.Background(), op)
-			if err != nil {
-				// OK, we also failed to write to persistence.
-				// This should only happen in very extreme cases where persistence is completely down.
-				// We still can't lose the old task so we just unload the entire task list
-				tr.logger.Error("Failed to complete task", tag.Error(err))
-				tr.onFatalErr()
-				return
-			}
-			tr.Signal()
+		err = tr.throttleRetry.Do(context.Background(), op)
+		if err != nil {
+			// OK, we also failed to write to persistence.
+			// This should only happen in very extreme cases where persistence is completely down.
+			// We still can't lose the old task so we just unload the entire task list
+			tr.logger.Error("Failed to complete task", tag.Error(err))
+			tr.onFatalErr()
+			return
 		}
+		tr.Signal()
 	}
 	ackLevel := tr.taskAckManager.AckItem(task.TaskID)
 	tr.taskGC.Run(ackLevel)
