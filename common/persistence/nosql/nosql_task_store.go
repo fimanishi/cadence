@@ -303,7 +303,7 @@ func (t *nosqlTaskStore) CreateTasks(
 
 		var ttl int
 		if !t.Data.Expiry.IsZero() {
-			scheduleToStartTimeoutSeconds := int(task.Expiry.Sub(now).Seconds())
+			scheduleToStartTimeoutSeconds := int(t.Data.Expiry.Sub(now).Seconds())
 
 			if scheduleToStartTimeoutSeconds > 0 {
 				ttl = scheduleToStartTimeoutSeconds
