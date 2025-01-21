@@ -302,6 +302,8 @@ func (t *nosqlTaskStore) CreateTasks(
 		}
 
 		var ttl int
+		// If the Data has a non-zero Expiry value, means that the ask is being re-added to the tasks table.
+		// If that's the case, use the Expiry value to calculate the new TTL value to match history's timeout value.
 		if !t.Data.Expiry.IsZero() {
 			scheduleToStartTimeoutSeconds := int(t.Data.Expiry.Sub(now).Seconds())
 
