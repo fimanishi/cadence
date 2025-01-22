@@ -24,6 +24,7 @@ package nosql
 import (
 	"context"
 	"fmt"
+	"github.com/uber/cadence/common/log/tag"
 	"math"
 	"time"
 
@@ -288,32 +289,34 @@ func (t *nosqlTaskStore) CreateTasks(
 ) (*persistence.CreateTasksResponse, error) {
 	now := time.Now()
 	var tasks []*nosqlplugin.TaskRowForInsert
-	for _, t := range request.Tasks {
+	for _, taskRequest := range request.Tasks {
 		task := &nosqlplugin.TaskRow{
 			DomainID:        request.TaskListInfo.DomainID,
 			TaskListName:    request.TaskListInfo.Name,
 			TaskListType:    request.TaskListInfo.TaskType,
-			TaskID:          t.TaskID,
-			WorkflowID:      t.Data.WorkflowID,
-			RunID:           t.Data.RunID,
-			ScheduledID:     t.Data.ScheduleID,
+			TaskID:          taskRequest.TaskID,
+			WorkflowID:      taskRequest.Data.WorkflowID,
+			RunID:           taskRequest.Data.RunID,
+			ScheduledID:     taskRequest.Data.ScheduleID,
 			CreatedTime:     now,
-			PartitionConfig: t.Data.PartitionConfig,
+			PartitionConfig: taskRequest.Data.PartitionConfig,
 		}
 
 		var ttl int
 		// If the Data has a non-zero Expiry value, means that the ask is being re-added to the tasks table.
 		// If that's the case, use the Expiry value to calculate the new TTL value to match history's timeout value.
-		if !t.Data.Expiry.IsZero() {
-			scheduleToStartTimeoutSeconds := int(t.Data.Expiry.Sub(now).Seconds())
+		if !taskRequest.Data.Expiry.IsZero() {
+			scheduleToStartTimeoutSeconds := int(taskRequest.Data.Expiry.Sub(now).Seconds())
 
 			if scheduleToStartTimeoutSeconds > 0 {
 				ttl = scheduleToStartTimeoutSeconds
 			} else {
+				logger := t.GetLogger()
+				logger.Warn("Async task not created. Task is expired", tag.WorkflowID(taskRequest.Data.WorkflowID), tag.WorkflowRunID(taskRequest.Data.RunID), tag.WorkflowScheduleID(taskRequest.Data.ScheduleID))
 				continue
 			}
 		} else {
-			ttl = int(t.Data.ScheduleToStartTimeoutSeconds)
+			ttl = int(taskRequest.Data.ScheduleToStartTimeoutSeconds)
 		}
 
 		tasks = append(tasks, &nosqlplugin.TaskRowForInsert{
