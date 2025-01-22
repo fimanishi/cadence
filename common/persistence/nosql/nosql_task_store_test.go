@@ -73,6 +73,7 @@ func setupNoSQLStoreMocks(t *testing.T) (*nosqlTaskStore, *nosqlplugin.MockDB) {
 			TestTaskType).
 		Return(&nosqlSt, nil).
 		AnyTimes()
+	shardedNosqlStoreMock.EXPECT().GetLogger().Return(log.NewNoop()).AnyTimes()
 
 	store := &nosqlTaskStore{
 		shardedNosqlStore: shardedNosqlStoreMock,
