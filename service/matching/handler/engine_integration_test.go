@@ -264,6 +264,7 @@ func (s *matchingEngineSuite) PollForDecisionTasksResultTest() {
 	stickyTaskList.Kind = &stickyTlKind
 
 	s.matchingEngine.config.RangeSize = 2 // to test that range is not updated without tasks
+	s.matchingEngine.config.ReadRangeSize = dynamicconfig.GetIntPropertyFn(2)
 	s.matchingEngine.config.LongPollExpirationInterval = dynamicconfig.GetDurationPropertyFnFilteredByTaskListInfo(10 * time.Millisecond)
 
 	runID := "run1"
@@ -344,6 +345,7 @@ func (s *matchingEngineSuite) PollForDecisionTasksResultTest() {
 
 func (s *matchingEngineSuite) PollForTasksEmptyResultTest(callContext context.Context, taskType int) {
 	s.matchingEngine.config.RangeSize = 2 // to test that range is not updated without tasks
+	s.matchingEngine.config.ReadRangeSize = dynamicconfig.GetIntPropertyFn(2)
 	if _, ok := callContext.Deadline(); !ok {
 		s.matchingEngine.config.LongPollExpirationInterval = dynamicconfig.GetDurationPropertyFnFilteredByTaskListInfo(10 * time.Millisecond)
 	}
@@ -415,6 +417,7 @@ func (s *matchingEngineSuite) TestQueryWorkflow() {
 	stickyTaskList.Kind = &stickyTlKind
 
 	s.matchingEngine.config.RangeSize = 2 // to test that range is not updated without tasks
+	s.matchingEngine.config.ReadRangeSize = dynamicconfig.GetIntPropertyFn(2)
 
 	runID := "run1"
 	workflowID := "workflow1"
@@ -510,6 +513,7 @@ func (s *matchingEngineSuite) TestAddDecisionTasksForwarded() {
 
 func (s *matchingEngineSuite) AddTasksTest(taskType int, isForwarded bool) {
 	s.matchingEngine.config.RangeSize = 300 // override to low number for the test
+	s.matchingEngine.config.ReadRangeSize = dynamicconfig.GetIntPropertyFn(300)
 
 	domainID := "domainId"
 	tl := "makeToast"
@@ -584,6 +588,7 @@ func (s *matchingEngineSuite) AddAndPollTasks(taskType int, enableIsolation bool
 	testParam := newTestParam(s.T(), taskType)
 	s.taskManager.SetRangeID(testParam.TaskListID, initialRangeID)
 	s.matchingEngine.config.RangeSize = rangeSize // override to low number for the test
+	s.matchingEngine.config.ReadRangeSize = dynamicconfig.GetIntPropertyFn(rangeSize)
 
 	s.setupGetDrainStatus()
 
@@ -661,6 +666,7 @@ func (s *matchingEngineSuite) SyncMatchTasks(taskType int, enableIsolation bool)
 	// Set a short long poll expiration so we don't have to wait too long for 0 throttling cases
 	s.matchingEngine.config.LongPollExpirationInterval = dynamicconfig.GetDurationPropertyFnFilteredByTaskListInfo(200 * time.Millisecond)
 	s.matchingEngine.config.RangeSize = rangeSize // override to low number for the test
+	s.matchingEngine.config.ReadRangeSize = dynamicconfig.GetIntPropertyFn(rangeSize)
 	s.matchingEngine.config.TaskDispatchRPSTTL = time.Nanosecond
 	s.matchingEngine.config.MinTaskThrottlingBurstSize = dynamicconfig.GetIntPropertyFilteredByTaskListInfo(_minBurst)
 	// So we can get snapshots
@@ -831,6 +837,7 @@ func (s *matchingEngineSuite) ConcurrentAddAndPollTasks(taskType int, workerCoun
 	testParam := newTestParam(s.T(), taskType)
 	tlKind := types.TaskListKindNormal
 	s.matchingEngine.config.RangeSize = rangeSize // override to low number for the test
+	s.matchingEngine.config.ReadRangeSize = dynamicconfig.GetIntPropertyFn(rangeSize)
 	s.matchingEngine.config.TaskDispatchRPSTTL = time.Nanosecond
 	s.matchingEngine.config.MinTaskThrottlingBurstSize = dynamicconfig.GetIntPropertyFilteredByTaskListInfo(_minBurst)
 	s.taskManager.SetRangeID(testParam.TaskListID, initialRangeID)
@@ -980,9 +987,11 @@ func (s *matchingEngineSuite) MultipleEnginesTasksRangeStealing(taskType int) {
 	testParam := newTestParam(s.T(), taskType)
 	s.taskManager.SetRangeID(testParam.TaskListID, initialRangeID)
 	s.matchingEngine.config.RangeSize = rangeSize // override to low number for the test
+	s.matchingEngine.config.ReadRangeSize = dynamicconfig.GetIntPropertyFn(rangeSize)
 
 	engine1 := s.newMatchingEngine(defaultTestConfig(), s.taskManager)
 	engine1.config.RangeSize = rangeSize
+	engine1.config.ReadRangeSize = dynamicconfig.GetIntPropertyFn(rangeSize)
 	engine1.Start()
 	defer engine1.Stop()
 
@@ -1005,6 +1014,7 @@ func (s *matchingEngineSuite) MultipleEnginesTasksRangeStealing(taskType int) {
 
 	engine2 := s.newMatchingEngine(defaultTestConfig(), s.taskManager)
 	engine2.config.RangeSize = rangeSize
+	engine2.config.ReadRangeSize = dynamicconfig.GetIntPropertyFn(rangeSize)
 	engine2.Start()
 	defer engine2.Stop()
 
@@ -1115,6 +1125,7 @@ func (s *matchingEngineSuite) UnloadTasklistOnIsolationConfigChange(taskType int
 	testParam := newTestParam(s.T(), taskType)
 	s.taskManager.SetRangeID(testParam.TaskListID, initialRangeID)
 	s.matchingEngine.config.RangeSize = rangeSize // override to low number for the test
+	s.matchingEngine.config.ReadRangeSize = dynamicconfig.GetIntPropertyFn(rangeSize)
 
 	addRequest := &addTaskRequest{
 		TaskType:                      taskType,
@@ -1181,6 +1192,7 @@ func (s *matchingEngineSuite) DrainBacklogNoPollersIsolationGroup(taskType int) 
 	testParam := newTestParam(s.T(), taskType)
 	s.taskManager.SetRangeID(testParam.TaskListID, initialRangeID)
 	s.matchingEngine.config.RangeSize = rangeSize // override to low number for the test
+	s.matchingEngine.config.ReadRangeSize = dynamicconfig.GetIntPropertyFn(rangeSize)
 	_, err := s.matchingEngine.getTaskListManager(testParam.TaskListID, testParam.TaskList.Kind)
 	s.NoError(err)
 	// advance the time a bit more than warmup time of new tasklist after the creation of tasklist manager, which is 1 minute
@@ -1249,6 +1261,7 @@ func (s *matchingEngineSuite) TestAddStickyDecisionNoPollerIsolation() {
 	testParam.TaskList.Kind = &stickyKind
 	s.taskManager.SetRangeID(testParam.TaskListID, initialRangeID)
 	s.matchingEngine.config.RangeSize = rangeSize // override to low number for the test
+	s.matchingEngine.config.ReadRangeSize = dynamicconfig.GetIntPropertyFn(rangeSize)
 
 	s.setupGetDrainStatus()
 
