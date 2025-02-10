@@ -834,6 +834,7 @@ func TestTaskListManagerGetTaskBatch(t *testing.T) {
 	taskListID := NewTestTaskListID(t, "domainId", "tl", 0)
 	cfg := defaultTestConfig()
 	cfg.RangeSize = rangeSize
+	cfg.ReadRangeSize = dynamicconfig.GetIntPropertyFn(rangeSize)
 	tlMgr, err := NewManager(
 		mockDomainCache,
 		logger,
@@ -962,6 +963,7 @@ func TestTaskListReaderPumpAdvancesAckLevelAfterEmptyReads(t *testing.T) {
 	taskListID := NewTestTaskListID(t, "domainId", "tl", 0)
 	cfg := defaultTestConfig()
 	cfg.RangeSize = rangeSize
+	cfg.ReadRangeSize = dynamicconfig.GetIntPropertyFn(rangeSize)
 
 	tlMgr, err := NewManager(
 		mockDomainCache,
@@ -1036,6 +1038,7 @@ func TestTaskListManagerGetTaskBatch_ReadBatchDone(t *testing.T) {
 	const maxReadLevel = int64(120)
 	config := defaultTestConfig()
 	config.RangeSize = rangeSize
+	config.ReadRangeSize = dynamicconfig.GetIntPropertyFn(rangeSize)
 	controller := gomock.NewController(t)
 	logger := testlogger.New(t)
 	tlm := createTestTaskListManagerWithConfig(t, logger, controller, config, clock.NewMockedTimeSource())
@@ -1095,6 +1098,7 @@ func TestTaskExpiryAndCompletion(t *testing.T) {
 			taskListID := NewTestTaskListID(t, "domainId", "tl", 0)
 			cfg := defaultTestConfig()
 			cfg.RangeSize = rangeSize
+			cfg.ReadRangeSize = dynamicconfig.GetIntPropertyFn(rangeSize)
 			cfg.MaxTaskDeleteBatchSize = dynamicconfig.GetIntPropertyFilteredByTaskListInfo(tc.batchSize)
 			cfg.MaxTimeBetweenTaskDeletes = tc.maxTimeBtwnDeletes
 			// set idle timer check to a really small value to assert that we don't accidentally drop tasks while blocking
