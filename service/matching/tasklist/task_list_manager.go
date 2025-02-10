@@ -1030,6 +1030,7 @@ func newTaskListConfig(id *Identifier, cfg *config.Config, domainName string) *c
 	taskType := id.GetType()
 	return &config.TaskListConfig{
 		RangeSize:          cfg.RangeSize,
+		ReadRangeSize:      cfg.ReadRangeSize,
 		AllIsolationGroups: cfg.AllIsolationGroups,
 		EnableTasklistIsolation: func() bool {
 			return cfg.EnableTasklistIsolation(domainName)

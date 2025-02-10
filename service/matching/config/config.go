@@ -111,7 +111,7 @@ type (
 		// Time to hold a poll request before returning an empty response if there are no tasks
 		LongPollExpirationInterval          func() time.Duration
 		RangeSize                           int64
-		ReadRangeSize                       int
+		ReadRangeSize                       dynamicconfig.IntPropertyFn
 		ActivityTaskSyncMatchWaitTime       dynamicconfig.DurationPropertyFnWithDomainFilter
 		GetTasksBatchSize                   func() int
 		UpdateAckInterval                   func() time.Duration
