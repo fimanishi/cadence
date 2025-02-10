@@ -50,6 +50,7 @@ func TestNewConfig(t *testing.T) {
 		"DomainUserRPS":                        {dynamicconfig.MatchingDomainUserRPS, 5},
 		"DomainWorkerRPS":                      {dynamicconfig.MatchingDomainWorkerRPS, 6},
 		"RangeSize":                            {nil, int64(100000)},
+		"ReadRangeSize":                        {dynamicconfig.MatchingReadRangeSize, 50000},
 		"GetTasksBatchSize":                    {dynamicconfig.MatchingGetTasksBatchSize, 7},
 		"UpdateAckInterval":                    {dynamicconfig.MatchingUpdateAckInterval, time.Duration(8)},
 		"IdleTasklistCheckInterval":            {dynamicconfig.MatchingIdleTasklistCheckInterval, time.Duration(9)},
