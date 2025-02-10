@@ -812,6 +812,12 @@ const (
 	// Default value: 20
 	// Allowed filters: DomainName,TasklistName,TasklistType
 	MatchingForwarderMaxChildrenPerNode
+	// MatchingReadRangeSize is the read range size for the task reader
+	// KeyName: matching.readRangeSize
+	// Value type: Int
+	// Default value: 50000
+	// Allowed filters: N/A
+	MatchingReadRangeSize
 
 	MatchingPartitionUpscaleRPS
 

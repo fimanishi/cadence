@@ -40,6 +40,7 @@ type (
 
 		// taskListManager configuration
 		RangeSize                            int64
+		ReadRangeSize                        dynamicconfig.IntPropertyFn
 		GetTasksBatchSize                    dynamicconfig.IntPropertyFnWithTaskListInfoFilters
 		UpdateAckInterval                    dynamicconfig.DurationPropertyFnWithTaskListInfoFilters
 		IdleTasklistCheckInterval            dynamicconfig.DurationPropertyFnWithTaskListInfoFilters
@@ -110,6 +111,7 @@ type (
 		// Time to hold a poll request before returning an empty response if there are no tasks
 		LongPollExpirationInterval          func() time.Duration
 		RangeSize                           int64
+		ReadRangeSize                       int
 		ActivityTaskSyncMatchWaitTime       dynamicconfig.DurationPropertyFnWithDomainFilter
 		GetTasksBatchSize                   func() int
 		UpdateAckInterval                   func() time.Duration
@@ -163,6 +165,7 @@ func NewConfig(dc *dynamicconfig.Collection, hostName string, getIsolationGroups
 		DomainUserRPS:                        dc.GetIntPropertyFilteredByDomain(dynamicconfig.MatchingDomainUserRPS),
 		DomainWorkerRPS:                      dc.GetIntPropertyFilteredByDomain(dynamicconfig.MatchingDomainWorkerRPS),
 		RangeSize:                            100000,
+		ReadRangeSize:                        dc.GetIntProperty(dynamicconfig.MatchingReadRangeSize),
 		GetTasksBatchSize:                    dc.GetIntPropertyFilteredByTaskListInfo(dynamicconfig.MatchingGetTasksBatchSize),
 		UpdateAckInterval:                    dc.GetDurationPropertyFilteredByTaskListInfo(dynamicconfig.MatchingUpdateAckInterval),
 		IdleTasklistCheckInterval:            dc.GetDurationPropertyFilteredByTaskListInfo(dynamicconfig.MatchingIdleTasklistCheckInterval),

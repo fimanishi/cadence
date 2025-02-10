@@ -281,7 +281,7 @@ func (tr *taskReader) getTaskBatch(readLevel, maxReadLevel int64) ([]*persistenc
 
 	// counter i is used to break and let caller check whether tasklist is still alive and need resume read.
 	for i := 0; i < 10 && readLevel < maxReadLevel; i++ {
-		upper := readLevel + tr.config.RangeSize
+		upper := readLevel + int64(tr.config.ReadRangeSize)
 		if upper > maxReadLevel {
 			upper = maxReadLevel
 		}
