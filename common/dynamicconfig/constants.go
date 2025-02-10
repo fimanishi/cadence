@@ -3278,6 +3278,11 @@ var IntKeys = map[IntKey]DynamicInt{
 		Description:  "MatchingForwarderMaxChildrenPerNode is the max number of children per node in the task list partition tree",
 		DefaultValue: 20,
 	},
+	MatchingReadRangeSize: {
+		KeyName:      "matching.readRangeSize",
+		Description:  "MatchingReadRangeSize is the read range size for the task reader",
+		DefaultValue: 50000,
+	},
 	MatchingPartitionUpscaleRPS: {
 		KeyName:      "matching.partitionUpscaleRPS",
 		Filters:      []Filter{DomainName, TaskListName, TaskType},
