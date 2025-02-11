@@ -896,8 +896,8 @@ func TestTaskListManagerGetTaskBatch(t *testing.T) {
 	tlm.taskAckManager.SetReadLevel(0)
 	tasks, readLevel, isReadBatchDone, err = tlm.taskReader.getTaskBatch(tlm.taskAckManager.GetReadLevel(), tlm.taskWriter.GetMaxReadLevel())
 	assert.NoError(t, err)
-	assert.Equal(t, rangeSize, len(tasks))
-	assert.Equal(t, rangeSize, int(readLevel))
+	assert.Equal(t, rangeSize/2, len(tasks))
+	assert.Equal(t, rangeSize/2, int(readLevel))
 	assert.True(t, isReadBatchDone)
 
 	// reset the ackManager readLevel to the buffer size and consume
@@ -1047,7 +1047,15 @@ func TestTaskListManagerGetTaskBatch_ReadBatchDone(t *testing.T) {
 	atomic.StoreInt64(&tlm.taskWriter.maxReadLevel, maxReadLevel)
 	tasks, readLevel, isReadBatchDone, err := tlm.taskReader.getTaskBatch(tlm.taskAckManager.GetReadLevel(), tlm.taskWriter.GetMaxReadLevel())
 	assert.Empty(t, tasks)
-	assert.Equal(t, int64(rangeSize*10), readLevel)
+	assert.Equal(t, int64(rangeSize/2*10), readLevel)
+	assert.False(t, isReadBatchDone)
+	assert.NoError(t, err)
+
+	tlm.taskAckManager.SetReadLevel(readLevel)
+	atomic.StoreInt64(&tlm.taskWriter.maxReadLevel, maxReadLevel)
+	tasks, readLevel, isReadBatchDone, err = tlm.taskReader.getTaskBatch(tlm.taskAckManager.GetReadLevel(), tlm.taskWriter.GetMaxReadLevel())
+	assert.Empty(t, tasks)
+	assert.Equal(t, 2*int64(rangeSize/2*10), readLevel)
 	assert.False(t, isReadBatchDone)
 	assert.NoError(t, err)
 
