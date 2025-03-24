@@ -1885,7 +1885,7 @@ const (
 	// EnableAsyncWorkflowConsumption decides whether to enable system workers for processing async workflows
 	// KeyName: worker.enableAsyncWorkflowConsumption
 	// Value type: Bool
-	// Default value: false
+	// Default value: true
 	// Allowed filters: N/A
 	EnableAsyncWorkflowConsumption
 
