@@ -1634,7 +1634,7 @@ const (
 	// MatchingEnableStandbyTaskCompletion is to enable completion of tasks in the domain's passive side
 	// KeyName: matching.enableStandbyTaskCompletion
 	// Value type: Bool
-	// Default value: false
+	// Default value: true
 	// Allowed filters: DomainName,TasklistName,TasklistType
 	MatchingEnableStandbyTaskCompletion
 
