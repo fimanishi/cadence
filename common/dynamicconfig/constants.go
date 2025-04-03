@@ -4084,7 +4084,7 @@ var BoolKeys = map[BoolKey]DynamicBool{
 		KeyName:      "matching.enableStandbyTaskCompletion",
 		Filters:      []Filter{DomainName, TaskListName, TaskType},
 		Description:  "MatchingEnableStandbyTaskCompletion is to enable completion of tasks in the domain's passive side",
-		DefaultValue: false,
+		DefaultValue: true,
 	},
 	MatchingEnableAdaptiveScaler: {
 		KeyName:      "matching.enableAdaptiveScaler",
@@ -4312,7 +4312,7 @@ var BoolKeys = map[BoolKey]DynamicBool{
 	EnableAsyncWorkflowConsumption: {
 		KeyName:      "worker.enableAsyncWorkflowConsumption",
 		Description:  "EnableAsyncWorkflowConsumption decides whether to enable async workflows",
-		DefaultValue: false,
+		DefaultValue: true,
 	},
 	EnableStickyQuery: {
 		KeyName:      "system.enableStickyQuery",
