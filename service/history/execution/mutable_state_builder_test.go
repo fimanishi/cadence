@@ -23,8 +23,6 @@ package execution
 import (
 	"context"
 	"errors"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest/observer"
 	"math/rand"
 	"testing"
 	"time"
@@ -35,6 +33,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/uber-go/tally"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/uber/cadence/common"
 	"github.com/uber/cadence/common/backoff"
