@@ -501,7 +501,7 @@ func (e *mutableStateBuilder) FlushBufferedEvents() error {
 		}
 	}
 
-	e.logDuplicatedActivityEvents(newBufferedEvents)
+	e.logDuplicatedActivityEvents(newBufferedEvents, "newBufferedEvents")
 
 	// no decision in-flight, flush all buffered events to committed bucket
 	if !e.HasInFlightDecision() {
@@ -510,8 +510,8 @@ func (e *mutableStateBuilder) FlushBufferedEvents() error {
 		// and cause workflow to be stuck in decision task failed state
 		// this can be removed after the root cause is identified and fixed
 		// TODO: remove this after the root cause is identified and fixed or add deduplication
-		e.logDuplicatedActivityEvents(e.bufferedEvents)
-		e.logDuplicatedActivityEvents(e.updateBufferedEvents)
+		e.logDuplicatedActivityEvents(e.bufferedEvents, "bufferedEvents")
+		e.logDuplicatedActivityEvents(e.updateBufferedEvents, "updateBufferedEvents")
 
 		// flush persisted buffered events
 		if len(e.bufferedEvents) > 0 {
@@ -527,7 +527,7 @@ func (e *mutableStateBuilder) FlushBufferedEvents() error {
 		// clear pending buffered events
 		e.updateBufferedEvents = nil
 
-		e.logDuplicatedActivityEvents(reorderedEvents)
+		e.logDuplicatedActivityEvents(reorderedEvents, "reorderedEvents")
 
 		// Put back all the reordered buffer events at the end
 		if len(reorderedEvents) > 0 {
@@ -2266,7 +2266,7 @@ func (e *mutableStateBuilder) logDataInconsistency() {
 		tag.WorkflowRunID(runID),
 	)
 }
-func (e *mutableStateBuilder) logDuplicatedActivityEvents(events []*types.HistoryEvent) {
+func (e *mutableStateBuilder) logDuplicatedActivityEvents(events []*types.HistoryEvent, duplicationSource string) {
 	type activityTaskUniqueEventParams struct {
 		eventType        types.EventType
 		scheduledEventID int64
@@ -2328,7 +2328,10 @@ func (e *mutableStateBuilder) logDuplicatedActivityEvents(events []*types.Histor
 				tag.WorkflowRunID(e.GetExecutionInfo().RunID),
 				tag.WorkflowScheduleID(scheduledEventID),
 				tag.WorkflowEventType(event.GetEventType().String()),
+				tag.Dynamic("duplication-source", duplicationSource),
 			)
+
+			e.metricsClient.IncCounter(metrics.HistoryFlushBufferedEventsScope, metrics.DuplicateActivityTaskEventCounter)
 		} else {
 			activityTaskUniqueEvents[uniqueEventParams] = struct{}{}
 		}

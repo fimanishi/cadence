@@ -1321,6 +1321,8 @@ const (
 	HistoryExecutionCacheScope
 	// HistoryWorkflowCacheScope is the scope used by history workflow cache
 	HistoryWorkflowCacheScope
+	// HistoryFlushBufferedEventsScope is the scope used by history when flushing buffered events
+	HistoryFlushBufferedEventsScope
 
 	NumHistoryScopes
 )
@@ -2018,6 +2020,7 @@ var ScopeDefs = map[ServiceIdx]map[int]scopeDefinition{
 		LargeExecutionBlobShardScope:                                    {operation: "LargeExecutionBlobShard"},
 		HistoryExecutionCacheScope:                                      {operation: "HistoryExecutionCache"},
 		HistoryWorkflowCacheScope:                                       {operation: "HistoryWorkflowCache"},
+		HistoryFlushBufferedEventsScope:                                 {operation: "HistoryFlushBufferedEvents"},
 	},
 	// Matching Scope Names
 	Matching: {
@@ -2420,6 +2423,7 @@ const (
 	DecisionRetriesExceededCounter
 	StaleMutableStateCounter
 	DataInconsistentCounter
+	DuplicateActivityTaskEventCounter
 	TimerResurrectionCounter
 	TimerProcessingDeletionTimerNoopDueToMutableStateNotLoading
 	TimerProcessingDeletionTimerNoopDueToWFRunning
