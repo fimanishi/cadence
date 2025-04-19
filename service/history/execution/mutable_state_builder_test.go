@@ -3740,7 +3740,7 @@ func Test__logDuplicatedActivityEvents(t *testing.T) {
 			msb.executionInfo.WorkflowID = "some-workflow-id"
 			msb.executionInfo.RunID = "some-run-id"
 
-			msb.logDuplicatedActivityEvents(tc.buildEvents(msb))
+			msb.logDuplicatedActivityEvents(tc.buildEvents(msb), "test")
 
 			tc.assertions(t, observedLogs)
 		})
