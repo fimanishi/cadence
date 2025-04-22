@@ -23,14 +23,14 @@ testSummaryFile="$resultFolder/$testName-summary.txt"
 # Prune everything and rebuild images unless rerun is specified
 if [ "$rerun" != "rerun" ]; then
   echo "Removing some of the previous containers (if exists) to start fresh"
-  docker-compose -f docker/buildkite/docker-compose-local-replication-simulation.yml \
+  SCENARIO=$testCase docker-compose -f docker/buildkite/docker-compose-local-replication-simulation.yml \
     down cassandra cadence-cluster0 cadence-cluster1 cadence-worker0 cadence-worker1 replication-simulator
 
   echo "Each simulation run creates multiple new giant container images. Running docker system prune to avoid disk space issues"
   docker system prune -f
 
   echo "Building test images"
-  docker-compose -f docker/buildkite/docker-compose-local-replication-simulation.yml \
+  SCENARIO=$testCase docker-compose -f docker/buildkite/docker-compose-local-replication-simulation.yml \
     build cadence-cluster0 cadence-cluster1 cadence-worker0 cadence-worker1 replication-simulator
 fi
 
