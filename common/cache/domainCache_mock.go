@@ -151,15 +151,15 @@ func (mr *MockDomainCacheMockRecorder) GetDomainName(id any) *gomock.Call {
 }
 
 // RegisterDomainChangeCallback mocks base method.
-func (m *MockDomainCache) RegisterDomainChangeCallback(shard int, initialNotificationVersion int64, prepareCallback PrepareCallbackFn, callback CallbackFn) {
+func (m *MockDomainCache) RegisterDomainChangeCallback(id string, catchUpFn CatchUpFn, prepareCallback PrepareCallbackFn, callback CallbackFn) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "RegisterDomainChangeCallback", shard, initialNotificationVersion, prepareCallback, callback)
+	m.ctrl.Call(m, "RegisterDomainChangeCallback", id, catchUpFn, prepareCallback, callback)
 }
 
 // RegisterDomainChangeCallback indicates an expected call of RegisterDomainChangeCallback.
-func (mr *MockDomainCacheMockRecorder) RegisterDomainChangeCallback(shard, initialNotificationVersion, prepareCallback, callback any) *gomock.Call {
+func (mr *MockDomainCacheMockRecorder) RegisterDomainChangeCallback(id, catchUpFn, prepareCallback, callback any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterDomainChangeCallback", reflect.TypeOf((*MockDomainCache)(nil).RegisterDomainChangeCallback), shard, initialNotificationVersion, prepareCallback, callback)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterDomainChangeCallback", reflect.TypeOf((*MockDomainCache)(nil).RegisterDomainChangeCallback), id, catchUpFn, prepareCallback, callback)
 }
 
 // Start mocks base method.
@@ -187,13 +187,13 @@ func (mr *MockDomainCacheMockRecorder) Stop() *gomock.Call {
 }
 
 // UnregisterDomainChangeCallback mocks base method.
-func (m *MockDomainCache) UnregisterDomainChangeCallback(shard int) {
+func (m *MockDomainCache) UnregisterDomainChangeCallback(id string) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "UnregisterDomainChangeCallback", shard)
+	m.ctrl.Call(m, "UnregisterDomainChangeCallback", id)
 }
 
 // UnregisterDomainChangeCallback indicates an expected call of UnregisterDomainChangeCallback.
-func (mr *MockDomainCacheMockRecorder) UnregisterDomainChangeCallback(shard any) *gomock.Call {
+func (mr *MockDomainCacheMockRecorder) UnregisterDomainChangeCallback(id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnregisterDomainChangeCallback", reflect.TypeOf((*MockDomainCache)(nil).UnregisterDomainChangeCallback), shard)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnregisterDomainChangeCallback", reflect.TypeOf((*MockDomainCache)(nil).UnregisterDomainChangeCallback), id)
 }

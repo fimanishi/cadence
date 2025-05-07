@@ -24,6 +24,7 @@ package engineimpl
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
@@ -397,7 +398,7 @@ func (e *historyEngineImpl) Stop() {
 	e.failoverMarkerNotifier.Stop()
 
 	// unset the failover callback
-	e.shard.GetDomainCache().UnregisterDomainChangeCallback(e.shard.GetShardID())
+	e.shard.GetDomainCache().UnregisterDomainChangeCallback(strconv.Itoa(e.shard.GetShardID()))
 }
 
 // ScheduleDecisionTask schedules a decision if no outstanding decision found

@@ -23,6 +23,8 @@ package engineimpl
 
 import (
 	"context"
+	"sort"
+	"strconv"
 
 	"github.com/uber/cadence/common/activecluster"
 	"github.com/uber/cadence/common/cache"
@@ -54,10 +56,35 @@ func (e *historyEngineImpl) registerDomainFailoverCallback() {
 	//		failover min / max task levels calculated & updated to shard (using shard lock) -> failover start
 	// above 2 guarantees that failover start is after persistence of the task.
 
+	initialNotificationVersion := e.shard.GetDomainNotificationVersion()
+
+	catchUpFn := func(domainCache cache.DomainCache, prepareCallback cache.PrepareCallbackFn, callback cache.CallbackFn) {
+		// this section is trying to make the shard catch up with domain changes
+		domains := cache.DomainCacheEntries{}
+		for _, domain := range domainCache.GetAllDomain() {
+			domains = append(domains, domain)
+		}
+		// we must notify the change in an ordered fashion
+		// since history shard has to update the shard info
+		// with the domain change version.
+		sort.Sort(domains)
+
+		var updatedEntries []*cache.DomainCacheEntry
+		for _, domain := range domains {
+			if domain.GetNotificationVersion() >= initialNotificationVersion {
+				updatedEntries = append(updatedEntries, domain)
+			}
+		}
+		if len(updatedEntries) > 0 {
+			prepareCallback()
+			callback(updatedEntries)
+		}
+	}
+
 	// first set the failover callback
 	e.shard.GetDomainCache().RegisterDomainChangeCallback(
-		e.shard.GetShardID(),
-		e.shard.GetDomainNotificationVersion(),
+		strconv.Itoa(e.shard.GetShardID()),
+		catchUpFn,
 		e.lockTaskProcessingForDomainUpdate,
 		e.domainChangeCB,
 	)
