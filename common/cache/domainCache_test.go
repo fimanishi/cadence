@@ -395,7 +395,7 @@ func Test_IsActiveIn(t *testing.T) {
 }
 
 func (s *domainCacheSuite) TestRegisterCallback_CatchUp() {
-	prepareCallbacckInvoked := false
+	prepareCallbackInvoked := false
 	callBackInvoked := false
 	entriesNotification := []*DomainCacheEntry{}
 
@@ -406,14 +406,14 @@ func (s *domainCacheSuite) TestRegisterCallback_CatchUp() {
 			callback(entriesNotification)
 		},
 		func() {
-			prepareCallbacckInvoked = true
+			prepareCallbackInvoked = true
 		},
 		func(nextDomains []*DomainCacheEntry) {
 			callBackInvoked = true
 		},
 	)
 
-	s.True(prepareCallbacckInvoked)
+	s.True(prepareCallbackInvoked)
 	s.True(callBackInvoked)
 }
 
@@ -509,19 +509,19 @@ func (s *domainCacheSuite) TestUpdateCache_TriggerCallBack() {
 	entry1New := s.buildEntryFromRecord(domainRecord1New)
 	domainNotificationVersion++
 
-	prepareCallbacckInvoked := false
+	prepareCallbackInvoked := false
 	entriesNew := []*DomainCacheEntry{}
 	s.domainCache.RegisterDomainChangeCallback(
 		"0",
 		func(domainCache DomainCache, prepareCallback PrepareCallbackFn, callback CallbackFn) {},
 		func() {
-			prepareCallbacckInvoked = true
+			prepareCallbackInvoked = true
 		},
 		func(nextDomains []*DomainCacheEntry) {
 			entriesNew = nextDomains
 		},
 	)
-	s.False(prepareCallbacckInvoked)
+	s.False(prepareCallbackInvoked)
 	s.Empty(entriesNew)
 
 	s.metadataMgr.On("GetMetadata", mock.Anything).Return(&persistence.GetMetadataResponse{NotificationVersion: domainNotificationVersion}, nil).Once()
@@ -540,7 +540,7 @@ func (s *domainCacheSuite) TestUpdateCache_TriggerCallBack() {
 	// the record 1 got updated later, thus a higher notification version.
 	// making sure notifying from lower to higher version helps the shard to keep track the
 	// domain change events
-	s.True(prepareCallbacckInvoked)
+	s.True(prepareCallbackInvoked)
 	s.Equal([]*DomainCacheEntry{entry2New, entry1New}, entriesNew)
 }
 
