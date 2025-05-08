@@ -25,6 +25,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -5545,4 +5546,10 @@ func TestRecordChildExecutionCompleted(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_createShardNameFromShardID(t *testing.T) {
+	shardID := 1
+	shardName := createShardNameFromShardID(shardID)
+	assert.Equal(t, fmt.Sprintf("history-engine-%d", shardID), shardName)
 }
