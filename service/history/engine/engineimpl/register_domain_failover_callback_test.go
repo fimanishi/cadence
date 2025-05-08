@@ -23,7 +23,6 @@
 package engineimpl
 
 import (
-	"github.com/uber/cadence/common/activecluster"
 	"testing"
 	"time"
 
@@ -31,6 +30,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/uber/cadence/common"
+	"github.com/uber/cadence/common/activecluster"
 	"github.com/uber/cadence/common/cache"
 	"github.com/uber/cadence/common/clock"
 	"github.com/uber/cadence/common/cluster"

@@ -23,6 +23,8 @@ package engineimpl
 
 import (
 	"context"
+	"sort"
+
 	"github.com/uber/cadence/common/activecluster"
 	"github.com/uber/cadence/common/cache"
 	"github.com/uber/cadence/common/constants"
@@ -30,7 +32,6 @@ import (
 	"github.com/uber/cadence/common/metrics"
 	"github.com/uber/cadence/common/persistence"
 	hcommon "github.com/uber/cadence/service/history/common"
-	"sort"
 )
 
 func (e *historyEngineImpl) registerDomainFailoverCallback() {
