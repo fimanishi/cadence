@@ -136,7 +136,7 @@ func TestGenerateFailoverTasksForDomainCallback(t *testing.T) {
 		"non-graceful failover domain update. This should generate no tasks as there's no failover taking place": {
 			domainUpdates:              failoverUpdateT2,
 			currentNotificationVersion: 2,
-			expectedRes:                []*persistence.FailoverMarkerTask{
+			expectedRes: []*persistence.FailoverMarkerTask{
 				// no failoverMarker tasks are created for non-graceful failovers, they just occur immediately
 			},
 		},
