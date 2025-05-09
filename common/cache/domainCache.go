@@ -80,6 +80,8 @@ type (
 	// it is guaranteed that  CallbackFn pair will be both called or non will be called
 	CallbackFn func(updatedDomains []*DomainCacheEntry)
 
+	// CatchUpFn is a function to execute PrepareCallbackFn and/or CallbackFn during domain callback registration,
+	// allowing the caller to catch up with the latest domain changes
 	CatchUpFn func(domainCache DomainCache, prepareCallback PrepareCallbackFn, callback CallbackFn)
 
 	// DomainCache is used the cache domain information and configuration to avoid making too many calls to cassandra.
