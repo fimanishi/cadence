@@ -1909,18 +1909,41 @@ func TestGetDomainActiveCluster(t *testing.T) {
 }
 
 func TestDisconnectBlockedPollers(t *testing.T) {
-	tlID, err := NewIdentifier("domain-id", "tl", persistence.TaskListTypeDecision)
-	require.NoError(t, err)
+	tests := []struct {
+		name                 string
+		newActiveClusterName *string
+	}{
+		{
+			name:                 "test-disconnect-blocked-pollers and update active cluster",
+			newActiveClusterName: common.StringPtr("new-active-cluster"),
+		},
+		{
+			name:                 "test-disconnect-blocked-pollers and not update active cluster",
+			newActiveClusterName: nil,
+		},
+	}
 
-	tlm, _ := setupMocksForTaskListManager(t, tlID, types.TaskListKindNormal)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tlID, err := NewIdentifier("domain-id", "tl", persistence.TaskListTypeDecision)
+			require.NoError(t, err)
 
-	mockMatcher := NewMockTaskMatcher(gomock.NewController(t))
-	tlm.matcher = mockMatcher
-	mockMatcher.EXPECT().DisconnectBlockedPollers().Times(1)
+			tlm, _ := setupMocksForTaskListManager(t, tlID, types.TaskListKindNormal)
 
-	tlm.DisconnectBlockedPollers(common.StringPtr("new-active-cluster"))
+			mockMatcher := NewMockTaskMatcher(gomock.NewController(t))
+			tlm.matcher = mockMatcher
+			mockMatcher.EXPECT().DisconnectBlockedPollers().Times(1)
+			currentActiveClusterName := tlm.GetDomainActiveCluster()
 
-	assert.Equal(t, "new-active-cluster", tlm.GetDomainActiveCluster())
+			tlm.DisconnectBlockedPollers(tc.newActiveClusterName)
+
+			if tc.newActiveClusterName == nil {
+				assert.Equal(t, currentActiveClusterName, tlm.GetDomainActiveCluster())
+			} else {
+				assert.Equal(t, *tc.newActiveClusterName, tlm.GetDomainActiveCluster())
+			}
+		})
+	}
 }
 
 func partitions(num int) map[int]*types.TaskListPartition {
