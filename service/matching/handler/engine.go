@@ -172,6 +172,7 @@ func (e *matchingEngineImpl) Stop() {
 	for _, l := range e.getTaskLists(math.MaxInt32) {
 		l.Stop()
 	}
+	e.unregisterDomainFailoverCallback()
 	e.shutdownCompletion.Wait()
 }
 
@@ -1465,6 +1466,10 @@ func (e *matchingEngineImpl) registerDomainFailoverCallback() {
 		func(_ cache.DomainCache, _ cache.PrepareCallbackFn, _ cache.CallbackFn) {},
 		func() {},
 		e.domainChangeCallback)
+}
+
+func (e *matchingEngineImpl) unregisterDomainFailoverCallback() {
+	e.domainCache.UnregisterDomainChangeCallback(service.Matching)
 }
 
 func (e *matchingEngineImpl) disconnectTaskListPollersAfterDomainFailover(taskListName string, domain *cache.DomainCacheEntry, taskType int) {
