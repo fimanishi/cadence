@@ -648,6 +648,7 @@ func TestIsShuttingDown(t *testing.T) {
 	wg.Add(0)
 	mockDomainCache := cache.NewMockDomainCache(gomock.NewController(t))
 	mockDomainCache.EXPECT().RegisterDomainChangeCallback(service.Matching, gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+	mockDomainCache.EXPECT().UnregisterDomainChangeCallback(service.Matching).Times(1)
 	e := matchingEngineImpl{
 		domainCache:        mockDomainCache,
 		shutdownCompletion: &wg,
