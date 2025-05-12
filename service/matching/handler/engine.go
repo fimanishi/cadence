@@ -538,7 +538,7 @@ pollLoop:
 		pollerCtx = tasklist.ContextWithIsolationGroup(pollerCtx, req.GetIsolationGroup())
 		tlMgr, err := e.getTaskListManager(taskListID, taskListKind)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't load tasklist namanger: %w", err)
+			return nil, fmt.Errorf("couldn't load tasklist manager: %w", err)
 		}
 		startT := time.Now() // Record the start time
 		task, err := tlMgr.GetTask(pollerCtx, nil)
@@ -727,7 +727,7 @@ pollLoop:
 		taskListKind := request.TaskList.Kind
 		tlMgr, err := e.getTaskListManager(taskListID, taskListKind)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't load tasklist namanger: %w", err)
+			return nil, fmt.Errorf("couldn't load tasklist manager: %w", err)
 		}
 		startT := time.Now() // Record the start time
 		task, err := tlMgr.GetTask(pollerCtx, maxDispatch)
@@ -1477,7 +1477,11 @@ func (e *matchingEngineImpl) disconnectTaskListPollersAfterDomainFailover(taskLi
 	if err != nil {
 		return
 	}
-	tlMgr, _ := e.getTaskListManager(taskList, types.TaskListKindNormal.Ptr())
+	tlMgr, err := e.getTaskListManager(taskList, types.TaskListKindNormal.Ptr())
+	if err != nil {
+		e.logger.Error("Couldn't load tasklist manager", tag.Error(err))
+		return
+	}
 
 	if tlMgr.GetDomainActiveCluster() != "" && tlMgr.GetDomainActiveCluster() != domain.GetReplicationConfig().ActiveClusterName {
 		tlMgr.DisconnectBlockedPollers(&domain.GetReplicationConfig().ActiveClusterName)
