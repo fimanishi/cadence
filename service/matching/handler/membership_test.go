@@ -246,6 +246,8 @@ func TestSubscriptionAndErrorReturned(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	m := membership.NewMockResolver(ctrl)
 
+	mockDomainCache := cache.NewMockDomainCache(ctrl)
+
 	shutdownWG := sync.WaitGroup{}
 	shutdownWG.Add(1)
 
@@ -255,8 +257,9 @@ func TestSubscriptionAndErrorReturned(t *testing.T) {
 		config: &config.Config{
 			EnableTasklistOwnershipGuard: func(opts ...dynamicproperties.FilterOption) bool { return true },
 		},
-		shutdown: make(chan struct{}),
-		logger:   log.NewNoop(),
+		shutdown:    make(chan struct{}),
+		logger:      log.NewNoop(),
+		domainCache: mockDomainCache,
 	}
 
 	// this should trigger the error case on a membership event
@@ -271,6 +274,8 @@ func TestSubscriptionAndErrorReturned(t *testing.T) {
 			}
 			inc <- &m
 		})
+
+	mockDomainCache.EXPECT().UnregisterDomainChangeCallback(service.Matching).Times(1)
 
 	go func() {
 		// then call stop so the test can finish
@@ -328,9 +333,12 @@ func TestGetTasklistManagerShutdownScenario(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	m := membership.NewMockResolver(ctrl)
 
+	mockDomainCache := cache.NewMockDomainCache(ctrl)
+
 	self := membership.NewDetailedHostInfo("self", "self", nil)
 
 	m.EXPECT().WhoAmI().Return(self, nil).AnyTimes()
+	mockDomainCache.EXPECT().UnregisterDomainChangeCallback(service.Matching).Times(1)
 
 	shutdownWG := sync.WaitGroup{}
 	shutdownWG.Add(0)
@@ -341,8 +349,9 @@ func TestGetTasklistManagerShutdownScenario(t *testing.T) {
 		config: &config.Config{
 			EnableTasklistOwnershipGuard: func(opts ...dynamicproperties.FilterOption) bool { return true },
 		},
-		shutdown: make(chan struct{}),
-		logger:   log.NewNoop(),
+		shutdown:    make(chan struct{}),
+		logger:      log.NewNoop(),
+		domainCache: mockDomainCache,
 	}
 
 	// set this engine to be shutting down so as to trigger the tasklistGetTasklistByID guard
