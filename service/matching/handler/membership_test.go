@@ -207,14 +207,17 @@ func TestSubscriptionAndShutdown(t *testing.T) {
 	shutdownWG := &sync.WaitGroup{}
 	shutdownWG.Add(1)
 
+	mockDomainCache := cache.NewMockDomainCache(ctrl)
+
 	e := matchingEngineImpl{
 		shutdownCompletion: shutdownWG,
 		membershipResolver: m,
 		config: &config.Config{
 			EnableTasklistOwnershipGuard: func(opts ...dynamicproperties.FilterOption) bool { return true },
 		},
-		shutdown: make(chan struct{}),
-		logger:   log.NewNoop(),
+		shutdown:    make(chan struct{}),
+		logger:      log.NewNoop(),
+		domainCache: mockDomainCache,
 	}
 
 	// anytimes here because this is quite a racy test and the actual assertions for the unsubscription logic will be separated out
@@ -228,6 +231,7 @@ func TestSubscriptionAndShutdown(t *testing.T) {
 			}
 			inc <- &m
 		})
+	mockDomainCache.EXPECT().UnregisterDomainChangeCallback(service.Matching).Times(1)
 
 	go func() {
 		// then call stop so the test can finish
