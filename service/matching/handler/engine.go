@@ -1431,6 +1431,10 @@ func (e *matchingEngineImpl) domainChangeCallback(nextDomains []*cache.DomainCac
 	newNotificationVersion := e.notificationVersion
 
 	for _, domain := range nextDomains {
+		if domain.GetNotificationVersion() > newNotificationVersion {
+			newNotificationVersion = domain.GetNotificationVersion()
+		}
+
 		if !isDomainEligibleToDisconnectPollers(domain, e.notificationVersion) {
 			continue
 		}
@@ -1450,10 +1454,6 @@ func (e *matchingEngineImpl) domainChangeCallback(nextDomains []*cache.DomainCac
 
 		for taskListName := range resp.ActivityTaskListMap {
 			e.disconnectTaskListPollersAfterDomainFailover(taskListName, domain, persistence.TaskListTypeActivity)
-		}
-
-		if domain.GetNotificationVersion() > newNotificationVersion {
-			newNotificationVersion = domain.GetNotificationVersion()
 		}
 	}
 	e.notificationVersion = newNotificationVersion
