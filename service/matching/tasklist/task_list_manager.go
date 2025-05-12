@@ -774,10 +774,9 @@ func (c *taskListManagerImpl) GetDomainActiveCluster() string {
 }
 
 func (c *taskListManagerImpl) DisconnectBlockedPollers(domainActiveCluster *string) {
-	if domainActiveCluster == nil {
-		return
+	if domainActiveCluster != nil {
+		c.domainActiveCluster = *domainActiveCluster
 	}
-	c.domainActiveCluster = *domainActiveCluster
 	c.matcher.DisconnectBlockedPollers()
 }
 
