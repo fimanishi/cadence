@@ -290,6 +290,8 @@ func TestSubscribeToMembershipChangesQuitsIfSubscribeFails(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	m := membership.NewMockResolver(ctrl)
 
+	mockDomainCache := cache.NewMockDomainCache(ctrl)
+
 	logger, logs := testlogger.NewObserved(t)
 
 	shutdownWG := sync.WaitGroup{}
@@ -301,8 +303,9 @@ func TestSubscribeToMembershipChangesQuitsIfSubscribeFails(t *testing.T) {
 		config: &config.Config{
 			EnableTasklistOwnershipGuard: func(opts ...dynamicproperties.FilterOption) bool { return true },
 		},
-		shutdown: make(chan struct{}),
-		logger:   logger,
+		shutdown:    make(chan struct{}),
+		logger:      logger,
+		domainCache: mockDomainCache,
 	}
 
 	// this should trigger the error case on a membership event
@@ -310,6 +313,8 @@ func TestSubscribeToMembershipChangesQuitsIfSubscribeFails(t *testing.T) {
 
 	m.EXPECT().Subscribe(service.Matching, "matching-engine", gomock.Any()).
 		Return(errors.New("matching-engine is already subscribed to updates"))
+
+	mockDomainCache.EXPECT().UnregisterDomainChangeCallback(service.Matching).AnyTimes()
 
 	go func() {
 		// then call stop so the test can finish
