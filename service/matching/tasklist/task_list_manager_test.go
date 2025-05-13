@@ -1933,6 +1933,7 @@ func TestDisconnectBlockedPollers(t *testing.T) {
 			mockMatcher := NewMockTaskMatcher(gomock.NewController(t))
 			tlm.matcher = mockMatcher
 			mockMatcher.EXPECT().DisconnectBlockedPollers().Times(1)
+			mockMatcher.EXPECT().RefreshCancelContext().Times(1)
 			currentActiveClusterName := tlm.GetDomainActiveCluster()
 
 			tlm.DisconnectBlockedPollers(tc.newActiveClusterName)
