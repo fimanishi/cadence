@@ -445,6 +445,18 @@ func (mr *MockTaskMatcherMockRecorder) Rate() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Rate", reflect.TypeOf((*MockTaskMatcher)(nil).Rate))
 }
 
+// RefreshCancelContext mocks base method.
+func (m *MockTaskMatcher) RefreshCancelContext() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RefreshCancelContext")
+}
+
+// RefreshCancelContext indicates an expected call of RefreshCancelContext.
+func (mr *MockTaskMatcherMockRecorder) RefreshCancelContext() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshCancelContext", reflect.TypeOf((*MockTaskMatcher)(nil).RefreshCancelContext))
+}
+
 // UpdateRatelimit mocks base method.
 func (m *MockTaskMatcher) UpdateRatelimit(rps *float64) {
 	m.ctrl.T.Helper()

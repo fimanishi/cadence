@@ -778,6 +778,7 @@ func (c *taskListManagerImpl) DisconnectBlockedPollers(domainActiveCluster *stri
 		c.domainActiveCluster = *domainActiveCluster
 	}
 	c.matcher.DisconnectBlockedPollers()
+	c.matcher.RefreshCancelContext()
 }
 
 func (c *taskListManagerImpl) String() string {

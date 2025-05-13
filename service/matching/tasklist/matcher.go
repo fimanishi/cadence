@@ -492,6 +492,10 @@ func (tm *taskMatcherImpl) Rate() float64 {
 	return rate
 }
 
+func (tm *taskMatcherImpl) RefreshCancelContext() {
+	tm.cancelCtx, tm.cancelFunc = context.WithCancel(context.Background())
+}
+
 func (tm *taskMatcherImpl) pollOrForward(
 	ctx context.Context,
 	startT time.Time,

@@ -78,6 +78,7 @@ type (
 		PollForQuery(ctx context.Context) (*InternalTask, error)
 		UpdateRatelimit(rps *float64)
 		Rate() float64
+		RefreshCancelContext()
 	}
 
 	Forwarder interface {
