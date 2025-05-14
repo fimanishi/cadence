@@ -1208,7 +1208,7 @@ func Test_domainChangeCallback(t *testing.T) {
 			nil,
 			0,
 			0,
-			0,
+			6,
 		),
 		cache.NewDomainCacheEntryForTest(
 			&persistence.DomainInfo{Name: "global-domain-2", ID: "global-domain-2-id"},

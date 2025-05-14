@@ -1432,8 +1432,8 @@ func (e *matchingEngineImpl) domainChangeCallback(nextDomains []*cache.DomainCac
 	newFailoverNotificationVersion := e.failoverNotificationVersion
 
 	for _, domain := range nextDomains {
-		if domain.GetNotificationVersion() > newFailoverNotificationVersion {
-			newFailoverNotificationVersion = domain.GetNotificationVersion()
+		if domain.GetFailoverNotificationVersion() > newFailoverNotificationVersion {
+			newFailoverNotificationVersion = domain.GetFailoverNotificationVersion()
 		}
 
 		if !isDomainEligibleToDisconnectPollers(domain, e.failoverNotificationVersion) {
