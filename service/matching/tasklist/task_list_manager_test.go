@@ -85,8 +85,7 @@ func setupMocksForTaskListManager(t *testing.T, taskListID *Identifier, taskList
 		mockTimeSource:     clock.NewMockedTimeSource(),
 		dynamicClient:      dynamicClient,
 	}
-	domain := cache.CreateDomainCacheEntry("domainName")
-	deps.mockDomainCache.EXPECT().GetDomainByID(gomock.Any()).Return(domain, nil).Times(1)
+	deps.mockDomainCache.EXPECT().GetDomainName(gomock.Any()).Return("domainName", nil).Times(1)
 	config := config.NewConfig(dynamicconfig.NewCollection(dynamicClient, logger), "hostname", getIsolationgroupsHelper)
 	mockHistoryService := history.NewMockClient(ctrl)
 
