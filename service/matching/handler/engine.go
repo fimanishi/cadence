@@ -79,25 +79,25 @@ type (
 	}
 
 	matchingEngineImpl struct {
-		shutdownCompletion   *sync.WaitGroup
-		shutdown             chan struct{}
-		taskManager          persistence.TaskManager
-		clusterMetadata      cluster.Metadata
-		historyService       history.Client
-		matchingClient       matching.Client
-		tokenSerializer      common.TaskTokenSerializer
-		logger               log.Logger
-		metricsClient        metrics.Client
-		taskListsLock        sync.RWMutex                             // locks mutation of taskLists
-		taskLists            map[tasklist.Identifier]tasklist.Manager // Convert to LRU cache
-		config               *config.Config
-		lockableQueryTaskMap lockableQueryTaskMap
-		domainCache          cache.DomainCache
-		versionChecker       client.VersionChecker
-		membershipResolver   membership.Resolver
-		isolationState       isolationgroup.State
-		timeSource           clock.TimeSource
-		notificationVersion  int64
+		shutdownCompletion          *sync.WaitGroup
+		shutdown                    chan struct{}
+		taskManager                 persistence.TaskManager
+		clusterMetadata             cluster.Metadata
+		historyService              history.Client
+		matchingClient              matching.Client
+		tokenSerializer             common.TaskTokenSerializer
+		logger                      log.Logger
+		metricsClient               metrics.Client
+		taskListsLock               sync.RWMutex                             // locks mutation of taskLists
+		taskLists                   map[tasklist.Identifier]tasklist.Manager // Convert to LRU cache
+		config                      *config.Config
+		lockableQueryTaskMap        lockableQueryTaskMap
+		domainCache                 cache.DomainCache
+		versionChecker              client.VersionChecker
+		membershipResolver          membership.Resolver
+		isolationState              isolationgroup.State
+		timeSource                  clock.TimeSource
+		failoverNotificationVersion int64
 	}
 
 	// HistoryInfo consists of two integer regarding the history size and history count
@@ -1429,14 +1429,14 @@ func (e *matchingEngineImpl) isShuttingDown() bool {
 }
 
 func (e *matchingEngineImpl) domainChangeCallback(nextDomains []*cache.DomainCacheEntry) {
-	newNotificationVersion := e.notificationVersion
+	newFailoverNotificationVersion := e.failoverNotificationVersion
 
 	for _, domain := range nextDomains {
-		if domain.GetNotificationVersion() > newNotificationVersion {
-			newNotificationVersion = domain.GetNotificationVersion()
+		if domain.GetNotificationVersion() > newFailoverNotificationVersion {
+			newFailoverNotificationVersion = domain.GetNotificationVersion()
 		}
 
-		if !isDomainEligibleToDisconnectPollers(domain, e.notificationVersion) {
+		if !isDomainEligibleToDisconnectPollers(domain, e.failoverNotificationVersion) {
 			continue
 		}
 
@@ -1457,13 +1457,21 @@ func (e *matchingEngineImpl) domainChangeCallback(nextDomains []*cache.DomainCac
 			e.disconnectTaskListPollersAfterDomainFailover(taskListName, domain, persistence.TaskListTypeActivity)
 		}
 	}
-	e.notificationVersion = newNotificationVersion
+	e.failoverNotificationVersion = newFailoverNotificationVersion
 }
 
 func (e *matchingEngineImpl) registerDomainFailoverCallback() {
+	catchUpFn := func(domainCache cache.DomainCache, _ cache.PrepareCallbackFn, _ cache.CallbackFn) {
+		for _, domain := range domainCache.GetAllDomain() {
+			if domain.GetFailoverNotificationVersion() > e.failoverNotificationVersion {
+				e.failoverNotificationVersion = domain.GetFailoverNotificationVersion()
+			}
+		}
+	}
+
 	e.domainCache.RegisterDomainChangeCallback(
 		service.Matching,
-		func(_ cache.DomainCache, _ cache.PrepareCallbackFn, _ cache.CallbackFn) {},
+		catchUpFn,
 		func() {},
 		e.domainChangeCallback)
 }
@@ -1483,8 +1491,16 @@ func (e *matchingEngineImpl) disconnectTaskListPollersAfterDomainFailover(taskLi
 		return
 	}
 
-	if tlMgr.GetDomainActiveCluster() != "" && tlMgr.GetDomainActiveCluster() != domain.GetReplicationConfig().ActiveClusterName {
-		tlMgr.DisconnectBlockedPollers(&domain.GetReplicationConfig().ActiveClusterName)
+	err = tlMgr.ReleaseBlockedPollers()
+	if err != nil {
+		e.logger.Error("Couldn't disconnect tasklist pollers after domain failover",
+			tag.Error(err),
+			tag.WorkflowDomainID(domain.GetInfo().ID),
+			tag.WorkflowDomainName(domain.GetInfo().Name),
+			tag.WorkflowTaskListName(taskListName),
+			tag.WorkflowTaskListType(taskType),
+		)
+		return
 	}
 }
 
@@ -1519,5 +1535,5 @@ func isDomainEligibleToDisconnectPollers(domain *cache.DomainCacheEntry, current
 	return domain.IsGlobalDomain() &&
 		domain.GetReplicationConfig() != nil &&
 		!domain.GetReplicationConfig().IsActiveActive() &&
-		domain.GetNotificationVersion() > currentVersion
+		domain.GetFailoverNotificationVersion() > currentVersion
 }

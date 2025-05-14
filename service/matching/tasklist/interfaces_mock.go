@@ -84,18 +84,6 @@ func (mr *MockManagerMockRecorder) DescribeTaskList(includeTaskListStatus any) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeTaskList", reflect.TypeOf((*MockManager)(nil).DescribeTaskList), includeTaskListStatus)
 }
 
-// DisconnectBlockedPollers mocks base method.
-func (m *MockManager) DisconnectBlockedPollers(domainActiveCluster *string) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DisconnectBlockedPollers", domainActiveCluster)
-}
-
-// DisconnectBlockedPollers indicates an expected call of DisconnectBlockedPollers.
-func (mr *MockManagerMockRecorder) DisconnectBlockedPollers(domainActiveCluster any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DisconnectBlockedPollers", reflect.TypeOf((*MockManager)(nil).DisconnectBlockedPollers), domainActiveCluster)
-}
-
 // DispatchQueryTask mocks base method.
 func (m *MockManager) DispatchQueryTask(ctx context.Context, taskID string, request *types.MatchingQueryWorkflowRequest) (*types.MatchingQueryWorkflowResponse, error) {
 	m.ctrl.T.Helper()
@@ -137,20 +125,6 @@ func (m *MockManager) GetAllPollerInfo() []*types.PollerInfo {
 func (mr *MockManagerMockRecorder) GetAllPollerInfo() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllPollerInfo", reflect.TypeOf((*MockManager)(nil).GetAllPollerInfo))
-}
-
-// GetDomainActiveCluster mocks base method.
-func (m *MockManager) GetDomainActiveCluster() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDomainActiveCluster")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// GetDomainActiveCluster indicates an expected call of GetDomainActiveCluster.
-func (mr *MockManagerMockRecorder) GetDomainActiveCluster() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDomainActiveCluster", reflect.TypeOf((*MockManager)(nil).GetDomainActiveCluster))
 }
 
 // GetTask mocks base method.
@@ -222,6 +196,20 @@ func (m *MockManager) RefreshTaskListPartitionConfig(arg0 context.Context, arg1 
 func (mr *MockManagerMockRecorder) RefreshTaskListPartitionConfig(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshTaskListPartitionConfig", reflect.TypeOf((*MockManager)(nil).RefreshTaskListPartitionConfig), arg0, arg1)
+}
+
+// ReleaseBlockedPollers mocks base method.
+func (m *MockManager) ReleaseBlockedPollers() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReleaseBlockedPollers")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ReleaseBlockedPollers indicates an expected call of ReleaseBlockedPollers.
+func (mr *MockManagerMockRecorder) ReleaseBlockedPollers() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleaseBlockedPollers", reflect.TypeOf((*MockManager)(nil).ReleaseBlockedPollers))
 }
 
 // Start mocks base method.

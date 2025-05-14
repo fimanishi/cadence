@@ -1823,103 +1823,29 @@ func TestGetNumPartitions(t *testing.T) {
 	assert.NotPanics(t, func() { tlm.matcher.UpdateRatelimit(common.Ptr(float64(100))) })
 }
 
-func TestGetDomainActiveCluster(t *testing.T) {
-	tests := []struct {
-		name             string
-		domainCacheEntry *cache.DomainCacheEntry
-		expectedCluster  string
-	}{
-		{
-			name: "global active-passive domain",
-			domainCacheEntry: cache.NewGlobalDomainCacheEntryForTest(
-				&persistence.DomainInfo{ID: constants.TestDomainID, Name: constants.TestDomainName},
-				&persistence.DomainConfig{Retention: 1},
-				&persistence.DomainReplicationConfig{
-					ActiveClusterName: cluster.TestCurrentClusterName,
-					Clusters:          []*persistence.ClusterReplicationConfig{{ClusterName: cluster.TestCurrentClusterName}, {ClusterName: cluster.TestAlternativeClusterName}},
-				},
-				1,
-			),
-			expectedCluster: cluster.TestCurrentClusterName,
-		},
-		{
-			name: "local domain",
-			domainCacheEntry: cache.NewLocalDomainCacheEntryForTest(
-				&persistence.DomainInfo{ID: constants.TestDomainID, Name: constants.TestDomainName},
-				&persistence.DomainConfig{Retention: 1},
-				cluster.TestCurrentClusterName,
-			),
-			expectedCluster: cluster.TestCurrentClusterName,
-		},
-		{
-			name: "global active-active domain",
-			domainCacheEntry: cache.NewGlobalDomainCacheEntryForTest(
-				&persistence.DomainInfo{ID: constants.TestDomainID, Name: constants.TestDomainName},
-				&persistence.DomainConfig{Retention: 1},
-				&persistence.DomainReplicationConfig{
-					ActiveClusters: &persistence.ActiveClustersConfig{RegionToClusterMap: map[string]persistence.ActiveClusterConfig{}},
-					Clusters:       []*persistence.ClusterReplicationConfig{{ClusterName: cluster.TestCurrentClusterName}, {ClusterName: cluster.TestAlternativeClusterName}},
-				},
-				1,
-			),
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			controller := gomock.NewController(t)
-			logger := testlogger.New(t)
-			timeSource := clock.NewMockedTimeSource()
-
-			tm := NewTestTaskManager(t, logger, timeSource)
-			mockIsolationState := isolationgroup.NewMockState(controller)
-			mockIsolationState.EXPECT().IsDrained(gomock.Any(), "domainName", gomock.Any()).Return(false, nil).AnyTimes()
-			mockDomainCache := cache.NewMockDomainCache(controller)
-			mockDomainCache.EXPECT().GetDomainByID(gomock.Any()).Return(tc.domainCacheEntry, nil).AnyTimes()
-			mockDomainCache.EXPECT().GetDomainName(gomock.Any()).Return("domainName", nil).AnyTimes()
-			mockHistoryService := history.NewMockClient(controller)
-			tl := "tl"
-			dID := "domain"
-			tlID, err := NewIdentifier(dID, tl, persistence.TaskListTypeActivity)
-			if err != nil {
-				panic(err)
-			}
-			tlKind := types.TaskListKindNormal
-			tlMgr, err := NewManager(
-				mockDomainCache,
-				logger,
-				metrics.NewClient(tally.NoopScope, metrics.Matching),
-				tm,
-				cluster.GetTestClusterMetadata(true),
-				mockIsolationState,
-				nil,
-				func(Manager) {},
-				tlID,
-				&tlKind,
-				config.NewConfig(dynamicconfig.NewCollection(dynamicconfig.NewInMemoryClient(), logger), "hostname", getIsolationgroupsHelper),
-				timeSource,
-				timeSource.Now(),
-				mockHistoryService,
-			)
-
-			activeClusterName := tlMgr.GetDomainActiveCluster()
-			assert.Equal(t, tc.expectedCluster, activeClusterName)
-		})
-	}
-}
-
 func TestDisconnectBlockedPollers(t *testing.T) {
 	tests := []struct {
 		name                 string
 		newActiveClusterName *string
+		mockSetup            func(mockMatcher *MockTaskMatcher)
+		stopped              int32
+		expectedErr          error
 	}{
 		{
-			name:                 "test-disconnect-blocked-pollers and update active cluster",
+			name:                 "disconnect blocked pollers and refresh cancel context",
 			newActiveClusterName: common.StringPtr("new-active-cluster"),
+			mockSetup: func(mockMatcher *MockTaskMatcher) {
+				mockMatcher.EXPECT().DisconnectBlockedPollers().Times(1)
+				mockMatcher.EXPECT().RefreshCancelContext().Times(1)
+			},
+			expectedErr: nil,
 		},
 		{
-			name:                 "test-disconnect-blocked-pollers and not update active cluster",
-			newActiveClusterName: nil,
+			name:                 "tasklist manager is shutting down, noop",
+			newActiveClusterName: common.StringPtr("new-active-cluster"),
+			mockSetup:            func(mockMatcher *MockTaskMatcher) {},
+			stopped:              int32(1),
+			expectedErr:          errShutdown,
 		},
 	}
 
@@ -1932,17 +1858,14 @@ func TestDisconnectBlockedPollers(t *testing.T) {
 
 			mockMatcher := NewMockTaskMatcher(gomock.NewController(t))
 			tlm.matcher = mockMatcher
-			mockMatcher.EXPECT().DisconnectBlockedPollers().Times(1)
-			mockMatcher.EXPECT().RefreshCancelContext().Times(1)
-			currentActiveClusterName := tlm.GetDomainActiveCluster()
 
-			tlm.DisconnectBlockedPollers(tc.newActiveClusterName)
+			tc.mockSetup(mockMatcher)
 
-			if tc.newActiveClusterName == nil {
-				assert.Equal(t, currentActiveClusterName, tlm.GetDomainActiveCluster())
-			} else {
-				assert.Equal(t, *tc.newActiveClusterName, tlm.GetDomainActiveCluster())
-			}
+			tlm.stopped = tc.stopped
+
+			err = tlm.ReleaseBlockedPollers()
+
+			assert.Equal(t, tc.expectedErr, err)
 		})
 	}
 }

@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"go.uber.org/atomic"
@@ -67,6 +68,7 @@ type taskMatcherImpl struct {
 
 	cancelCtx  context.Context // used to cancel long polling
 	cancelFunc context.CancelFunc
+	cancelLock sync.Mutex
 
 	tasklist     *Identifier
 	tasklistKind types.TaskListKind
@@ -493,6 +495,8 @@ func (tm *taskMatcherImpl) Rate() float64 {
 }
 
 func (tm *taskMatcherImpl) RefreshCancelContext() {
+	tm.cancelLock.Lock()
+	defer tm.cancelLock.Unlock()
 	tm.cancelCtx, tm.cancelFunc = context.WithCancel(context.Background())
 }
 
