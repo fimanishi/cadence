@@ -16,10 +16,6 @@ domains:
     name: test-domain
     activeClusters:
     - cluster0
-  test-domain-2:
-    name: test-domain-2
-    activeClusters:
-    - cluster0
 
 operations:
   - op: start_workflow
