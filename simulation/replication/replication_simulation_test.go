@@ -67,10 +67,16 @@ func TestReplicationSimulation(t *testing.T) {
 		simCfg.MustInitClientsFor(t, clusterName)
 	}
 
-	simCfg.MustRegisterDomain(t)
+	simTypes.Logf(t, "Registering domains")
+	for domainName := range simCfg.Domains {
+		simTypes.Logf(t, "Domain: %s", domainName)
+		simCfg.MustRegisterDomain(t, domainName)
+	}
 
 	// wait for domain data to be replicated and workers to start.
-	waitUntilWorkersReady(t)
+	for domainName := range simCfg.Domains {
+		waitUntilWorkersReady(t, domainName)
+	}
 
 	sort.Slice(simCfg.Operations, func(i, j int) bool {
 		return simCfg.Operations[i].At < simCfg.Operations[j].At
@@ -115,14 +121,14 @@ func startWorkflow(
 ) error {
 	t.Helper()
 
-	simTypes.Logf(t, "Starting workflow: %s on cluster: %s", op.WorkflowID, op.Cluster)
+	simTypes.Logf(t, "Starting workflow: %s on domain %s on cluster: %s", op.WorkflowID, op.Domain, op.Cluster)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	resp, err := simCfg.MustGetFrontendClient(t, op.Cluster).StartWorkflowExecution(ctx,
 		&types.StartWorkflowExecutionRequest{
 			RequestID:                           uuid.New(),
-			Domain:                              simCfg.Domain.Name,
+			Domain:                              op.Domain,
 			WorkflowID:                          op.WorkflowID,
 			WorkflowType:                        &types.WorkflowType{Name: simTypes.WorkflowName},
 			TaskList:                            &types.TaskList{Name: simTypes.TasklistName},
@@ -135,7 +141,7 @@ func startWorkflow(
 		return err
 	}
 
-	simTypes.Logf(t, "Started workflow: %s on cluster: %s. RunID: %s", op.WorkflowID, op.Cluster, resp.GetRunID())
+	simTypes.Logf(t, "Started workflow: %s on domain: %s on cluster: %s. RunID: %s", op.WorkflowID, op.Domain, op.Cluster, resp.GetRunID())
 
 	return nil
 }
@@ -147,16 +153,16 @@ func changeActiveClusters(
 ) error {
 	t.Helper()
 
-	simTypes.Logf(t, "Changing active clusters to: %v", op.NewActiveClusters)
+	simTypes.Logf(t, "Changing active clusters for domain %s to: %v", op.Domain, op.NewActiveClusters)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	descResp, err := simCfg.MustGetFrontendClient(t, simCfg.PrimaryCluster).DescribeDomain(ctx, &types.DescribeDomainRequest{Name: common.StringPtr(simCfg.Domain.Name)})
+	descResp, err := simCfg.MustGetFrontendClient(t, simCfg.PrimaryCluster).DescribeDomain(ctx, &types.DescribeDomainRequest{Name: common.StringPtr(op.Domain)})
 	if err != nil {
-		return fmt.Errorf("failed to describe domain %s: %w", simCfg.Domain.Name, err)
+		return fmt.Errorf("failed to describe domain %s: %w", op.Domain, err)
 	}
 
-	if !simCfg.IsActiveActiveDomain() {
+	if !simCfg.IsActiveActiveDomain(op.Domain) {
 		fromCluster := descResp.ReplicationConfiguration.ActiveClusterName
 		toCluster := op.NewActiveClusters[0]
 
@@ -164,7 +170,7 @@ func changeActiveClusters(
 		defer cancel()
 		_, err = simCfg.MustGetFrontendClient(t, simCfg.PrimaryCluster).UpdateDomain(ctx,
 			&types.UpdateDomainRequest{
-				Name:                     simCfg.Domain.Name,
+				Name:                     op.Domain,
 				ActiveClusterName:        &toCluster,
 				FailoverTimeoutInSeconds: op.FailoverTimeout,
 			})
@@ -196,7 +202,7 @@ func validate(
 	defer cancel()
 	resp, err := simCfg.MustGetFrontendClient(t, op.Cluster).DescribeWorkflowExecution(ctx,
 		&types.DescribeWorkflowExecutionRequest{
-			Domain: simCfg.Domain.Name,
+			Domain: op.Domain,
 			Execution: &types.WorkflowExecution{
 				WorkflowID: op.WorkflowID,
 			},
@@ -214,7 +220,7 @@ func validate(
 
 	// Get history to validate the worker identity that started and completed the workflow
 	// Some workflows start in cluster0 and complete in cluster1. This is to validate that
-	history, err := getAllHistory(t, simCfg, op.Cluster, op.WorkflowID)
+	history, err := getAllHistory(t, simCfg, op.Cluster, op.Domain, op.WorkflowID)
 	if err != nil {
 		return err
 	}
@@ -227,8 +233,8 @@ func validate(
 	if err != nil {
 		return err
 	}
-	if op.Want.StartedByWorkersInCluster != "" && startedWorker != simTypes.WorkerIdentityFor(op.Want.StartedByWorkersInCluster) {
-		return fmt.Errorf("workflow %s started by worker %s, expected %s", op.WorkflowID, startedWorker, simTypes.WorkerIdentityFor(op.Want.StartedByWorkersInCluster))
+	if op.Want.StartedByWorkersInCluster != "" && startedWorker != simTypes.WorkerIdentityFor(op.Want.StartedByWorkersInCluster, op.Domain) {
+		return fmt.Errorf("workflow %s started by worker %s, expected %s", op.WorkflowID, startedWorker, simTypes.WorkerIdentityFor(op.Want.StartedByWorkersInCluster, op.Domain))
 	}
 
 	completedWorker, err := lastDecisionTaskWorker(history)
@@ -236,8 +242,8 @@ func validate(
 		return err
 	}
 
-	if op.Want.CompletedByWorkersInCluster != "" && completedWorker != simTypes.WorkerIdentityFor(op.Want.CompletedByWorkersInCluster) {
-		return fmt.Errorf("workflow %s completed by worker %s, expected %s", op.WorkflowID, completedWorker, simTypes.WorkerIdentityFor(op.Want.CompletedByWorkersInCluster))
+	if op.Want.CompletedByWorkersInCluster != "" && completedWorker != simTypes.WorkerIdentityFor(op.Want.CompletedByWorkersInCluster, op.Domain) {
+		return fmt.Errorf("workflow %s completed by worker %s, expected %s", op.WorkflowID, completedWorker, simTypes.WorkerIdentityFor(op.Want.CompletedByWorkersInCluster, op.Domain))
 	}
 
 	return nil
@@ -273,14 +279,14 @@ func waitForOpTime(t *testing.T, op *simTypes.Operation, startTime time.Time) {
 	simTypes.Logf(t, "Operation time (t + %ds) reached: %v", int(op.At.Seconds()), startTime.Add(op.At))
 }
 
-func getAllHistory(t *testing.T, simCfg *simTypes.ReplicationSimulationConfig, clusterName, wfID string) ([]types.HistoryEvent, error) {
+func getAllHistory(t *testing.T, simCfg *simTypes.ReplicationSimulationConfig, clusterName, domainName, wfID string) ([]types.HistoryEvent, error) {
 	frontendCl := simCfg.MustGetFrontendClient(t, clusterName)
 	var nextPageToken []byte
 	var history []types.HistoryEvent
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		response, err := frontendCl.GetWorkflowExecutionHistory(ctx, &types.GetWorkflowExecutionHistoryRequest{
-			Domain: simCfg.Domain.Name,
+			Domain: domainName,
 			Execution: &types.WorkflowExecution{
 				WorkflowID: wfID,
 			},
@@ -316,7 +322,7 @@ func mustJSON(t *testing.T, v interface{}) []byte {
 	return data
 }
 
-func waitUntilWorkersReady(t *testing.T) {
+func waitUntilWorkersReady(t *testing.T, domainName string) {
 	// workers expose :6060/health endpoint. Poll on them to check if they are healthy
 	simTypes.Logf(t, "Waiting for workers to start and report healthy")
 	workerEndpoints := []string{
