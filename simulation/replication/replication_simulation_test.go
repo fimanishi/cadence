@@ -130,7 +130,7 @@ func startWorkflow(
 			WorkflowID:                          op.WorkflowID,
 			WorkflowType:                        &types.WorkflowType{Name: simTypes.WorkflowName},
 			TaskList:                            &types.TaskList{Name: simTypes.TasklistName},
-			ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(int32((op.WorkflowDuration + 30*time.Second).Seconds())),
+			ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(int32((op.WorkflowExecutionStartToCloseTimeout).Seconds())),
 			TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(5),
 			Input:                               mustJSON(t, &simTypes.WorkflowInput{Duration: op.WorkflowDuration}),
 		})

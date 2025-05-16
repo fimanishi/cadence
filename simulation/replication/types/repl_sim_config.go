@@ -76,8 +76,9 @@ type Operation struct {
 	At      time.Duration                  `yaml:"at"`
 	Cluster string                         `yaml:"cluster"`
 
-	WorkflowID       string        `yaml:"workflowID"`
-	WorkflowDuration time.Duration `yaml:"workflowDuration"`
+	WorkflowID                           string        `yaml:"workflowID"`
+	WorkflowExecutionStartToCloseTimeout time.Duration `yaml:"workflowExecutionStartToCloseTimeout"`
+	WorkflowDuration                     time.Duration `yaml:"workflowDuration"`
 
 	Domain            string   `yaml:"domain"`
 	NewActiveClusters []string `yaml:"newActiveClusters"`

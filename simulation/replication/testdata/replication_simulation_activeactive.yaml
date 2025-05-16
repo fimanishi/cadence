@@ -24,6 +24,7 @@ operations:
     workflowID: wf1
     cluster: cluster0
     domain: test-domain-aa
+    workflowExecutionStartToCloseTimeout: 90s
     workflowDuration: 60s
 
   - op: start_workflow
@@ -31,6 +32,7 @@ operations:
     workflowID: wf2
     cluster: cluster1
     domain: test-domain-aa
+    workflowExecutionStartToCloseTimeout: 90s
     workflowDuration: 60s
 
   - op: validate

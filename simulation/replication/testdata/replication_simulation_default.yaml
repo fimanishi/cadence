@@ -23,6 +23,7 @@ operations:
     workflowID: wf1
     cluster: cluster0
     domain: test-domain
+    workflowExecutionStartToCloseTimeout: 65s
     workflowDuration: 35s
 
   - op: change_active_clusters # failover from cluster0 to cluster1
