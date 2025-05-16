@@ -33,7 +33,7 @@ operations:
     # failoverTimeoutSec: 5 # unset means force failover. setting it means graceful failover request
 
   - op: validate
-    at: 40s
+    at: 41s # with the current workflow implementation, it's possible that the workflow may finish right after the 40s mark
     workflowID: wf1
     cluster: cluster1
     domain: test-domain
