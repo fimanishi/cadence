@@ -123,6 +123,11 @@ func startWorkflow(
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
+
+	if op.WorkflowExecutionStartToCloseTimeout == 0 || op.WorkflowExecutionStartToCloseTimeout < op.WorkflowDuration {
+		return fmt.Errorf("workflow execution start to close timeout must be specified and should be greater than workflow duration")
+	}
+
 	resp, err := simCfg.MustGetFrontendClient(t, op.Cluster).StartWorkflowExecution(ctx,
 		&types.StartWorkflowExecutionRequest{
 			RequestID:                           uuid.New(),
