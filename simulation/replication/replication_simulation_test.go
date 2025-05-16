@@ -74,9 +74,7 @@ func TestReplicationSimulation(t *testing.T) {
 	}
 
 	// wait for domain data to be replicated and workers to start.
-	for domainName := range simCfg.Domains {
-		waitUntilWorkersReady(t, domainName)
-	}
+	waitUntilWorkersReady(t)
 
 	sort.Slice(simCfg.Operations, func(i, j int) bool {
 		return simCfg.Operations[i].At < simCfg.Operations[j].At
@@ -322,7 +320,7 @@ func mustJSON(t *testing.T, v interface{}) []byte {
 	return data
 }
 
-func waitUntilWorkersReady(t *testing.T, domainName string) {
+func waitUntilWorkersReady(t *testing.T) {
 	// workers expose :6060/health endpoint. Poll on them to check if they are healthy
 	simTypes.Logf(t, "Waiting for workers to start and report healthy")
 	workerEndpoints := []string{

@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -79,7 +80,7 @@ func main() {
 	}
 
 	dispatcher := yarpc.NewDispatcher(yarpc.Config{
-		Name: simTypes.WorkerIdentityFor(*clusterName, "test-domain"),
+		Name: simTypes.WorkerIdentityFor(*clusterName, ""),
 		Outbounds: yarpc.Outbounds{
 			"cadence-frontend": {Unary: grpc.NewTransport().NewSingleOutbound(cluster.GRPCEndpoint)},
 		},
@@ -100,16 +101,23 @@ func main() {
 	)
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		if atomic.LoadInt32(&ready) == 1 {
+		if atomic.LoadInt32(&ready) == int32(len(simCfg.Domains)) {
 			w.WriteHeader(http.StatusOK)
 		} else {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
 	})
 	go http.ListenAndServe(":6060", nil)
+
+	wg := sync.WaitGroup{}
 	for domainName := range simCfg.Domains {
-		waitUntilDomainReady(logger, cadenceClient, domainName)
+		wg.Add(1)
+		go func() {
+			waitUntilDomainReady(logger, cadenceClient, domainName)
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 
 	// Create a channel to receive termination signals
 	sigs := make(chan os.Signal, 1)
@@ -167,7 +175,7 @@ func waitUntilDomainReady(logger *zap.Logger, client workflowserviceclient.Inter
 		cancel()
 		if err == nil {
 			logger.Info("Domains is ready", zap.String("domain", domainName))
-			atomic.StoreInt32(&ready, 1)
+			atomic.AddInt32(&ready, 1)
 			return
 		}
 
