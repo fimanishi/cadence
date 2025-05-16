@@ -111,7 +111,9 @@ func main() {
 
 	wg := sync.WaitGroup{}
 	for domainName := range simCfg.Domains {
+		domainName := domainName
 		wg.Add(1)
+
 		go func() {
 			waitUntilDomainReady(logger, cadenceClient, domainName)
 			wg.Done()
