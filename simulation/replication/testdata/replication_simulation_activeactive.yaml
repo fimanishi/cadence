@@ -21,7 +21,7 @@ domains:
 operations:
   - op: start_workflow
     at: 0s
-    workflowType: test-workflow
+    workflowType: timer-activity-loop-workflow
     workflowID: wf1
     cluster: cluster0
     domain: test-domain-aa

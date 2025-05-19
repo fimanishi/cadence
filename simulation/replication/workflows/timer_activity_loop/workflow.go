@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package main
+package timeractivityloop
 
 import (
 	"context"
@@ -31,12 +31,7 @@ import (
 	"github.com/uber/cadence/simulation/replication/types"
 )
 
-var (
-	workflows  = map[string]any{"test-workflow": TestWorkflow}
-	activities = map[string]any{"test-activity": TestActivity}
-)
-
-func TestWorkflow(ctx workflow.Context, input types.WorkflowInput) (types.WorkflowOutput, error) {
+func Workflow(ctx workflow.Context, input types.WorkflowInput) (types.WorkflowOutput, error) {
 	logger := workflow.GetLogger(ctx)
 	logger.Sugar().Infof("testWorkflow started with input: %+v", input)
 
@@ -49,7 +44,7 @@ func TestWorkflow(ctx workflow.Context, input types.WorkflowInput) (types.Workfl
 			TaskList:               types.TasklistName,
 			ScheduleToStartTimeout: 10 * time.Second,
 			StartToCloseTimeout:    10 * time.Second,
-		}), TestActivity, "World")
+		}), FormatStringActivity, "World")
 		selector.AddFuture(activityFuture, func(f workflow.Future) {
 			logger.Info("testWorkflow completed activity")
 		})
@@ -78,7 +73,7 @@ func TestWorkflow(ctx workflow.Context, input types.WorkflowInput) (types.Workfl
 	return types.WorkflowOutput{Count: count}, nil
 }
 
-func TestActivity(ctx context.Context, input string) (string, error) {
+func FormatStringActivity(ctx context.Context, input string) (string, error) {
 	logger := activity.GetLogger(ctx)
 	logger.Info("testActivity started")
 	return fmt.Sprintf("Hello, %s!", input), nil

@@ -47,6 +47,7 @@ import (
 
 	"github.com/uber/cadence/common"
 	simTypes "github.com/uber/cadence/simulation/replication/types"
+	"github.com/uber/cadence/simulation/replication/workflows"
 )
 
 var (
@@ -142,11 +143,11 @@ func main() {
 			workerOptions,
 		)
 
-		for name, wf := range workflows {
+		for name, wf := range workflows.Workflows {
 			w.RegisterWorkflowWithOptions(wf, workflow.RegisterOptions{Name: name})
 		}
 
-		for name, act := range activities {
+		for name, act := range workflows.Activities {
 			w.RegisterActivityWithOptions(act, activity.RegisterOptions{Name: name})
 		}
 
