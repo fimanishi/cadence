@@ -31,6 +31,11 @@ import (
 	"github.com/uber/cadence/simulation/replication/types"
 )
 
+var (
+	workflows  = map[string]any{"test-workflow": TestWorkflow}
+	activities = map[string]any{"test-activity": TestActivity}
+)
+
 func TestWorkflow(ctx workflow.Context, input types.WorkflowInput) (types.WorkflowOutput, error) {
 	logger := workflow.GetLogger(ctx)
 	logger.Sugar().Infof("testWorkflow started with input: %+v", input)
@@ -44,7 +49,7 @@ func TestWorkflow(ctx workflow.Context, input types.WorkflowInput) (types.Workfl
 			TaskList:               types.TasklistName,
 			ScheduleToStartTimeout: 10 * time.Second,
 			StartToCloseTimeout:    10 * time.Second,
-		}), types.ActivityName, "World")
+		}), TestActivity, "World")
 		selector.AddFuture(activityFuture, func(f workflow.Future) {
 			logger.Info("testWorkflow completed activity")
 		})

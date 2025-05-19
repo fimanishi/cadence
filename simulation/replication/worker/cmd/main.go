@@ -142,8 +142,13 @@ func main() {
 			workerOptions,
 		)
 
-		w.RegisterWorkflowWithOptions(TestWorkflow, workflow.RegisterOptions{Name: simTypes.WorkflowName})
-		w.RegisterActivityWithOptions(TestActivity, activity.RegisterOptions{Name: simTypes.ActivityName})
+		for name, wf := range workflows {
+			w.RegisterWorkflowWithOptions(wf, workflow.RegisterOptions{Name: name})
+		}
+
+		for name, act := range activities {
+			w.RegisterActivityWithOptions(act, activity.RegisterOptions{Name: name})
+		}
 
 		err := w.Start()
 		if err != nil {

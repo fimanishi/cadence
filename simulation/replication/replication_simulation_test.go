@@ -105,7 +105,7 @@ func TestReplicationSimulation(t *testing.T) {
 	// Print the test summary.
 	// Don't change the start/end line format as it is used by scripts to parse the summary info
 	executionTime := time.Since(startTime)
-	testSummary := []string{}
+	var testSummary []string
 	testSummary = append(testSummary, "Simulation Summary:")
 	testSummary = append(testSummary, fmt.Sprintf("Simulation Duration: %v", executionTime))
 	testSummary = append(testSummary, "End of Simulation Summary")
@@ -133,7 +133,7 @@ func startWorkflow(
 			RequestID:                           uuid.New(),
 			Domain:                              op.Domain,
 			WorkflowID:                          op.WorkflowID,
-			WorkflowType:                        &types.WorkflowType{Name: simTypes.WorkflowName},
+			WorkflowType:                        &types.WorkflowType{Name: op.WorkflowType},
 			TaskList:                            &types.TaskList{Name: simTypes.TasklistName},
 			ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(int32((op.WorkflowExecutionStartToCloseTimeout).Seconds())),
 			TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(5),

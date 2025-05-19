@@ -20,6 +20,7 @@ domains:
 operations:
   - op: start_workflow
     at: 0s
+    workflowType: test-workflow
     workflowID: wf1
     cluster: cluster0
     domain: test-domain

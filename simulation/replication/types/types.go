@@ -29,8 +29,6 @@ import (
 const (
 	DefaultTestCase = "testdata/replication_simulation_default.yaml"
 	TasklistName    = "test-tasklist"
-	WorkflowName    = "test-workflow"
-	ActivityName    = "test-activity"
 
 	TimerInterval = 5 * time.Second
 )
