@@ -1160,8 +1160,10 @@ func Test_domainChangeCallback(t *testing.T) {
 	tlIdentifierActivityGlobal1, _ := tasklist.NewIdentifier("global-domain-1-id", "global-domain-1", persistence.TaskListTypeActivity)
 	tlIdentifierDecisionGlobal2, _ := tasklist.NewIdentifier("global-domain-2-id", "global-domain-2", persistence.TaskListTypeDecision)
 	tlIdentifierActivityGlobal2, _ := tasklist.NewIdentifier("global-domain-2-id", "global-domain-2", persistence.TaskListTypeActivity)
+	tlIdentifierStickyGlobal2, _ := tasklist.NewIdentifier("global-domain-2-id", "global-domain-2", persistence.TaskListTypeDecision)
 	tlIdentifierActivityGlobal3, _ := tasklist.NewIdentifier("global-domain-3-id", "global-domain-3", persistence.TaskListTypeActivity)
 	tlIdentifierDecisionGlobal3, _ := tasklist.NewIdentifier("global-domain-3-id", "global-domain-3", persistence.TaskListTypeDecision)
+	tlIdentifierStickyGlobal3, _ := tasklist.NewIdentifier("global-domain-3-id", "global-domain-3", persistence.TaskListTypeDecision)
 	tlIdentifierDecisionLocal1, _ := tasklist.NewIdentifier("local-domain-1-id", "local-domain-1", persistence.TaskListTypeDecision)
 	tlIdentifierActivityLocal1, _ := tasklist.NewIdentifier("local-domain-1-id", "local-domain-1", persistence.TaskListTypeActivity)
 	tlIdentifierDecisionActiveActive1, _ := tasklist.NewIdentifier("active-active-domain-1-id", "active-active-domain-1", persistence.TaskListTypeDecision)
@@ -1177,8 +1179,10 @@ func Test_domainChangeCallback(t *testing.T) {
 			*tlIdentifierActivityGlobal1:       mockTaskListManagerGlobal1,
 			*tlIdentifierDecisionGlobal2:       mockTaskListManagerGlobal2,
 			*tlIdentifierActivityGlobal2:       mockTaskListManagerGlobal2,
+			*tlIdentifierStickyGlobal2:         mockTaskListManagerGlobal2,
 			*tlIdentifierDecisionGlobal3:       mockTaskListManagerGlobal3,
 			*tlIdentifierActivityGlobal3:       mockTaskListManagerGlobal3,
+			*tlIdentifierStickyGlobal3:         mockTaskListManagerGlobal3,
 			*tlIdentifierDecisionLocal1:        mockTaskListManagerLocal1,
 			*tlIdentifierActivityLocal1:        mockTaskListManagerLocal1,
 			*tlIdentifierDecisionActiveActive1: mockTaskListManagerActiveActive1,
@@ -1188,15 +1192,15 @@ func Test_domainChangeCallback(t *testing.T) {
 
 	mockTaskListManagerGlobal1.EXPECT().ReleaseBlockedPollers().Times(0)
 	mockTaskListManagerGlobal2.EXPECT().GetTaskListKind().Return(types.TaskListKindNormal).Times(2)
-	mockTaskListManagerGlobal2.EXPECT().DescribeTaskList(gomock.Any()).Return(&types.DescribeTaskListResponse{}).Times(2)
-	mockTaskListManagerGlobal2.EXPECT().ReleaseBlockedPollers().Times(2)
+	mockTaskListManagerGlobal2.EXPECT().GetTaskListKind().Return(types.TaskListKindSticky).Times(1)
+	mockTaskListManagerGlobal2.EXPECT().DescribeTaskList(gomock.Any()).Return(&types.DescribeTaskListResponse{}).Times(3)
+	mockTaskListManagerGlobal2.EXPECT().ReleaseBlockedPollers().Times(3)
 	mockTaskListManagerGlobal3.EXPECT().GetTaskListKind().Return(types.TaskListKindNormal).Times(2)
-	mockTaskListManagerGlobal3.EXPECT().DescribeTaskList(gomock.Any()).Return(&types.DescribeTaskListResponse{}).Times(2)
-	mockTaskListManagerGlobal3.EXPECT().ReleaseBlockedPollers().Return(errors.New("some-error")).Times(2)
+	mockTaskListManagerGlobal3.EXPECT().GetTaskListKind().Return(types.TaskListKindSticky).Times(1)
+	mockTaskListManagerGlobal3.EXPECT().DescribeTaskList(gomock.Any()).Return(&types.DescribeTaskListResponse{}).Times(3)
+	mockTaskListManagerGlobal3.EXPECT().ReleaseBlockedPollers().Return(errors.New("some-error")).Times(3)
 	mockTaskListManagerLocal1.EXPECT().ReleaseBlockedPollers().Times(0)
 	mockTaskListManagerActiveActive1.EXPECT().ReleaseBlockedPollers().Times(0)
-	mockDomainCache.EXPECT().GetDomainID("global-domain-2").Return("global-domain-2-id", nil).Times(1)
-	mockDomainCache.EXPECT().GetDomainID("global-domain-3").Return("global-domain-3-id", nil).Times(1)
 
 	domains := []*cache.DomainCacheEntry{
 		cache.NewDomainCacheEntryForTest(
