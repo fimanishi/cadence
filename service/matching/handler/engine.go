@@ -279,11 +279,11 @@ func (e *matchingEngineImpl) getTaskListManager(taskList *tasklist.Identifier, t
 	return mgr, nil
 }
 
-func (e *matchingEngineImpl) getTaskListByDomainLocked(domainID string) *types.GetTaskListsByDomainResponse {
+func (e *matchingEngineImpl) getTaskListByDomainLocked(domainID string, taskListKind types.TaskListKind) *types.GetTaskListsByDomainResponse {
 	decisionTaskListMap := make(map[string]*types.DescribeTaskListResponse)
 	activityTaskListMap := make(map[string]*types.DescribeTaskListResponse)
 	for tl, tlm := range e.taskLists {
-		if tl.GetDomainID() == domainID && tlm.GetTaskListKind() == types.TaskListKindNormal {
+		if tl.GetDomainID() == domainID && tlm.GetTaskListKind() == taskListKind {
 			if types.TaskListType(tl.GetType()) == types.TaskListTypeDecision {
 				decisionTaskListMap[tl.GetRoot()] = tlm.DescribeTaskList(false)
 			} else {
@@ -294,18 +294,6 @@ func (e *matchingEngineImpl) getTaskListByDomainLocked(domainID string) *types.G
 	return &types.GetTaskListsByDomainResponse{
 		DecisionTaskListMap: decisionTaskListMap,
 		ActivityTaskListMap: activityTaskListMap,
-	}
-}
-
-func (e *matchingEngineImpl) getStickyTaskListByDomainLocked(domainID string) *types.GetTaskListsByDomainResponse {
-	decisionTaskListMap := make(map[string]*types.DescribeTaskListResponse)
-	for tl, tlm := range e.taskLists {
-		if tl.GetDomainID() == domainID && types.TaskListType(tl.GetType()) == types.TaskListTypeDecision && tlm.GetTaskListKind() == types.TaskListKindSticky {
-			decisionTaskListMap[tl.GetRoot()] = tlm.DescribeTaskList(false)
-		}
-	}
-	return &types.GetTaskListsByDomainResponse{
-		DecisionTaskListMap: decisionTaskListMap,
 	}
 }
 
@@ -1057,7 +1045,7 @@ func (e *matchingEngineImpl) GetTaskListsByDomain(
 
 	e.taskListsLock.RLock()
 	defer e.taskListsLock.RUnlock()
-	return e.getTaskListByDomainLocked(domainID), nil
+	return e.getTaskListByDomainLocked(domainID, types.TaskListKindNormal), nil
 }
 
 func (e *matchingEngineImpl) UpdateTaskListPartitionConfig(
@@ -1453,7 +1441,7 @@ func (e *matchingEngineImpl) domainChangeCallback(nextDomains []*cache.DomainCac
 		}
 
 		e.taskListsLock.RLock()
-		resp := e.getTaskListByDomainLocked(domain.GetInfo().ID)
+		resp := e.getTaskListByDomainLocked(domain.GetInfo().ID, types.TaskListKindNormal)
 		e.taskListsLock.RUnlock()
 
 		for taskListName := range resp.DecisionTaskListMap {
@@ -1465,7 +1453,7 @@ func (e *matchingEngineImpl) domainChangeCallback(nextDomains []*cache.DomainCac
 		}
 
 		e.taskListsLock.RLock()
-		resp = e.getStickyTaskListByDomainLocked(domain.GetInfo().ID)
+		resp = e.getTaskListByDomainLocked(domain.GetInfo().ID, types.TaskListKindSticky)
 		e.taskListsLock.RUnlock()
 
 		for taskListName := range resp.DecisionTaskListMap {
