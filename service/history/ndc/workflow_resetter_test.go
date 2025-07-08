@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/pborman/uuid"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
@@ -143,7 +142,6 @@ func (s *workflowResetterSuite) TestResetWorkflow_NoError() {
 	incomingVersion := baseVersion + 3
 
 	rebuiltHistorySize := int64(9999)
-	newBranchToken := []byte("other random branch token")
 	domainName := "test-domainName"
 
 	s.mockBaseMutableState.EXPECT().GetVersionHistories().Return(versionHistories).AnyTimes()
@@ -180,17 +178,10 @@ func (s *workflowResetterSuite) TestResetWorkflow_NoError() {
 			s.workflowID,
 			s.newRunID,
 		),
-		newBranchToken,
+		gomock.Any(),
 		gomock.Any(),
 	).Return(s.mockRebuiltMutableState, rebuiltHistorySize, nil).Times(1)
 	s.mockShard.Resource.DomainCache.EXPECT().GetDomainName(gomock.Any()).Return(domainName, nil).AnyTimes()
-	s.mockHistoryV2Mgr.On("ForkHistoryBranch", mock.Anything, &persistence.ForkHistoryBranchRequest{
-		ForkBranchToken: branchToken,
-		ForkNodeID:      baseEventID + 1,
-		Info:            persistence.BuildHistoryGarbageCleanupInfo(s.domainID, s.workflowID, s.newRunID),
-		ShardID:         common.IntPtr(s.mockShard.GetShardID()),
-		DomainName:      domainName,
-	}).Return(&persistence.ForkHistoryBranchResponse{NewBranchToken: newBranchToken}, nil).Times(1)
 
 	rebuiltMutableState, err := s.workflowResetter.ResetWorkflow(
 		ctx,

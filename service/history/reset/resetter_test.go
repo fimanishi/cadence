@@ -219,21 +219,12 @@ func (s *workflowResetterSuite) TestReplayResetWorkflow() {
 	baseBranchToken := []byte("some random base branch token")
 	baseRebuildLastEventID := int64(1233)
 	baseRebuildLastEventVersion := int64(12)
-	baseNodeID := baseRebuildLastEventID + 1
 
-	resetBranchToken := []byte("some random reset branch token")
 	resetRequestID := uuid.New()
 	resetHistorySize := int64(4411)
 	resetMutableState := execution.NewMockMutableState(s.controller)
 	domainName := uuid.New()
 	s.mockShard.Resource.DomainCache.EXPECT().GetDomainName(gomock.Any()).Return(domainName, nil).AnyTimes()
-	s.mockHistoryV2Mgr.On("ForkHistoryBranch", mock.Anything, &persistence.ForkHistoryBranchRequest{
-		ForkBranchToken: baseBranchToken,
-		ForkNodeID:      baseNodeID,
-		Info:            persistence.BuildHistoryGarbageCleanupInfo(s.domainID, s.workflowID, s.resetRunID),
-		ShardID:         common.IntPtr(s.mockShard.GetShardID()),
-		DomainName:      domainName,
-	}).Return(&persistence.ForkHistoryBranchResponse{NewBranchToken: resetBranchToken}, nil).Times(1)
 
 	s.mockStateRebuilder.EXPECT().Rebuild(
 		ctx,
@@ -251,7 +242,7 @@ func (s *workflowResetterSuite) TestReplayResetWorkflow() {
 			s.workflowID,
 			s.resetRunID,
 		),
-		resetBranchToken,
+		gomock.Any(),
 		resetRequestID,
 	).Return(resetMutableState, resetHistorySize, nil).Times(1)
 

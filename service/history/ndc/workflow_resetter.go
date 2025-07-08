@@ -119,9 +119,15 @@ func (r *workflowResetterImpl) ResetWorkflow(
 		return nil, err
 	}
 
-	resetBranchToken, err := r.getResetBranchToken(ctx, baseBranchToken, baseLastEventID)
-	if err != nil {
-		return nil, err
+	//resetBranchToken, err := r.getResetBranchToken(ctx, baseBranchToken, baseLastEventID)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	resetBranchTokenFn := func() ([]byte, error) {
+		resetBranchToken, err := r.getResetBranchToken(ctx, baseBranchToken, baseLastEventID)
+
+		return resetBranchToken, err
 	}
 
 	requestID := uuid.New()
@@ -141,7 +147,7 @@ func (r *workflowResetterImpl) ResetWorkflow(
 			r.workflowID,
 			r.newRunID,
 		),
-		resetBranchToken,
+		resetBranchTokenFn,
 		requestID,
 	)
 	if err != nil {

@@ -157,7 +157,7 @@ func (s *conflictResolverSuite) TestRebuild() {
 		lastEventID1,
 		version,
 		workflowIdentifier,
-		branchToken1,
+		gomock.Any(),
 		requestID,
 	).Return(mockRebuildMutableState, historySize, nil).Times(1)
 
@@ -250,7 +250,7 @@ func (s *conflictResolverSuite) TestPrepareMutableState_Rebuild() {
 		lastEventID1,
 		version,
 		workflowIdentifier,
-		branchToken1,
+		gomock.Any(),
 		gomock.Any(),
 	).Return(mockRebuildMutableState, historySize, nil).Times(1)
 
