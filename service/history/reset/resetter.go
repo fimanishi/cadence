@@ -320,18 +320,6 @@ func (r *workflowResetterImpl) replayResetWorkflow(
 	resetRequestID string,
 ) (execution.Workflow, error) {
 
-	//resetBranchToken, err := r.forkAndGenerateBranchToken(
-	//	ctx,
-	//	domainID,
-	//	workflowID,
-	//	baseBranchToken,
-	//	baseRebuildLastEventID+1,
-	//	resetRunID,
-	//)
-	//if err != nil {
-	//	return nil, err
-	//}
-
 	resetContext := execution.NewContext(
 		domainID,
 		types.WorkflowExecution{
