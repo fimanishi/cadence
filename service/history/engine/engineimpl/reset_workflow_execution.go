@@ -86,12 +86,12 @@ func (e *historyEngineImpl) ResetWorkflowExecution(
 		return nil, err
 	}
 
-	//// validate if workflow is resettable
-	//if err := e.isWorkflowResettable(baseMutableState, domainID); err != nil {
-	//	return nil, &types.BadRequestError{
-	//		Message: fmt.Sprintf("workflow is not resettable. Error: %v", err),
-	//	}
-	//}
+	// validate if workflow is resettable
+	if err := e.isWorkflowResettable(baseMutableState, domainID); err != nil {
+		return nil, &types.BadRequestError{
+			Message: fmt.Sprintf("workflow is not resettable. Error: %v", err),
+		}
+	}
 
 	currentRunID := resp.RunID
 	var currentContext execution.Context

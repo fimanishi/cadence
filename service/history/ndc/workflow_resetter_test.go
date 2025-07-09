@@ -22,15 +22,15 @@ package ndc
 
 import (
 	ctx "context"
-	"github.com/stretchr/testify/mock"
-	"golang.org/x/net/context"
 	"testing"
 	"time"
 
 	"github.com/pborman/uuid"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
+	"golang.org/x/net/context"
 
 	"github.com/uber/cadence/common"
 	"github.com/uber/cadence/common/definition"
