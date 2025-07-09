@@ -22,7 +22,9 @@ package ndc
 
 import (
 	ctx "context"
+	"golang.org/x/net/context"
 	"testing"
+	"time"
 
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/require"
@@ -159,7 +161,13 @@ func (s *conflictResolverSuite) TestRebuild() {
 		workflowIdentifier,
 		gomock.Any(),
 		requestID,
-	).Return(mockRebuildMutableState, historySize, nil).Times(1)
+	).DoAndReturn(func(ctx context.Context, now time.Time, baseWorkflowIdentifier definition.WorkflowIdentifier, baseBranchToken []byte, baseRebuildLastEventID int64, baseRebuildLastEventVersion int64, targetWorkflowIdentifier definition.WorkflowIdentifier, targetBranchFn func() ([]byte, error), requestID string) (execution.MutableState, int64, error) {
+		targetBranchToken, err := targetBranchFn()
+		s.NoError(err)
+		s.Equal(branchToken1, targetBranchToken)
+
+		return mockRebuildMutableState, historySize, nil
+	}).Times(1)
 
 	s.mockContext.EXPECT().Clear().Times(1)
 	s.mockContext.EXPECT().SetHistorySize(historySize).Times(1)
@@ -252,7 +260,13 @@ func (s *conflictResolverSuite) TestPrepareMutableState_Rebuild() {
 		workflowIdentifier,
 		gomock.Any(),
 		gomock.Any(),
-	).Return(mockRebuildMutableState, historySize, nil).Times(1)
+	).DoAndReturn(func(ctx context.Context, now time.Time, baseWorkflowIdentifier definition.WorkflowIdentifier, baseBranchToken []byte, baseRebuildLastEventID int64, baseRebuildLastEventVersion int64, targetWorkflowIdentifier definition.WorkflowIdentifier, targetBranchFn func() ([]byte, error), requestID string) (execution.MutableState, int64, error) {
+		targetBranchToken, err := targetBranchFn()
+		s.NoError(err)
+		s.Equal(branchToken1, targetBranchToken)
+
+		return mockRebuildMutableState, historySize, nil
+	}).Times(1)
 
 	s.mockContext.EXPECT().Clear().Times(1)
 	s.mockContext.EXPECT().SetHistorySize(int64(historySize)).Times(1)
