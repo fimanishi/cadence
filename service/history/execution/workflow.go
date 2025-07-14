@@ -25,6 +25,7 @@ package execution
 import (
 	"context"
 	"fmt"
+	"github.com/uber/cadence/common/log/tag"
 
 	"github.com/uber/cadence/common/activecluster"
 	"github.com/uber/cadence/common/cluster"
@@ -123,6 +124,27 @@ func (r *workflowImpl) HappensAfter(
 	thatLastWriteVersion, thatLastEventTaskID, err := that.GetVectorClock()
 	if err != nil {
 		return false, err
+	}
+
+	happensAfter := workflowHappensAfter(
+		thisLastWriteVersion,
+		thisLastEventTaskID,
+		thatLastWriteVersion,
+		thatLastEventTaskID,
+	)
+
+	if !happensAfter {
+		r.logger.Warn(
+			"Workflow happens after check failed",
+			tag.WorkflowID(r.mutableState.GetExecutionInfo().WorkflowID),
+			tag.WorkflowRunID(r.mutableState.GetExecutionInfo().RunID),
+			tag.Dynamic("currentWorkflowID", that.GetMutableState().GetExecutionInfo().WorkflowID),
+			tag.Dynamic("currentWorkflowRunID", that.GetMutableState().GetExecutionInfo().RunID),
+			tag.Dynamic("targetLastWriteVersion", thisLastWriteVersion),
+			tag.Dynamic("targetLastEventTaskID", thisLastEventTaskID),
+			tag.Dynamic("currentLastWriteVersion", thatLastWriteVersion),
+			tag.Dynamic("currentLastEventTaskID", thatLastEventTaskID),
+		)
 	}
 
 	return workflowHappensAfter(
