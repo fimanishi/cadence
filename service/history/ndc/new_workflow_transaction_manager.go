@@ -25,6 +25,7 @@ package ndc
 import (
 	ctx "context"
 	"fmt"
+	"github.com/uber/cadence/common/log/tag"
 	"time"
 
 	"github.com/uber/cadence/common/log"
@@ -112,6 +113,25 @@ func (r *transactionManagerForNewWorkflowImpl) dispatchForNewWorkflow(
 	if err != nil {
 		return err
 	}
+
+	currentLastWriteVersion, currentLastEventTaskID, err := currentWorkflow.GetVectorClock()
+	if err != nil {
+		return err
+	}
+
+	targetLastWriteVersion, targetLastEventTaskID, err := targetWorkflow.GetVectorClock()
+
+	r.logger.Warn(
+		"Dispatch for new workflow vector clocks - no current runID",
+		tag.WorkflowID(targetWorkflow.GetMutableState().GetExecutionInfo().WorkflowID),
+		tag.WorkflowRunID(targetWorkflow.GetMutableState().GetExecutionInfo().RunID),
+		tag.Dynamic("currentWorkflowID", currentWorkflow.GetMutableState().GetExecutionInfo().WorkflowID),
+		tag.Dynamic("currentWorkflowRunID", currentWorkflow.GetMutableState().GetExecutionInfo().RunID),
+		tag.Dynamic("targetLastWriteVersion", targetLastWriteVersion),
+		tag.Dynamic("targetLastEventTaskID", targetLastEventTaskID),
+		tag.Dynamic("currentLastWriteVersion", currentLastWriteVersion),
+		tag.Dynamic("currentLastEventTaskID", currentLastEventTaskID),
+	)
 
 	if !targetWorkflowIsNewer {
 		// target workflow is older than current workflow, need to suppress the target workflow
