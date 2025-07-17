@@ -25,10 +25,10 @@ package ndc
 import (
 	ctx "context"
 	"fmt"
-	"github.com/uber/cadence/common/log/tag"
 	"time"
 
 	"github.com/uber/cadence/common/log"
+	"github.com/uber/cadence/common/log/tag"
 	"github.com/uber/cadence/common/persistence"
 	"github.com/uber/cadence/common/types"
 	"github.com/uber/cadence/service/history/events"

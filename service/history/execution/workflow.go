@@ -25,11 +25,11 @@ package execution
 import (
 	"context"
 	"fmt"
-	"github.com/uber/cadence/common/log/tag"
 
 	"github.com/uber/cadence/common/activecluster"
 	"github.com/uber/cadence/common/cluster"
 	"github.com/uber/cadence/common/log"
+	"github.com/uber/cadence/common/log/tag"
 	"github.com/uber/cadence/common/persistence"
 	"github.com/uber/cadence/common/types"
 )

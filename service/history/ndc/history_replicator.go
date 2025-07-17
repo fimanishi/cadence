@@ -766,6 +766,14 @@ func applyNonStartEventsMissingMutableState(
 		)
 	}
 
+	task.getLogger().Debug("applyNonStartEventsMissingMutableState - reset task",
+		tag.Dynamic("task-version", task.getVersion()),
+		tag.Dynamic("first-event-id", task.getFirstEvent().ID),
+		tag.Dynamic("last-event-id", task.getLastEvent().ID),
+		tag.WorkflowID(task.getExecution().GetWorkflowID()),
+		tag.WorkflowRunID(task.getExecution().GetRunID()),
+	)
+
 	decisionTaskEvent := task.getFirstEvent()
 	baseEventID := decisionTaskEvent.ID - 1
 	baseRunID, newRunID, baseEventVersion, _ := task.getWorkflowResetMetadata()

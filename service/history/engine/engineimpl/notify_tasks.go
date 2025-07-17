@@ -79,6 +79,12 @@ func (e *historyEngineImpl) NotifyNewReplicationTasks(info *hcommon.NotifyTaskIn
 			e.logger.Error("failed to preemptively hydrate replication task", tag.Error(err))
 			continue
 		}
+		e.logger.Debug("notifyNewReplicationTasks",
+			tag.Dynamic("task-version", task.GetVersion()),
+			tag.Dynamic("task-id", task.GetTaskID()),
+			tag.WorkflowID(task.GetWorkflowID()),
+			tag.WorkflowRunID(task.GetRunID()),
+		)
 		e.replicationTaskStore.Put(hTask)
 	}
 }
