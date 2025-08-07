@@ -212,7 +212,6 @@ func (e *historyEngineImpl) ResetWorkflowExecution(
 		request.GetReason(),
 		nil,
 		request.GetSkipSignalReapply(),
-		true,
 	); err != nil {
 		if t, ok := persistence.AsDuplicateRequestError(err); ok {
 			if t.RequestType == persistence.WorkflowRequestTypeReset {

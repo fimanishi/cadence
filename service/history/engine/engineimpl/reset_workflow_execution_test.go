@@ -426,7 +426,6 @@ func TestResetWorkflowExecution(t *testing.T) {
 						gomock.Eq(testRequestReason),
 						gomock.Nil(),
 						gomock.Eq(testRequestSkipSignalReapply),
-						gomock.Eq(true),
 					).Return(nil).Times(1)
 				},
 			},
@@ -494,7 +493,6 @@ func TestResetWorkflowExecution(t *testing.T) {
 						gomock.Eq(testRequestReason),
 						gomock.Nil(),
 						gomock.Eq(testRequestSkipSignalReapply),
-						gomock.Eq(true),
 					).Return(nil).Times(1)
 				},
 			},
@@ -550,7 +548,6 @@ func TestResetWorkflowExecution(t *testing.T) {
 						gomock.Eq(testRequestReason),
 						gomock.Nil(),
 						gomock.Eq(testRequestSkipSignalReapply),
-						gomock.Eq(true),
 					).Return(nil).Times(1)
 				},
 			},
@@ -595,7 +592,6 @@ func TestResetWorkflowExecution(t *testing.T) {
 						gomock.Eq(testRequestReason),
 						gomock.Nil(),
 						gomock.Eq(testRequestSkipSignalReapply),
-						gomock.Eq(true),
 					).Return(&persistence.DuplicateRequestError{
 						RequestType: persistence.WorkflowRequestTypeReset,
 						RunID:       "errorID",
@@ -645,7 +641,6 @@ func TestResetWorkflowExecution(t *testing.T) {
 						gomock.Eq(testRequestReason),
 						gomock.Nil(),
 						gomock.Eq(testRequestSkipSignalReapply),
-						gomock.Eq(true),
 					).Return(&persistence.DuplicateRequestError{
 						RequestType: persistence.WorkflowRequestTypeStart,
 						RunID:       "errorID",
@@ -696,7 +691,6 @@ func TestResetWorkflowExecution(t *testing.T) {
 						gomock.Eq(testRequestReason),
 						gomock.Nil(),
 						gomock.Eq(testRequestSkipSignalReapply),
-						gomock.Eq(true),
 					).Return(&types.BadRequestError{
 						Message: "didn't work",
 					}).Times(1)
@@ -830,7 +824,6 @@ func TestResetWorkflowExecution_ResetPointsValidation(t *testing.T) {
 					gomock.Eq(testRequestReason),
 					gomock.Nil(),
 					gomock.Eq(testRequestSkipSignalReapply),
-					gomock.Eq(true),
 				).Return(nil).Times(1)
 			},
 			resetEventID: 23,
@@ -854,7 +847,6 @@ func TestResetWorkflowExecution_ResetPointsValidation(t *testing.T) {
 					gomock.Eq(testRequestReason),
 					gomock.Nil(),
 					gomock.Eq(testRequestSkipSignalReapply),
-					gomock.Eq(true),
 				).Return(nil).Times(1)
 			},
 			resetEventID: 9,
@@ -878,7 +870,6 @@ func TestResetWorkflowExecution_ResetPointsValidation(t *testing.T) {
 					gomock.Eq(testRequestReason),
 					gomock.Nil(),
 					gomock.Eq(testRequestSkipSignalReapply),
-					gomock.Eq(true),
 				).Return(nil).Times(1)
 			},
 			resetEventID: 12,
@@ -902,7 +893,6 @@ func TestResetWorkflowExecution_ResetPointsValidation(t *testing.T) {
 					gomock.Eq(testRequestReason),
 					gomock.Nil(),
 					gomock.Eq(testRequestSkipSignalReapply),
-					gomock.Eq(true),
 				).Return(nil).Times(1)
 			},
 			resetEventID: 24,
