@@ -234,10 +234,7 @@ func (e *historyEngineImpl) validateResetPointForResetWorkflowExecutionRequest(
 		}
 	}
 
-	if err := checkResetEventType(events, request.GetDecisionFinishEventID()); err != nil {
-		return err
-	}
-	return nil
+	return checkResetEventType(events, request.GetDecisionFinishEventID())
 }
 
 func (e *historyEngineImpl) getPaginationFn(

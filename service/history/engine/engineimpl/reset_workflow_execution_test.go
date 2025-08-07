@@ -916,7 +916,6 @@ func TestResetWorkflowExecution_ResetPointsValidation(t *testing.T) {
 
 			withHistoryPagination(pageToken, tc.resetEventID)(t, eft)
 
-			//withCurrentExecution(latestExecution)
 			withState(latestExecution, &persistence.WorkflowMutableState{
 				ExecutionInfo: &persistence.WorkflowExecutionInfo{
 					DomainID:           constants.TestDomainID,
