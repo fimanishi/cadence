@@ -24,6 +24,9 @@ package engineimpl
 import (
 	"context"
 	"fmt"
+	"github.com/uber/cadence/common"
+	"github.com/uber/cadence/common/collection"
+	persistenceutils "github.com/uber/cadence/common/persistence/persistence-utils"
 
 	"github.com/pborman/uuid"
 
@@ -32,6 +35,10 @@ import (
 	"github.com/uber/cadence/common/persistence"
 	"github.com/uber/cadence/common/types"
 	"github.com/uber/cadence/service/history/execution"
+)
+
+const (
+	DefaultPageSize = 100
 )
 
 func (e *historyEngineImpl) ResetWorkflowExecution(
@@ -84,13 +91,6 @@ func (e *historyEngineImpl) ResetWorkflowExecution(
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	// validate if workflow is resettable
-	if err := e.isWorkflowResettable(baseMutableState, domainID); err != nil {
-		return nil, &types.BadRequestError{
-			Message: fmt.Sprintf("workflow is not resettable. Error: %v", err),
-		}
 	}
 
 	currentRunID := resp.RunID
@@ -153,6 +153,42 @@ func (e *historyEngineImpl) ResetWorkflowExecution(
 		baseCurrentBranchToken = baseCurrentVersionHistory.GetBranchToken()
 	}
 
+	// validate reset point
+
+	iter := collection.NewPagingIterator(e.getPaginationFn(
+		ctx,
+		constants.FirstEventID,
+		request.GetDecisionFinishEventID()+1,
+		baseCurrentBranchToken,
+		domainID,
+	))
+
+	if !iter.HasNext() {
+		return nil, fmt.Errorf("workflow has corrupted or missing history")
+	}
+
+	var events []*types.HistoryEvent
+
+	for iter.HasNext() {
+		batch, err := iter.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		events = batch.(*types.History).Events
+
+		// because there we are validating the lastEvent, the lastEvent is present in the history events
+		// we don't want to add the lastEvent to the mutable state again, so if the batch first event id is greater
+		// than or equal to the baseLastEventID, we can stop processing
+		if events[len(events)-1].ID >= request.GetDecisionFinishEventID() {
+			break
+		}
+	}
+
+	if err := checkResetEventType(events, request.GetDecisionFinishEventID()); err != nil {
+		return nil, err
+	}
+
 	if err := e.workflowResetter.ResetWorkflow(
 		ctx,
 		domainID,
@@ -176,6 +212,7 @@ func (e *historyEngineImpl) ResetWorkflowExecution(
 		request.GetReason(),
 		nil,
 		request.GetSkipSignalReapply(),
+		true,
 	); err != nil {
 		if t, ok := persistence.AsDuplicateRequestError(err); ok {
 			if t.RequestType == persistence.WorkflowRequestTypeReset {
@@ -193,23 +230,61 @@ func (e *historyEngineImpl) ResetWorkflowExecution(
 	}, nil
 }
 
-/*
-If a workflow was started in a different cluster, it is not resettable because replication stack is not able to handle workflow start event.
-*/
-func (e *historyEngineImpl) isWorkflowResettable(baseMutableState execution.MutableState, domainID string) error {
-	startVersion, err := baseMutableState.GetStartVersion()
-	if err != nil {
-		return fmt.Errorf("fail to get failover version of workflow start event: %w", err)
+func (e *historyEngineImpl) getPaginationFn(
+	ctx context.Context,
+	firstEventID int64,
+	nextEventID int64,
+	branchToken []byte,
+	domainID string,
+) collection.PaginationFn {
+
+	return func(paginationToken []byte) ([]interface{}, []byte, error) {
+
+		_, historyBatches, token, _, err := persistenceutils.PaginateHistory(
+			ctx,
+			e.historyV2Mgr,
+			true,
+			branchToken,
+			firstEventID,
+			nextEventID,
+			paginationToken,
+			DefaultPageSize,
+			common.IntPtr(e.shard.GetShardID()),
+			domainID,
+			e.shard.GetDomainCache(),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		var paginateItems []interface{}
+		for _, history := range historyBatches {
+			paginateItems = append(paginateItems, history)
+		}
+		return paginateItems, token, nil
+	}
+}
+
+// checkResetEventType checks the type of the reset event and only allows specific types to be resettable
+func checkResetEventType(events []*types.HistoryEvent, resetEventID int64) error {
+	for _, event := range events {
+		if event.ID == resetEventID {
+			switch *event.EventType {
+			case types.EventTypeDecisionTaskStarted:
+				return nil
+			case types.EventTypeDecisionTaskTimedOut:
+				return nil
+			case types.EventTypeDecisionTaskFailed:
+				return nil
+			case types.EventTypeDecisionTaskCompleted:
+				return nil
+			default:
+				return &types.BadRequestError{
+					Message: fmt.Sprintf("reset event must be of type DecisionTaskStarted, DecisionTaskTimedOut, DecisionTaskFailed, or DecisionTaskCompleted. Attempting to reset on event type: %v", event.EventType.String()),
+				}
+			}
+		}
 	}
 
-	startCluster, err := e.shard.GetActiveClusterManager().ClusterNameForFailoverVersion(startVersion, domainID)
-	if err != nil {
-		return fmt.Errorf("fail to get cluster name for failover version: %w", err)
-	}
-
-	if currentCluster := e.clusterMetadata.GetCurrentClusterName(); currentCluster != startCluster {
-		return fmt.Errorf("workflow was not started in the current cluster: failover to workflow start cluster %s before reset", startCluster)
-	}
-
-	return nil
+	return fmt.Errorf("reset event ID %v not found in the history events", resetEventID)
 }
