@@ -153,39 +153,10 @@ func (e *historyEngineImpl) ResetWorkflowExecution(
 		baseCurrentBranchToken = baseCurrentVersionHistory.GetBranchToken()
 	}
 
-	// validate reset point
-
-	iter := collection.NewPagingIterator(e.getPaginationFn(
-		ctx,
-		constants.FirstEventID,
-		request.GetDecisionFinishEventID()+1,
-		baseCurrentBranchToken,
-		domainID,
-	))
-
-	if !iter.HasNext() {
-		return nil, fmt.Errorf("workflow has corrupted or missing history")
-	}
-
-	var events []*types.HistoryEvent
-
-	for iter.HasNext() {
-		batch, err := iter.Next()
-		if err != nil {
-			return nil, err
-		}
-
-		events = batch.(*types.History).Events
-
-		// because there we are validating the lastEvent, the lastEvent is present in the history events
-		// we don't want to add the lastEvent to the mutable state again, so if the batch first event id is greater
-		// than or equal to the baseLastEventID, we can stop processing
-		if events[len(events)-1].ID >= request.GetDecisionFinishEventID() {
-			break
-		}
-	}
-
-	if err := checkResetEventType(events, request.GetDecisionFinishEventID()); err != nil {
+	// for reset workflow execution requests, the caller provides the decision finish event ID.
+	// must validate the event ID to ensure it is a valid reset point
+	err = e.validateResetPointForResetWorkflowExecutionRequest(ctx, request, baseCurrentBranchToken, domainID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -229,6 +200,46 @@ func (e *historyEngineImpl) ResetWorkflowExecution(
 	}, nil
 }
 
+func (e *historyEngineImpl) validateResetPointForResetWorkflowExecutionRequest(
+	ctx context.Context,
+	request *types.ResetWorkflowExecutionRequest,
+	baseCurrentBranchToken []byte,
+	domainID string,
+) error {
+	iter := collection.NewPagingIterator(e.getPaginationFn(
+		ctx,
+		constants.FirstEventID,
+		request.GetDecisionFinishEventID()+1,
+		baseCurrentBranchToken,
+		domainID,
+	))
+
+	if !iter.HasNext() {
+		return fmt.Errorf("workflow has corrupted or missing history")
+	}
+
+	var events []*types.HistoryEvent
+
+	for iter.HasNext() {
+		batch, err := iter.Next()
+		if err != nil {
+			return err
+		}
+
+		events = batch.(*types.History).Events
+
+		// get the batch of events that contains the reset event and exit the loop
+		if events[len(events)-1].ID >= request.GetDecisionFinishEventID() {
+			break
+		}
+	}
+
+	if err := checkResetEventType(events, request.GetDecisionFinishEventID()); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (e *historyEngineImpl) getPaginationFn(
 	ctx context.Context,
 	firstEventID int64,
@@ -238,7 +249,6 @@ func (e *historyEngineImpl) getPaginationFn(
 ) collection.PaginationFn {
 
 	return func(paginationToken []byte) ([]interface{}, []byte, error) {
-
 		_, historyBatches, token, _, err := persistenceutils.PaginateHistory(
 			ctx,
 			e.historyV2Mgr,
