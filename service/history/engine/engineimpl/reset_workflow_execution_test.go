@@ -950,23 +950,10 @@ func TestResetWorkflowExecution_ResetPointsValidation(t *testing.T) {
 
 			if tc.err != nil {
 				assert.Error(t, err)
-				//	s.EqualError(err, tc.err.Error())
+				assert.EqualError(t, err, tc.err.Error())
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
-				//	rebuildExecutionInfo := rebuildMutableState.GetExecutionInfo()
-				//	s.Equal(targetDomainID, rebuildExecutionInfo.DomainID)
-				//	s.Equal(targetWorkflowID, rebuildExecutionInfo.WorkflowID)
-				//	s.Equal(targetRunID, rebuildExecutionInfo.RunID)
-				//	s.Equal(partitionConfig, rebuildExecutionInfo.PartitionConfig)
-				//	s.Equal(int64(historySize), rebuiltHistorySize)
-				//	s.Equal(persistence.NewVersionHistories(
-				//		persistence.NewVersionHistory(
-				//			targetBranchToken,
-				//			[]*persistence.VersionHistoryItem{persistence.NewVersionHistoryItem(tc.resetEventID-1, version)},
-				//		),
-				//	), rebuildMutableState.GetVersionHistories())
-				//	s.Equal(rebuildMutableState.GetExecutionInfo().StartTimestamp, now)
 			}
 		})
 	}
