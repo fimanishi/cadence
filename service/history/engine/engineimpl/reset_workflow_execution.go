@@ -24,15 +24,15 @@ package engineimpl
 import (
 	"context"
 	"fmt"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/collection"
-	persistenceutils "github.com/uber/cadence/common/persistence/persistence-utils"
 
 	"github.com/pborman/uuid"
 
+	"github.com/uber/cadence/common"
+	"github.com/uber/cadence/common/collection"
 	"github.com/uber/cadence/common/constants"
 	"github.com/uber/cadence/common/log/tag"
 	"github.com/uber/cadence/common/persistence"
+	persistenceutils "github.com/uber/cadence/common/persistence/persistence-utils"
 	"github.com/uber/cadence/common/types"
 	"github.com/uber/cadence/service/history/execution"
 )

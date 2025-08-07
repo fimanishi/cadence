@@ -25,8 +25,6 @@ package engineimpl
 import (
 	ctx "context"
 	"fmt"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/mocks"
 	"testing"
 
 	"github.com/pborman/uuid"
@@ -34,7 +32,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/mock/gomock"
 
+	"github.com/uber/cadence/common"
 	commonconstants "github.com/uber/cadence/common/constants"
+	"github.com/uber/cadence/common/mocks"
 	"github.com/uber/cadence/common/persistence"
 	"github.com/uber/cadence/common/types"
 	"github.com/uber/cadence/service/history/constants"
