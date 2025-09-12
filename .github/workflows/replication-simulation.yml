@@ -18,6 +18,7 @@ jobs:
           - activeactive_regional_failover
           - activepassive_to_activeactive
           - clusterredirection
+          - reset
           - default
 
     steps:
