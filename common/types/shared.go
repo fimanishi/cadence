@@ -2038,6 +2038,7 @@ func (v *DomainConfiguration) ByteSize() uint64 {
 	if v == nil {
 		return 0
 	}
+
 	size := uint64(unsafe.Sizeof(*v))
 	size += v.BadBinaries.ByteSize()
 	size += v.HistoryArchivalStatus.ByteSize()
@@ -2196,6 +2197,7 @@ func (v *DomainReplicationConfiguration) ByteSize() uint64 {
 	if v == nil {
 		return 0
 	}
+
 	size := uint64(unsafe.Sizeof(*v))
 	size += uint64(len(v.ActiveClusterName))
 	for _, e := range v.Clusters {
@@ -2221,6 +2223,7 @@ func (v *ActiveClusters) ByteSize() uint64 {
 	if v == nil {
 		return 0
 	}
+
 	size := uint64(unsafe.Sizeof(*v))
 	for k, val := range v.ActiveClustersByRegion {
 		size += uint64(len(k)) + val.ByteSize()
@@ -2365,6 +2368,7 @@ func (e *DomainStatus) ByteSize() uint64 {
 	if e == nil {
 		return 0
 	}
+
 	return uint64(unsafe.Sizeof(*e))
 }
 
@@ -2433,6 +2437,7 @@ func (e *EncodingType) ByteSize() uint64 {
 	if e == nil {
 		return 0
 	}
+
 	return uint64(unsafe.Sizeof(*e))
 }
 

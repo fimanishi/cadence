@@ -451,8 +451,7 @@ func (c *AsyncWorkflowConfiguration) ByteSize() uint64 {
 	if c == nil {
 		return 0
 	}
-	var size uint64
-	size += uint64(unsafe.Sizeof(*c))
+	size := uint64(unsafe.Sizeof(*c))
 	size += uint64(len(c.PredefinedQueueName))
 	size += uint64(len(c.QueueType))
 	size += c.QueueConfig.ByteSize()

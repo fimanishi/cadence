@@ -138,10 +138,10 @@ func (c *Cache) Ack(level int64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	for c.order.Len() > 0 && c.order.Peek() <= level {
+	for c.order.Len() > 0 && c.order.Peek().(heapTaskInfo).taskID <= level {
 		taskInfo := heap.Pop(&c.order).(heapTaskInfo)
 		delete(c.cache, taskInfo.taskID)
-		c.currSize -= uint64(taskInfo.size)
+		c.currSize -= taskInfo.size
 	}
 
 	c.lastAck = level
@@ -169,6 +169,6 @@ func (h *int64Heap) Pop() interface{} {
 	return x
 }
 
-func (h *int64Heap) Peek() int64 {
-	return (*h)[0].taskID
+func (h *int64Heap) Peek() interface{} {
+	return (*h)[0]
 }
