@@ -40,9 +40,6 @@ func AssertByteSizeMatchesReflect(t *testing.T, v any) {
 		}
 		assert.True(t, ok, "%T does not implement ByteSize()", v)
 
-		// Ensure pointer fields are non-nil so new fields are exercised.
-		//autoPopulateNonNil(rv)
-
 		// Compare impl vs reflect-based computation.
 		root := rv
 		if root.Kind() == reflect.Ptr {
@@ -76,39 +73,7 @@ func AssertReachablesImplementByteSize(t *testing.T, root any) {
 	assert.Equal(t, 0, len(missing), "reachable struct types missing ByteSize(): %v", missing)
 }
 
-//// ------------------- helpers -------------------
-//
-//func autoPopulateNonNil(v reflect.Value) {
-//	if !v.IsValid() {
-//		return
-//	}
-//	if v.Kind() == reflect.Ptr {
-//		if v.IsNil() {
-//			v.Set(reflect.New(v.Type().Elem()))
-//		}
-//		v = v.Elem()
-//	}
-//	if v.Kind() != reflect.Struct {
-//		return
-//	}
-//	for i := 0; i < v.NumField(); i++ {
-//		f := v.Field(i)
-//		if !f.CanSet() {
-//			continue
-//		}
-//		switch f.Kind() {
-//		case reflect.Ptr:
-//			if f.IsNil() {
-//				f.Set(reflect.New(f.Type().Elem()))
-//			}
-//			autoPopulateNonNil(f)
-//		case reflect.Struct:
-//			// embedded struct (non-pointer)
-//			autoPopulateNonNil(f.Addr())
-//			// Leave slices/maps/strings at zero; both sides treat them equally.
-//		}
-//	}
-//}
+// ------------------- helpers -------------------
 
 func structPayloadSize(v reflect.Value) uint64 {
 	if v.Kind() == reflect.Ptr {
