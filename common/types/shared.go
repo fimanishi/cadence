@@ -2200,6 +2200,7 @@ func (v *DomainReplicationConfiguration) ByteSize() uint64 {
 
 	size := uint64(unsafe.Sizeof(*v))
 	size += uint64(len(v.ActiveClusterName))
+	size += uint64(len(v.Clusters)) * uint64(unsafe.Sizeof((*ClusterReplicationConfiguration)(nil)))
 	for _, e := range v.Clusters {
 		size += e.ByteSize()
 	}
@@ -2226,7 +2227,10 @@ func (v *ActiveClusters) ByteSize() uint64 {
 
 	size := uint64(unsafe.Sizeof(*v))
 	for k, val := range v.ActiveClustersByRegion {
-		size += uint64(len(k)) + val.ByteSize()
+		// reflection-based calculator purposely ignores Go’s internal map bucket/storage and treats each map element as
+		// key: dynamic payload only (e.g., len(string)), no string header
+		// value: dynamic payload only (e.g., for a struct, just its fields’ dynamic payload), no struct header, no inline ints/bools
+		size += uint64(len(k)) + val.ByteSize() - uint64(unsafe.Sizeof(val))
 	}
 	return size
 }
@@ -7617,11 +7621,13 @@ func (v *VersionHistory) ByteSize() uint64 {
 
 	size := uint64(unsafe.Sizeof(*v))
 	size += uint64(len(v.BranchToken))
-	if v.Items != nil {
-		for _, e := range v.Items {
-			size += e.ByteSize()
-		}
+
+	// [] *VersionHistoryItem backing array: len * pointer size
+	size += uint64(len(v.Items)) * uint64(unsafe.Sizeof((*VersionHistoryItem)(nil)))
+	for _, e := range v.Items {
+		size += e.ByteSize()
 	}
+
 	return size
 }
 

@@ -259,7 +259,9 @@ func (v *FailoverMarkerAttributes) ByteSize() uint64 {
 
 	size := uint64(unsafe.Sizeof(*v))
 	size += uint64(len(v.DomainID))
-	size += uint64(unsafe.Sizeof(v.CreationTime))
+	if v.CreationTime != nil {
+		size += uint64(unsafe.Sizeof(*v.CreationTime))
+	}
 
 	return size
 }
@@ -448,10 +450,9 @@ func (v *HistoryTaskV2Attributes) ByteSize() uint64 {
 	size += uint64(len(v.WorkflowID))
 	size += uint64(len(v.RunID))
 
-	if v.VersionHistoryItems != nil {
-		for _, item := range v.VersionHistoryItems {
-			size += item.ByteSize()
-		}
+	size += uint64(len(v.VersionHistoryItems)) * uint64(unsafe.Sizeof((*VersionHistoryItem)(nil)))
+	for _, item := range v.VersionHistoryItems {
+		size += item.ByteSize()
 	}
 
 	size += v.Events.ByteSize()

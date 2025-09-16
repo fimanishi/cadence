@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/uber/cadence/common/testing/testdatagen"
 )
 
 type byteSizer interface{ ByteSize() uint64 }
@@ -14,37 +15,44 @@ type byteSizer interface{ ByteSize() uint64 }
 func AssertByteSizeMatchesReflect(t *testing.T, v any) {
 	t.Helper()
 
-	rv := reflect.ValueOf(v)
-	if !rv.IsValid() {
-		t.Fatalf("nil/invalid value")
-	}
+	gen := testdatagen.New(t)
 
-	// Must implement ByteSize (on value or pointer)
-	bs, ok := v.(byteSizer)
-	if !ok {
-		// if they passed a non-pointer, check its pointer receiver too
-		if rv.Kind() != reflect.Ptr {
-			if pv, ok2 := reflect.New(rv.Type()).Interface().(byteSizer); ok2 {
-				bs = pv
-				rv = rv.Addr()
-				ok = true
+	for i := 0; i < 100; i++ {
+
+		gen.Fuzz(v)
+
+		rv := reflect.ValueOf(v)
+		if !rv.IsValid() {
+			t.Fatalf("nil/invalid value")
+		}
+
+		// Must implement ByteSize (on value or pointer)
+		bs, ok := v.(byteSizer)
+		if !ok {
+			// if they passed a non-pointer, check its pointer receiver too
+			if rv.Kind() != reflect.Ptr {
+				if pv, ok2 := reflect.New(rv.Type()).Interface().(byteSizer); ok2 {
+					bs = pv
+					rv = rv.Addr()
+					ok = true
+				}
 			}
 		}
+		assert.True(t, ok, "%T does not implement ByteSize()", v)
+
+		// Ensure pointer fields are non-nil so new fields are exercised.
+		//autoPopulateNonNil(rv)
+
+		// Compare impl vs reflect-based computation.
+		root := rv
+		if root.Kind() == reflect.Ptr {
+			root = root.Elem()
+		}
+		exp := uint64(root.Type().Size()) + structPayloadSize(root)
+		got := bs.ByteSize()
+
+		assert.Equal(t, exp, got, "ByteSize mismatch for %T: got=%d expected=%d (likely a new/changed field not reflected in ByteSize)", v, got, exp)
 	}
-	assert.True(t, ok, "%T does not implement ByteSize()", v)
-
-	// Ensure pointer fields are non-nil so new fields are exercised.
-	autoPopulateNonNil(rv)
-
-	// Compare impl vs reflect-based computation.
-	root := rv
-	if root.Kind() == reflect.Ptr {
-		root = root.Elem()
-	}
-	exp := uint64(root.Type().Size()) + structPayloadSize(root)
-	got := bs.ByteSize()
-
-	assert.Equal(t, exp, got, "ByteSize mismatch for %T: got=%d expected=%d (likely a new/changed field not reflected in ByteSize)", v, got, exp)
 }
 
 // AssertReachablesImplementByteSize ensures every reachable named struct
@@ -68,39 +76,39 @@ func AssertReachablesImplementByteSize(t *testing.T, root any) {
 	assert.Equal(t, 0, len(missing), "reachable struct types missing ByteSize(): %v", missing)
 }
 
-// ------------------- helpers -------------------
-
-func autoPopulateNonNil(v reflect.Value) {
-	if !v.IsValid() {
-		return
-	}
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			v.Set(reflect.New(v.Type().Elem()))
-		}
-		v = v.Elem()
-	}
-	if v.Kind() != reflect.Struct {
-		return
-	}
-	for i := 0; i < v.NumField(); i++ {
-		f := v.Field(i)
-		if !f.CanSet() {
-			continue
-		}
-		switch f.Kind() {
-		case reflect.Ptr:
-			if f.IsNil() {
-				f.Set(reflect.New(f.Type().Elem()))
-			}
-			autoPopulateNonNil(f)
-		case reflect.Struct:
-			// embedded struct (non-pointer)
-			autoPopulateNonNil(f.Addr())
-			// Leave slices/maps/strings at zero; both sides treat them equally.
-		}
-	}
-}
+//// ------------------- helpers -------------------
+//
+//func autoPopulateNonNil(v reflect.Value) {
+//	if !v.IsValid() {
+//		return
+//	}
+//	if v.Kind() == reflect.Ptr {
+//		if v.IsNil() {
+//			v.Set(reflect.New(v.Type().Elem()))
+//		}
+//		v = v.Elem()
+//	}
+//	if v.Kind() != reflect.Struct {
+//		return
+//	}
+//	for i := 0; i < v.NumField(); i++ {
+//		f := v.Field(i)
+//		if !f.CanSet() {
+//			continue
+//		}
+//		switch f.Kind() {
+//		case reflect.Ptr:
+//			if f.IsNil() {
+//				f.Set(reflect.New(f.Type().Elem()))
+//			}
+//			autoPopulateNonNil(f)
+//		case reflect.Struct:
+//			// embedded struct (non-pointer)
+//			autoPopulateNonNil(f.Addr())
+//			// Leave slices/maps/strings at zero; both sides treat them equally.
+//		}
+//	}
+//}
 
 func structPayloadSize(v reflect.Value) uint64 {
 	if v.Kind() == reflect.Ptr {
