@@ -84,7 +84,7 @@ func NewTaskStore(
 
 	clusters := map[string]*Cache{}
 	for clusterName := range clusterMetadata.GetRemoteClusterInfo() {
-		clusters[clusterName] = NewCache(config.ReplicatorCacheMaxCount, config.ReplicatorCacheMaxSize, logger)
+		clusters[clusterName] = NewCache(config.ReplicatorCacheCapacity, config.ReplicatorCacheMaxSize, logger)
 	}
 
 	retryPolicy := backoff.NewExponentialRetryPolicy(100 * time.Millisecond)

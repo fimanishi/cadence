@@ -145,7 +145,7 @@ func TestTaskStore(t *testing.T) {
 
 func createTestTaskStore(t *testing.T, domains domainCache, hydrator taskHydrator) *TaskStore {
 	cfg := hconfig.Config{
-		ReplicatorCacheMaxCount:         dynamicproperties.GetIntPropertyFn(2),
+		ReplicatorCacheCapacity:         dynamicproperties.GetIntPropertyFn(2),
 		ReplicationTaskGenerationQPS:    dynamicproperties.GetFloatPropertyFn(0),
 		ReplicatorReadTaskMaxRetryCount: dynamicproperties.GetIntPropertyFn(1),
 		ReplicatorCacheMaxSize:          dynamicproperties.GetIntPropertyFn(2000),

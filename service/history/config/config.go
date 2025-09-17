@@ -186,7 +186,7 @@ type Config struct {
 	ReplicatorProcessorMinTaskBatchSize    dynamicproperties.IntPropertyFnWithShardIDFilter
 	ReplicatorProcessorBatchSizeStepCount  dynamicproperties.IntPropertyFnWithShardIDFilter
 	ReplicatorUpperLatency                 dynamicproperties.DurationPropertyFn
-	ReplicatorCacheMaxCount                dynamicproperties.IntPropertyFn
+	ReplicatorCacheCapacity                dynamicproperties.IntPropertyFn
 	ReplicatorCacheMaxSize                 dynamicproperties.IntPropertyFn
 
 	// System Limits
@@ -481,7 +481,7 @@ func New(dc *dynamicconfig.Collection, numberOfShards int, maxMessageSize int, i
 		ReplicatorProcessorMinTaskBatchSize:    dc.GetIntPropertyFilteredByShardID(dynamicproperties.ReplicatorMinTaskBatchSize),
 		ReplicatorProcessorBatchSizeStepCount:  dc.GetIntPropertyFilteredByShardID(dynamicproperties.ReplicatorTaskBatchStepCount),
 		ReplicatorUpperLatency:                 dc.GetDurationProperty(dynamicproperties.ReplicatorUpperLatency),
-		ReplicatorCacheMaxCount:                dc.GetIntProperty(dynamicproperties.ReplicatorCacheMaxCount),
+		ReplicatorCacheCapacity:                dc.GetIntProperty(dynamicproperties.ReplicatorCacheCapacity),
 		ReplicatorCacheMaxSize:                 dc.GetIntProperty(dynamicproperties.ReplicatorCacheMaxSize),
 
 		MaximumBufferedEventsBatch:      dc.GetIntProperty(dynamicproperties.MaximumBufferedEventsBatch),

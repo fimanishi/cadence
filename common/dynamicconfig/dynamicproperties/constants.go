@@ -1088,12 +1088,12 @@ const (
 	// Default value: 3
 	// Allowed filters: N/A
 	ReplicatorReadTaskMaxRetryCount
-	// ReplicatorCacheMaxCount is the capacity of replication cache in number of tasks
-	// KeyName: history.replicatorCacheMaxCount
+	// ReplicatorCacheCapacity is the capacity of replication cache in number of tasks
+	// KeyName: history.replicatorCacheCapacity
 	// Value type: Int
 	// Default value: 0
 	// Allowed filters: N/A
-	ReplicatorCacheMaxCount
+	ReplicatorCacheCapacity
 	// ReplicatorCacheMaxSize is the max size of the replication cache in bytes
 	// KeyName: history.replicatorCacheSize
 	// Value type: Int
@@ -3688,9 +3688,9 @@ var IntKeys = map[IntKey]DynamicInt{
 		Description:  "ReplicatorReadTaskMaxRetryCount is the number of read replication task retry time",
 		DefaultValue: 3,
 	},
-	ReplicatorCacheMaxCount: {
-		KeyName:      "history.replicatorCacheMaxCount",
-		Description:  "ReplicatorCacheMaxCount is the capacity of replication cache in number of tasks",
+	ReplicatorCacheCapacity: {
+		KeyName:      "history.replicatorCacheCapacity",
+		Description:  "ReplicatorCacheCapacity is the capacity of replication cache in number of tasks",
 		DefaultValue: 0,
 	},
 	ReplicatorCacheMaxSize: {
