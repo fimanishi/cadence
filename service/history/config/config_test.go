@@ -165,7 +165,7 @@ func TestNewConfig(t *testing.T) {
 		"ReplicatorProcessorMaxTaskBatchSize":                  {dynamicproperties.ReplicatorMaxTaskBatchSize, 1000},
 		"ReplicatorProcessorBatchSizeStepCount":                {dynamicproperties.ReplicatorTaskBatchStepCount, 10},
 		"ReplicatorUpperLatency":                               {dynamicproperties.ReplicatorUpperLatency, time.Second},
-		"ReplicatorCacheMaxCount":                              {dynamicproperties.ReplicatorCacheCapacity, 56},
+		"ReplicatorCacheMaxCount":                              {dynamicproperties.ReplicatorCacheMaxCount, 56},
 		"ReplicatorCacheMaxSize":                               {dynamicproperties.ReplicatorCacheMaxSize, 2000},
 		"ExecutionMgrNumConns":                                 {dynamicproperties.ExecutionMgrNumConns, 57},
 		"HistoryMgrNumConns":                                   {dynamicproperties.HistoryMgrNumConns, 58},

@@ -481,7 +481,7 @@ func New(dc *dynamicconfig.Collection, numberOfShards int, maxMessageSize int, i
 		ReplicatorProcessorMinTaskBatchSize:    dc.GetIntPropertyFilteredByShardID(dynamicproperties.ReplicatorMinTaskBatchSize),
 		ReplicatorProcessorBatchSizeStepCount:  dc.GetIntPropertyFilteredByShardID(dynamicproperties.ReplicatorTaskBatchStepCount),
 		ReplicatorUpperLatency:                 dc.GetDurationProperty(dynamicproperties.ReplicatorUpperLatency),
-		ReplicatorCacheMaxCount:                dc.GetIntProperty(dynamicproperties.ReplicatorCacheCapacity),
+		ReplicatorCacheMaxCount:                dc.GetIntProperty(dynamicproperties.ReplicatorCacheMaxCount),
 		ReplicatorCacheMaxSize:                 dc.GetIntProperty(dynamicproperties.ReplicatorCacheMaxSize),
 
 		MaximumBufferedEventsBatch:      dc.GetIntProperty(dynamicproperties.MaximumBufferedEventsBatch),
