@@ -97,6 +97,8 @@ func typePayloadSize(v reflect.Value) uint64 {
 			return 0
 		}
 		// DO NOT call ByteSize() here — keep independence
+		// the size calculation is done recursively using reflection to provide an independent check on the ByteSize impl
+		// Therefore, the size calculated by reflection is the ground truth and the ByteSize impl must match it
 		elem := v.Elem()
 		// Add the pointed-to value's header size (since it's a separate allocation)
 		// plus its dynamic payload.

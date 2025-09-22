@@ -25,6 +25,7 @@ package replication
 import (
 	"container/heap"
 	"errors"
+	"math"
 	"sync"
 
 	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
@@ -112,7 +113,7 @@ func (c *Cache) Put(task *types.ReplicationTask) error {
 	taskSize := task.ByteSize()
 
 	// Check for full cache
-	if (len(c.order) >= c.maxCount()) || (c.currSize+taskSize) >= uint64(c.maxSize()) {
+	if (len(c.order) >= c.maxCount()) || (c.currSize+taskSize) >= uint64(c.maxSize()) || (c.currSize > (math.MaxUint64 - taskSize)) {
 		return errCacheFull
 	}
 
@@ -138,7 +139,7 @@ func (c *Cache) Ack(level int64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	for c.order.Len() > 0 && c.order.Peek().(heapTaskInfo).taskID <= level {
+	for c.order.Len() > 0 && c.order.Peek().taskID <= level {
 		taskInfo := heap.Pop(&c.order).(heapTaskInfo)
 		delete(c.cache, taskInfo.taskID)
 		c.currSize -= taskInfo.size
@@ -169,6 +170,6 @@ func (h *int64Heap) Pop() interface{} {
 	return x
 }
 
-func (h *int64Heap) Peek() interface{} {
+func (h *int64Heap) Peek() heapTaskInfo {
 	return (*h)[0]
 }
