@@ -81,7 +81,7 @@ type AckCache[T AckCacheItem] interface {
 // BoundedAckCache is a heap-based implementation of AckCache that maintains
 // items in sequence ID order and rejects new items when capacity limits are reached.
 type BoundedAckCache[T AckCacheItem] struct {
-	mu sync.RWMutex
+	mu sync.Mutex
 
 	maxCount dynamicproperties.IntPropertyFn
 	maxSize  dynamicproperties.IntPropertyFn
@@ -155,8 +155,8 @@ func (c *BoundedAckCache[T]) Put(item T, size uint64) error {
 
 // Get retrieves an item by sequence ID.
 func (c *BoundedAckCache[T]) Get(sequenceID int64) T {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	return c.cache[sequenceID]
 }
@@ -182,16 +182,16 @@ func (c *BoundedAckCache[T]) Ack(level int64) uint64 {
 
 // Size returns current total byte size.
 func (c *BoundedAckCache[T]) Size() uint64 {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	return c.currSize
 }
 
 // Count returns current number of items.
 func (c *BoundedAckCache[T]) Count() int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	return len(c.order)
 }
