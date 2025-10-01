@@ -51,7 +51,7 @@ var ErrUnknownCluster = errors.New("unknown cluster")
 // A cache stores only a pointer to the message. It is hydrates once and shared across caches. Cluster acknowledging the message will remove it from that corresponding cache.
 // Once all clusters acknowledge it, no more references will be held, and GC will eventually pick it up.
 type TaskStore struct {
-	clusters      map[string]*Cache
+	clusters      map[string]cache.AckCache[*types.ReplicationTask]
 	domains       domainCache
 	hydrator      taskHydrator
 	rateLimiter   quotas.Limiter
@@ -82,9 +82,9 @@ func NewTaskStore(
 	hydrator taskHydrator,
 ) *TaskStore {
 
-	clusters := map[string]*Cache{}
+	clusters := map[string]cache.AckCache[*types.ReplicationTask]{}
 	for clusterName := range clusterMetadata.GetRemoteClusterInfo() {
-		clusters[clusterName] = NewCache(config.ReplicatorCacheCapacity, config.ReplicatorCacheMaxSize, logger)
+		clusters[clusterName] = cache.NewBoundedAckCache[*types.ReplicationTask](config.ReplicatorCacheCapacity, config.ReplicatorCacheMaxSize, logger)
 	}
 
 	retryPolicy := backoff.NewExponentialRetryPolicy(100 * time.Millisecond)
@@ -187,7 +187,7 @@ func (m *TaskStore) Put(task *types.ReplicationTask) {
 
 		err = cacheByCluster.Put(task)
 		switch {
-		case errors.Is(err, errCacheFull):
+		case errors.Is(err, cache.ErrAckCacheFull):
 			scope.IncCounter(metrics.CacheFullCounter)
 
 			// This will help debug which shard is full. Logger already has ShardID tag attached.
@@ -196,7 +196,7 @@ func (m *TaskStore) Put(task *types.ReplicationTask) {
 				m.logger.Warn("Replication cache is full")
 				m.lastLogTime = time.Now()
 			}
-		case errors.Is(err, errAlreadyAcked):
+		case errors.Is(err, cache.ErrAlreadyAcked):
 			// No action, this is expected.
 			// Some cluster(s) may be already past this, due to different fetch rates.
 		}
