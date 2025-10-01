@@ -185,7 +185,7 @@ func (m *TaskStore) Put(task *types.ReplicationTask) {
 
 		scope := m.scope.Tagged(metrics.SourceClusterTag(targetCluster))
 
-		err = cacheByCluster.Put(task)
+		err = cacheByCluster.Put(task, task.ByteSize())
 		switch {
 		case errors.Is(err, cache.ErrAckCacheFull):
 			scope.IncCounter(metrics.CacheFullCounter)
@@ -213,7 +213,7 @@ func (m *TaskStore) Ack(cluster string, lastTaskID int64) error {
 		return ErrUnknownCluster
 	}
 
-	cache.Ack(lastTaskID)
+	_ = cache.Ack(lastTaskID)
 
 	scope := m.scope.Tagged(metrics.SourceClusterTag(cluster))
 	scope.RecordTimer(metrics.CacheSize, time.Duration(cache.Count()))

@@ -38,15 +38,11 @@ var (
 )
 
 // AckCacheItem represents an item that can be stored in an AckCache.
-// Items must have a sequence ID for ordering and a size for capacity management.
+// Items must have a sequence ID for ordering.
 type AckCacheItem interface {
 	// GetSequenceID returns the sequence identifier for this item.
 	// Items are ordered by sequence ID and acknowledged up to a sequence level.
 	GetSequenceID() int64
-
-	// ByteSize returns the approximate size of this item in bytes.
-	// Used for capacity management when size limits are configured.
-	ByteSize() uint64
 }
 
 // AckCache is a bounded cache that stores items in sequence ID order.
@@ -61,18 +57,19 @@ type AckCacheItem interface {
 //
 // The cache is thread-safe for concurrent readers and writers.
 type AckCache[T AckCacheItem] interface {
-	// Put stores an item in the cache. Returns ErrAckCacheFull if the cache
+	// Put stores an item in the cache with the specified size. Returns ErrAckCacheFull if the cache
 	// is at capacity, or ErrAlreadyAcked if the item's sequence ID has already
 	// been acknowledged. Silently ignores duplicate sequence IDs.
-	Put(item T) error
+	Put(item T, size uint64) error
 
 	// Get retrieves an item by its sequence ID. Returns the zero value of T
 	// if the item is not found.
 	Get(sequenceID int64) T
 
 	// Ack acknowledges all items with sequence ID <= level, removing them
-	// from the cache. This is the primary mechanism for freeing cache space.
-	Ack(level int64)
+	// from the cache. Returns the total size of items that were removed.
+	// This is the primary mechanism for freeing cache space.
+	Ack(level int64) uint64
 
 	// Size returns the current total byte size of all items in the cache.
 	Size() uint64
@@ -124,8 +121,8 @@ func NewBoundedAckCache[T AckCacheItem](
 	}
 }
 
-// Put stores an item in the cache.
-func (c *BoundedAckCache[T]) Put(item T) error {
+// Put stores an item in the cache with the specified size.
+func (c *BoundedAckCache[T]) Put(item T, size uint64) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -141,19 +138,17 @@ func (c *BoundedAckCache[T]) Put(item T) error {
 		return nil
 	}
 
-	itemSize := item.ByteSize()
-
 	// Check capacity limits
 	if (len(c.order) >= c.maxCount()) ||
-		(c.currSize+itemSize >= uint64(c.maxSize())) ||
-		(c.currSize > math.MaxUint64-itemSize) {
+		(c.currSize+size >= uint64(c.maxSize())) ||
+		(c.currSize > math.MaxUint64-size) {
 		return ErrAckCacheFull
 	}
 
 	// Add to both heap and map
 	c.cache[sequenceID] = item
-	heap.Push(&c.order, heapItem[T]{sequenceID: sequenceID, size: itemSize})
-	c.currSize += itemSize
+	heap.Push(&c.order, heapItem[T]{sequenceID: sequenceID, size: size})
+	c.currSize += size
 
 	return nil
 }
@@ -166,19 +161,23 @@ func (c *BoundedAckCache[T]) Get(sequenceID int64) T {
 	return c.cache[sequenceID]
 }
 
-// Ack acknowledges all items with sequence ID <= level.
-func (c *BoundedAckCache[T]) Ack(level int64) {
+// Ack acknowledges all items with sequence ID <= level and returns total freed size.
+func (c *BoundedAckCache[T]) Ack(level int64) uint64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	var freedSize uint64
 
 	// Remove all items from heap with sequence ID <= level
 	for c.order.Len() > 0 && c.order.Peek().sequenceID <= level {
 		item := heap.Pop(&c.order).(heapItem[T])
 		delete(c.cache, item.sequenceID)
 		c.currSize -= item.size
+		freedSize += item.size
 	}
 
 	c.lastAck = level
+	return freedSize
 }
 
 // Size returns current total byte size.

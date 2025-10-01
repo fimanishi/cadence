@@ -81,24 +81,24 @@ func TestBoundedAckCache_BasicOperations(t *testing.T) {
 	item2 := newTestItem(200, "item2")
 	item3 := newTestItem(150, "item3") // out of order
 
-	require.NoError(t, cache.Put(item1))
+	require.NoError(t, cache.Put(item1, item1.ByteSize()))
 	assert.Equal(t, item1.ByteSize(), cache.Size())
 	assert.Equal(t, 1, cache.Count())
 	assert.Equal(t, item1, cache.Get(100))
 
-	require.NoError(t, cache.Put(item2))
+	require.NoError(t, cache.Put(item2, item2.ByteSize()))
 	assert.Equal(t, item1.ByteSize()+item2.ByteSize(), cache.Size())
 	assert.Equal(t, 2, cache.Count())
 	assert.Equal(t, item2, cache.Get(200))
 
 	// Test out-of-order insertion
-	require.NoError(t, cache.Put(item3))
+	require.NoError(t, cache.Put(item3, item3.ByteSize()))
 	assert.Equal(t, item1.ByteSize()+item2.ByteSize()+item3.ByteSize(), cache.Size())
 	assert.Equal(t, 3, cache.Count())
 	assert.Equal(t, item3, cache.Get(150))
 
 	// Test duplicate insertion (should be silently ignored)
-	require.NoError(t, cache.Put(item1))
+	require.NoError(t, cache.Put(item1, item1.ByteSize()))
 	assert.Equal(t, 3, cache.Count()) // No change
 }
 
@@ -114,22 +114,24 @@ func TestBoundedAckCache_Acknowledgment(t *testing.T) {
 	item3 := newTestItem(300, "item3")
 	item4 := newTestItem(150, "item4")
 
-	require.NoError(t, cache.Put(item1))
-	require.NoError(t, cache.Put(item2))
-	require.NoError(t, cache.Put(item3))
-	require.NoError(t, cache.Put(item4))
+	require.NoError(t, cache.Put(item1, item1.ByteSize()))
+	require.NoError(t, cache.Put(item2, item2.ByteSize()))
+	require.NoError(t, cache.Put(item3, item3.ByteSize()))
+	require.NoError(t, cache.Put(item4, item4.ByteSize()))
 
 	totalSize := item1.ByteSize() + item2.ByteSize() + item3.ByteSize() + item4.ByteSize()
 	assert.Equal(t, totalSize, cache.Size())
 	assert.Equal(t, 4, cache.Count())
 
 	// Ack at level 0 - should not remove anything
-	cache.Ack(0)
+	freedSize := cache.Ack(0)
+	assert.Equal(t, uint64(0), freedSize)
 	assert.Equal(t, 4, cache.Count())
 	assert.Equal(t, totalSize, cache.Size())
 
 	// Ack at level 100 - should remove item1
-	cache.Ack(100)
+	freedSize = cache.Ack(100)
+	assert.Equal(t, item1.ByteSize(), freedSize)
 	assert.Equal(t, 3, cache.Count())
 	assert.Equal(t, totalSize-item1.ByteSize(), cache.Size())
 	assert.Nil(t, cache.Get(100))
@@ -138,7 +140,8 @@ func TestBoundedAckCache_Acknowledgment(t *testing.T) {
 	assert.Equal(t, item3, cache.Get(300))
 
 	// Ack at level 200 - should remove item4 and item2
-	cache.Ack(200)
+	freedSize = cache.Ack(200)
+	assert.Equal(t, item4.ByteSize()+item2.ByteSize(), freedSize)
 	assert.Equal(t, 1, cache.Count())
 	assert.Equal(t, item3.ByteSize(), cache.Size())
 	assert.Nil(t, cache.Get(100))
@@ -147,7 +150,8 @@ func TestBoundedAckCache_Acknowledgment(t *testing.T) {
 	assert.Equal(t, item3, cache.Get(300))
 
 	// Ack at level 500 - should remove everything
-	cache.Ack(500)
+	freedSize = cache.Ack(500)
+	assert.Equal(t, item3.ByteSize(), freedSize)
 	assert.Equal(t, 0, cache.Count())
 	assert.Equal(t, uint64(0), cache.Size())
 	assert.Nil(t, cache.Get(300))
@@ -164,21 +168,21 @@ func TestBoundedAckCache_AlreadyAcked(t *testing.T) {
 	item2 := newTestItem(200, "item2")
 	item3 := newTestItem(50, "item3") // lower than ack level
 
-	require.NoError(t, cache.Put(item1))
-	require.NoError(t, cache.Put(item2))
+	require.NoError(t, cache.Put(item1, item1.ByteSize()))
+	require.NoError(t, cache.Put(item2, item2.ByteSize()))
 
 	// Ack at level 150
-	cache.Ack(150)
+	_ = cache.Ack(150)
 	assert.Equal(t, 1, cache.Count())
 	assert.Nil(t, cache.Get(100))
 	assert.Equal(t, item2, cache.Get(200))
 
 	// Try to add item with sequence ID lower than ack level
-	assert.Equal(t, ErrAlreadyAcked, cache.Put(item3))
+	assert.Equal(t, ErrAlreadyAcked, cache.Put(item3, item3.ByteSize()))
 	assert.Equal(t, 1, cache.Count()) // No change
 
 	// Try to add item1 again (already acked)
-	assert.Equal(t, ErrAlreadyAcked, cache.Put(item1))
+	assert.Equal(t, ErrAlreadyAcked, cache.Put(item1, item1.ByteSize()))
 	assert.Equal(t, 1, cache.Count()) // No change
 }
 
@@ -194,20 +198,20 @@ func TestBoundedAckCache_CountLimit(t *testing.T) {
 	item3 := newTestItem(300, "item3")
 	item4 := newTestItem(400, "item4")
 
-	require.NoError(t, cache.Put(item1))
-	require.NoError(t, cache.Put(item2))
-	require.NoError(t, cache.Put(item3))
+	require.NoError(t, cache.Put(item1, item1.ByteSize()))
+	require.NoError(t, cache.Put(item2, item2.ByteSize()))
+	require.NoError(t, cache.Put(item3, item3.ByteSize()))
 	assert.Equal(t, 3, cache.Count())
 
 	// Fourth item should be rejected
-	assert.Equal(t, ErrAckCacheFull, cache.Put(item4))
+	assert.Equal(t, ErrAckCacheFull, cache.Put(item4, item4.ByteSize()))
 	assert.Equal(t, 3, cache.Count())
 	assert.Nil(t, cache.Get(400))
 
 	// After acking, should be able to add more
-	cache.Ack(200)
+	_ = cache.Ack(200)
 	assert.Equal(t, 1, cache.Count())
-	require.NoError(t, cache.Put(item4))
+	require.NoError(t, cache.Put(item4, item4.ByteSize()))
 	assert.Equal(t, 2, cache.Count())
 	assert.Equal(t, item4, cache.Get(400))
 }
@@ -223,22 +227,22 @@ func TestBoundedAckCache_SizeLimit(t *testing.T) {
 	item2 := newTestItemWithSize(200, "item2", 40)
 	item3 := newTestItemWithSize(300, "item3", 30) // would exceed size limit
 
-	require.NoError(t, cache.Put(item1))
-	require.NoError(t, cache.Put(item2))
+	require.NoError(t, cache.Put(item1, item1.ByteSize()))
+	require.NoError(t, cache.Put(item2, item2.ByteSize()))
 	assert.Equal(t, uint64(80), cache.Size())
 	assert.Equal(t, 2, cache.Count())
 
 	// Third item should be rejected due to size
-	assert.Equal(t, ErrAckCacheFull, cache.Put(item3))
+	assert.Equal(t, ErrAckCacheFull, cache.Put(item3, item3.ByteSize()))
 	assert.Equal(t, uint64(80), cache.Size())
 	assert.Equal(t, 2, cache.Count())
 	assert.Nil(t, cache.Get(300))
 
 	// After acking, should be able to add more
-	cache.Ack(150)
+	_ = cache.Ack(150)
 	assert.Equal(t, uint64(40), cache.Size())
 	assert.Equal(t, 1, cache.Count())
-	require.NoError(t, cache.Put(item3))
+	require.NoError(t, cache.Put(item3, item3.ByteSize()))
 	assert.Equal(t, uint64(70), cache.Size())
 	assert.Equal(t, 2, cache.Count())
 }
@@ -253,16 +257,16 @@ func TestBoundedAckCache_DynamicLimits(t *testing.T) {
 	item2 := newTestItem(200, "item2")
 	item3 := newTestItem(300, "item3")
 
-	require.NoError(t, cache.Put(item1))
-	require.NoError(t, cache.Put(item2))
-	assert.Equal(t, ErrAckCacheFull, cache.Put(item3))
+	require.NoError(t, cache.Put(item1, item1.ByteSize()))
+	require.NoError(t, cache.Put(item2, item2.ByteSize()))
+	assert.Equal(t, ErrAckCacheFull, cache.Put(item3, item3.ByteSize()))
 
 	// Increase count limit dynamically
 	maxCount = dynamicproperties.GetIntPropertyFn(5)
 	cache.(*BoundedAckCache[*testItem]).maxCount = maxCount
 
 	// Now the third item should be accepted
-	require.NoError(t, cache.Put(item3))
+	require.NoError(t, cache.Put(item3, item3.ByteSize()))
 	assert.Equal(t, 3, cache.Count())
 }
 
@@ -281,7 +285,7 @@ func TestBoundedAckCache_ConcurrentOperations(t *testing.T) {
 		defer func() { done <- true }()
 		for i := 0; i < 100; i++ {
 			item := newTestItem(int64(i*10), "item")
-			cache.Put(item)
+			cache.Put(item, item.ByteSize())
 		}
 	}()
 
@@ -299,7 +303,7 @@ func TestBoundedAckCache_ConcurrentOperations(t *testing.T) {
 	go func() {
 		defer func() { done <- true }()
 		for i := 0; i < 10; i++ {
-			cache.Ack(int64(i * 100))
+			_ = cache.Ack(int64(i * 100))
 		}
 	}()
 
@@ -309,7 +313,7 @@ func TestBoundedAckCache_ConcurrentOperations(t *testing.T) {
 	}
 
 	// Final ack to clean up
-	cache.Ack(1000)
+	_ = cache.Ack(1000)
 	assert.Equal(t, 0, cache.Count())
 	assert.Equal(t, uint64(0), cache.Size())
 }
@@ -324,7 +328,7 @@ func BenchmarkBoundedAckCache(b *testing.B) {
 	// Pre-populate cache
 	for i := 0; i < 5000; i++ {
 		item := newTestItem(int64(i*100), "benchmark_item")
-		cache.Put(item)
+		cache.Put(item, item.ByteSize())
 	}
 
 	b.ResetTimer()
@@ -332,9 +336,9 @@ func BenchmarkBoundedAckCache(b *testing.B) {
 		sequenceID := int64(n * 100)
 		cache.Get(sequenceID)
 		item := newTestItem(int64(n*100+500000), "new_item")
-		cache.Put(item)
+		cache.Put(item, item.ByteSize())
 		if n%100 == 0 {
-			cache.Ack(sequenceID)
+			_ = cache.Ack(sequenceID)
 		}
 	}
 }
