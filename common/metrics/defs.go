@@ -3245,14 +3245,14 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		WorkflowExecutionHistoryAccess: {metricName: "workflow_execution_history_access", metricType: Gauge},
 
 		// Budget manager metrics
-		BudgetManagerCapacityBytes:     {metricName: "budget_manager_capacity_bytes", metricType: Gauge},
-		BudgetManagerCapacityCount:     {metricName: "budget_manager_capacity_count", metricType: Gauge},
-		BudgetManagerUsedBytes:         {metricName: "budget_manager_used_bytes", metricType: Gauge},
-		BudgetManagerUsedCount:         {metricName: "budget_manager_used_count", metricType: Gauge},
-		BudgetManagerSoftThreshold:     {metricName: "budget_manager_soft_threshold", metricType: Gauge},
-		BudgetManagerActiveCacheCount:  {metricName: "budget_manager_active_cache_count", metricType: Gauge},
-		BudgetManagerHardCapExceeded:   {metricName: "budget_manager_hard_cap_exceeded", metricType: Counter},
-		BudgetManagerSoftCapExceeded:   {metricName: "budget_manager_soft_cap_exceeded", metricType: Counter},
+		BudgetManagerCapacityBytes:    {metricName: "budget_manager_capacity_bytes", metricType: Gauge},
+		BudgetManagerCapacityCount:    {metricName: "budget_manager_capacity_count", metricType: Gauge},
+		BudgetManagerUsedBytes:        {metricName: "budget_manager_used_bytes", metricType: Gauge},
+		BudgetManagerUsedCount:        {metricName: "budget_manager_used_count", metricType: Gauge},
+		BudgetManagerSoftThreshold:    {metricName: "budget_manager_soft_threshold", metricType: Gauge},
+		BudgetManagerActiveCacheCount: {metricName: "budget_manager_active_cache_count", metricType: Gauge},
+		BudgetManagerHardCapExceeded:  {metricName: "budget_manager_hard_cap_exceeded", metricType: Counter},
+		BudgetManagerSoftCapExceeded:  {metricName: "budget_manager_soft_cap_exceeded", metricType: Counter},
 	},
 	History: {
 		TaskRequests:                     {metricName: "task_requests", metricType: Counter},

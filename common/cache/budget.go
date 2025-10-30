@@ -180,8 +180,8 @@ type manager struct {
 //   - scope: metrics scope for emitting metrics (can be nil)
 //   - logger: logger for diagnostic messages (can be nil)
 //   - softCapThreshold: optional percentage (0.0-1.0) defining how capacity is split between two tiers:
-//       • Free space tier: (threshold * capacity) - shared by all caches
-//       • Fair share tier: ((1 - threshold) * capacity) / activeCaches - allocated per cache
+//   - Free space tier: (threshold * capacity) - shared by all caches
+//   - Fair share tier: ((1 - threshold) * capacity) / activeCaches - allocated per cache
 //     The fair share capacity is equal to the fair share capacity ((1 - threshold) * capacity) divided by the number
 //     of active caches (caches with usage > 0).
 func NewBudgetManager(
@@ -1093,7 +1093,7 @@ func (m *manager) enforceCapForCache(cacheID string, additionalBytes uint64, add
 
 		if !cacheIsActive && (additionalBytes > 0 || additionalCount > 0) {
 			// Cache will become active, include it in the count
-			activeCaches += 1
+			activeCaches++
 		}
 
 		fairShareCapacityBytes := uint64(float64(m.CapacityBytes()) * (1.0 - managerThreshold))
