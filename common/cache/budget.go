@@ -30,6 +30,72 @@ import (
 //
 // Pick the reclaim mode that fits the cache's eviction style (self-release vs manager-release)
 // and admission mode based on whether temporary overshooting is acceptable (Optimistic vs Strict).
+//
+// How to use it:
+//
+// Manager is a means to track cache size across multiple caches at the Module or Host level.
+// It solves the problem of accounting memory multiple caches working with a limited total amount of memory
+// in a centralized way, allowing each cache to operate independently while respecting global limits.
+//
+// The cache implementation should call one of the Reserve...() methods before adding items to the cache and then call
+// one of the Release...() methods when items are evicted or removed from the cache.
+//
+// Example usage:
+//   err := mgr.ReserveForCache(cacheID, itemSizeBytes, 1)
+//   if err != nil {
+//       // handle admission failure (e.g., reject adding the item)
+//   }
+//   // proceed to add item to cache
+//   if error occurs while adding to cache {
+//       mgr.ReleaseForCache(cacheID, itemSizeBytes, 1)
+//   }
+//
+// Example usage with callback:
+//   err := mgr.ReserveWithCallback(cacheID, itemSizeBytes, 1, func() error {
+//       // proceed to add item to cache
+//       return nil // or error if adding fails
+//   })
+//   if err != nil {
+//       // handle admission failure (e.g., reject adding the item)
+//   }
+//
+//   err := mgr.ReleaseWithCallback(cacheID, itemSizeBytes, 1, func() error {
+//       // proceed to remove item from cache
+//       return nil // or error if removal fails
+//   })
+//   if err != nil {
+//       // handle removal failure
+//   }
+//
+// Example usage with reclaim self release:
+//   err := mgr.ReserveOrReclaimSelfRelease(ctx, cacheID, itemSizeBytes, 1, true, func(needBytes uint64, needCount int64) {
+//       // evict items from cache until needBytes and needCount are satisfied
+//       // for each evicted item, call mgr.ReleaseForCache(cacheID, evictedItemSizeBytes, 1)
+//   })
+//   if err != nil {
+//       // handle admission failure (e.g., reject adding the item)
+//   }
+//
+// Example usage with reclaim manager release:
+//   err := mgr.ReserveOrReclaimManagerRelease(ctx, cacheID, itemSizeBytes, 1, true, func(needBytes uint64, needCount int64) (freedBytes uint64, freedCount int64) {
+//       // evict items from cache until needBytes and needCount are satisfied
+//       // return total freedBytes and freedCount
+//   })
+//   if err != nil {
+//       // handle admission failure (e.g., reject adding the item)
+//   }
+//
+// Example usage with reclaim manager release and callback:
+//   err := mgr.ReserveOrReclaimManagerReleaseWithCallback(ctx, cacheID, itemSizeBytes, 1, true, func(needBytes uint64, needCount int64) (freedBytes uint64, freedCount int64) {
+//       // evict items from cache until needBytes and needCount are satisfied
+//       // return total freedBytes and freedCount
+//   }, func() error {
+//       // proceed to add item to cache
+//       return nil // or error if adding fails
+//   })
+//   if err != nil {
+//       // handle admission failure (e.g., reject adding the item)
+//   }
 
 type AdmissionMode uint8
 
@@ -59,9 +125,9 @@ type Manager interface {
 	// ReserveForCache reserves usage for a specific cache, applying two-tier soft cap logic.
 	ReserveForCache(cacheID string, nBytes uint64, nCount int64) error
 	// ReserveBytesForCache reserves bytes for a specific cache, applying two-tier soft cap logic.
-	ReserveBytesForCache(cacheID string, n uint64) error
+	ReserveBytesForCache(cacheID string, nBytes uint64) error
 	// ReserveCountForCache reserves count for a specific cache, applying two-tier soft cap logic.
-	ReserveCountForCache(cacheID string, n int64) error
+	ReserveCountForCache(cacheID string, nBytes int64) error
 
 	// ReserveOrReclaimSelfRelease should be used when the caller can evict items individually or in small batches (self-release).
 	// The reclaim callback SHOULD evict and MUST call mgr.ReleaseForCache(...) for freed usage.
@@ -258,7 +324,7 @@ func (m *manager) emitHardCapExceeded(cacheID, budgetType string, requested, ava
 	}
 
 	if m.logger != nil {
-		m.logger.Warn("Hard capacity limit exceeded",
+		m.logger.Debug("Hard capacity limit exceeded",
 			tag.Name(m.name),
 			tag.Dynamic("cache_id", cacheID),
 			tag.Value(budgetType),
@@ -350,11 +416,11 @@ func (m *manager) ReserveForCache(cacheID string, nBytes uint64, nCount int64) e
 	return nil
 }
 
-func (m *manager) ReserveBytesForCache(cacheID string, n uint64) error {
+func (m *manager) ReserveBytesForCache(cacheID string, nBytes uint64) error {
 	// Check capacity constraints (both hard and soft cap)
-	capResult := m.enforceCapForCache(cacheID, n, 0)
+	capResult := m.enforceCapForCache(cacheID, nBytes, 0)
 	if capResult.Error != nil {
-		m.emitCapacityExceeded(cacheID, capResult.Error, n, 0, capResult)
+		m.emitCapacityExceeded(cacheID, capResult.Error, nBytes, 0, capResult)
 		return capResult.Error
 	}
 
@@ -363,12 +429,12 @@ func (m *manager) ReserveBytesForCache(cacheID string, n uint64) error {
 	cacheUsage.mu.Lock()
 	wasActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
 
-	if err := m.reserveBytes(n); err != nil {
+	if err := m.reserveBytes(nBytes); err != nil {
 		cacheUsage.mu.Unlock()
 		return err
 	}
 
-	cacheUsage.usedBytes += n
+	cacheUsage.usedBytes += nBytes
 	cacheUsage.fairShareCapacityBytes += capResult.FairShareBytes
 	cacheUsage.freeCapacityBytes += capResult.FreeBytes
 	cacheUsage.mu.Unlock()
@@ -381,20 +447,20 @@ func (m *manager) ReserveBytesForCache(cacheID string, n uint64) error {
 	return nil
 }
 
-func (m *manager) ReserveCountForCache(cacheID string, n int64) error {
-	if n < 0 {
+func (m *manager) ReserveCountForCache(cacheID string, nCount int64) error {
+	if nCount < 0 {
 		if m.logger != nil {
 			m.logger.Error("Invalid negative count value in ReserveCountForCache",
 				tag.Dynamic("cache_id", cacheID),
-				tag.Key("requested"), tag.Value(n),
+				tag.Key("requested"), tag.Value(nCount),
 			)
 		}
 		return ErrInvalidValue
 	}
 	// Check capacity constraints (both hard and soft cap)
-	capResult := m.enforceCapForCache(cacheID, 0, n)
+	capResult := m.enforceCapForCache(cacheID, 0, nCount)
 	if capResult.Error != nil {
-		m.emitCapacityExceeded(cacheID, capResult.Error, 0, n, capResult)
+		m.emitCapacityExceeded(cacheID, capResult.Error, 0, nCount, capResult)
 		return capResult.Error
 	}
 
@@ -403,12 +469,12 @@ func (m *manager) ReserveCountForCache(cacheID string, n int64) error {
 	cacheUsage.mu.Lock()
 	wasActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
 
-	if err := m.reserveCount(n); err != nil {
+	if err := m.reserveCount(nCount); err != nil {
 		cacheUsage.mu.Unlock()
 		return err
 	}
 
-	cacheUsage.usedCount += n
+	cacheUsage.usedCount += nCount
 	cacheUsage.fairShareCapacityCount += capResult.FairShareCount
 	cacheUsage.freeCapacityCount += capResult.FreeCount
 	cacheUsage.mu.Unlock()
