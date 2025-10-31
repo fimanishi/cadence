@@ -121,7 +121,9 @@ func TestBudgetManager_ReserveForCache(t *testing.T) {
 				dynamicproperties.GetFloatPropertyFn(tt.softCapThreshold),
 			)
 
-			err := mgr.ReserveForCache(tt.cacheID, tt.requestBytes, tt.requestCount)
+			err := mgr.ReserveWithCallback(tt.cacheID, tt.requestBytes, tt.requestCount, func() error {
+				return nil
+			})
 
 			if tt.expectedError != nil {
 				assert.Equal(t, tt.expectedError, err, tt.description)
@@ -156,7 +158,7 @@ func TestBudgetManager_SoftCapFairShare(t *testing.T) {
 			softCapThreshold: 0.5, // 500 free, 500 fair share
 			setup: func(mgr Manager) {
 				// Fill up the free space (threshold)
-				mgr.ReserveForCache("cache1", 500, 50)
+				mgr.ReserveWithCallback("cache1", 500, 50, func() error { return nil })
 				// Now cache1 tries to allocate more, should use fair share
 			},
 			requestBytes:  300, // Within fair share for cache1 (500/1 = 500 available)
@@ -172,9 +174,9 @@ func TestBudgetManager_SoftCapFairShare(t *testing.T) {
 			softCapThreshold: 0.5,
 			setup: func(mgr Manager) {
 				// Fill up the free space
-				mgr.ReserveForCache("cache1", 500, 50)
+				mgr.ReserveWithCallback("cache1", 500, 50, func() error { return nil })
 				// Activate cache2 with some fair share usage
-				mgr.ReserveForCache("cache2", 100, 10)
+				mgr.ReserveWithCallback("cache2", 100, 10, func() error { return nil })
 				// Now 2 active caches, fair share = 500/2 = 250 per cache
 			},
 			requestBytes:  120, // Should be within fair share for cache2 (250 - 100 existing = 150 available)
@@ -190,9 +192,9 @@ func TestBudgetManager_SoftCapFairShare(t *testing.T) {
 			softCapThreshold: 0.5,
 			setup: func(mgr Manager) {
 				// Fill up the free space
-				mgr.ReserveForCache("cache1", 500, 50)
+				mgr.ReserveWithCallback("cache1", 500, 50, func() error { return nil })
 				// Activate cache2 with some fair share usage
-				mgr.ReserveForCache("cache2", 100, 10)
+				mgr.ReserveWithCallback("cache2", 100, 10, func() error { return nil })
 				// Now 2 active caches, fair share = 500/2 = 250 per cache
 			},
 			requestBytes:  200, // cache2 already has 100, requesting 200 more = 300 total > 250 fair share
@@ -208,9 +210,9 @@ func TestBudgetManager_SoftCapFairShare(t *testing.T) {
 			softCapThreshold: 0.5,
 			setup: func(mgr Manager) {
 				// Fill up the free space
-				mgr.ReserveForCache("cache1", 500, 50)
+				mgr.ReserveWithCallback("cache1", 500, 50, func() error { return nil })
 				// Activate cache2
-				mgr.ReserveForCache("cache2", 100, 10)
+				mgr.ReserveWithCallback("cache2", 100, 10, func() error { return nil })
 				// Now 2 active caches, fair share count = 50/2 = 25 per cache
 			},
 			requestBytes:  50, // bytes within limit
@@ -226,9 +228,9 @@ func TestBudgetManager_SoftCapFairShare(t *testing.T) {
 			softCapThreshold: 0.5,
 			setup: func(mgr Manager) {
 				// Fill up the free space
-				mgr.ReserveForCache("cache1", 500, 50)
+				mgr.ReserveWithCallback("cache1", 500, 50, func() error { return nil })
 				// Activate cache2
-				mgr.ReserveForCache("cache2", 100, 10)
+				mgr.ReserveWithCallback("cache2", 100, 10, func() error { return nil })
 				// Now 2 active caches, fair share count = 50/2 = 25 per cache
 			},
 			requestBytes:  200, // cache2 already has 100, requesting 200 more = 300 total > 250 fair share
@@ -256,7 +258,7 @@ func TestBudgetManager_SoftCapFairShare(t *testing.T) {
 				tt.setup(mgr)
 			}
 
-			err := mgr.ReserveForCache(tt.cacheID, tt.requestBytes, tt.requestCount)
+			err := mgr.ReserveWithCallback(tt.cacheID, tt.requestBytes, tt.requestCount, func() error { return nil })
 
 			if tt.expectedError != nil {
 				assert.Equal(t, tt.expectedError, err, tt.description)
@@ -281,11 +283,11 @@ func TestBudgetManager_ReleaseFairShareTracking(t *testing.T) {
 	).(*manager)
 
 	// Fill up the free space (500 bytes)
-	err := mgr.ReserveForCache("cache1", 500, 50)
+	err := mgr.ReserveWithCallback("cache1", 500, 50, func() error { return nil })
 	assert.NoError(t, err, "Should reserve free space successfully")
 
 	// Now allocate from fair share (cache1 uses fair share portion)
-	err = mgr.ReserveForCache("cache1", 200, 20)
+	err = mgr.ReserveWithCallback("cache1", 200, 20, func() error { return nil })
 	assert.NoError(t, err, "Should reserve from fair share successfully")
 
 	// Total usage: 700 bytes (500 free + 200 fair share)
@@ -307,7 +309,7 @@ func TestBudgetManager_ReleaseFairShareTracking(t *testing.T) {
 	fairShareBytes = cacheUsage.fairShareCapacityBytes
 	assert.Equal(t, uint64(100), fairShareBytes, "Fair share bytes should be reduced to 100")
 
-	// Release more (150 bytes) - should deduct remaining 100 from fair share, then 50 from free
+	// Release more (150 bytes) - should deduct the remaining 100 from fair share, then 50 from free
 	mgr.ReleaseForCache("cache1", 150, 15)
 
 	// Total usage should be 450
@@ -334,7 +336,7 @@ func TestBudgetManager_IndividualReserveRelease(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operations: func(mgr Manager) error {
-				return mgr.ReserveBytesForCache("cache1", 100)
+				return mgr.ReserveBytesWithCallback("cache1", 100, func() error { return nil })
 			},
 			expectedError: nil,
 			description:   "Should successfully reserve bytes only",
@@ -344,7 +346,7 @@ func TestBudgetManager_IndividualReserveRelease(t *testing.T) {
 			capacityBytes: 100,
 			capacityCount: 100,
 			operations: func(mgr Manager) error {
-				return mgr.ReserveBytesForCache("cache1", 200)
+				return mgr.ReserveBytesWithCallback("cache1", 200, func() error { return nil })
 			},
 			expectedError: ErrBytesBudgetExceeded,
 			description:   "Should fail when bytes exceed capacity",
@@ -354,7 +356,7 @@ func TestBudgetManager_IndividualReserveRelease(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operations: func(mgr Manager) error {
-				return mgr.ReserveCountForCache("cache1", 10)
+				return mgr.ReserveCountWithCallback("cache1", 10, func() error { return nil })
 			},
 			expectedError: nil,
 			description:   "Should successfully reserve count only",
@@ -364,7 +366,7 @@ func TestBudgetManager_IndividualReserveRelease(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 10,
 			operations: func(mgr Manager) error {
-				return mgr.ReserveCountForCache("cache1", 20)
+				return mgr.ReserveCountWithCallback("cache1", 20, func() error { return nil })
 			},
 			expectedError: ErrCountBudgetExceeded,
 			description:   "Should fail when count exceeds capacity",
@@ -374,8 +376,8 @@ func TestBudgetManager_IndividualReserveRelease(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operations: func(mgr Manager) error {
-				mgr.ReserveBytesForCache("cache1", 100)
-				mgr.ReleaseBytesForCache("cache1", 50)
+				mgr.ReserveBytesWithCallback("cache1", 100, func() error { return nil })
+				mgr.ReleaseBytesWithCallback("cache1", func() (uint64, error) { return 50, nil })
 				if mgr.UsedBytes() != 50 {
 					return assert.AnError
 				}
@@ -389,8 +391,8 @@ func TestBudgetManager_IndividualReserveRelease(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operations: func(mgr Manager) error {
-				mgr.ReserveCountForCache("cache1", 10)
-				mgr.ReleaseCountForCache("cache1", 5)
+				mgr.ReserveCountWithCallback("cache1", 10, func() error { return nil })
+				mgr.ReleaseCountWithCallback("cache1", func() (int64, error) { return 5, nil })
 				if mgr.UsedCount() != 5 {
 					return assert.AnError
 				}
@@ -404,7 +406,7 @@ func TestBudgetManager_IndividualReserveRelease(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operations: func(mgr Manager) error {
-				return mgr.ReserveCountForCache("cache1", -10)
+				return mgr.ReserveCountWithCallback("cache1", -10, func() error { return nil })
 			},
 			expectedError: ErrInvalidValue,
 			description:   "Should reject negative count values",
@@ -450,7 +452,7 @@ func TestBudgetManager_StrictAdmission(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operations: func(mgr Manager) error {
-				return mgr.ReserveForCache("cache1", 100, 10)
+				return mgr.ReserveWithCallback("cache1", 100, 10, func() error { return nil })
 			},
 			expectedError: nil,
 			description:   "Should successfully reserve in strict mode when capacity available",
@@ -460,7 +462,7 @@ func TestBudgetManager_StrictAdmission(t *testing.T) {
 			capacityBytes: 100,
 			capacityCount: 100,
 			operations: func(mgr Manager) error {
-				return mgr.ReserveForCache("cache1", 200, 10)
+				return mgr.ReserveWithCallback("cache1", 200, 10, func() error { return nil })
 			},
 			expectedError: ErrBytesBudgetExceeded,
 			description:   "Should fail in strict mode when bytes exceed capacity",
@@ -470,7 +472,7 @@ func TestBudgetManager_StrictAdmission(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 10,
 			operations: func(mgr Manager) error {
-				return mgr.ReserveForCache("cache1", 100, 20)
+				return mgr.ReserveWithCallback("cache1", 100, 20, func() error { return nil })
 			},
 			expectedError: ErrCountBudgetExceeded,
 			description:   "Should fail in strict mode when count exceeds capacity",
@@ -481,11 +483,11 @@ func TestBudgetManager_StrictAdmission(t *testing.T) {
 			capacityCount: 100,
 			operations: func(mgr Manager) error {
 				// First reserve should succeed
-				if err := mgr.ReserveForCache("cache1", 60, 60); err != nil {
+				if err := mgr.ReserveWithCallback("cache1", 60, 60, func() error { return nil }); err != nil {
 					return err
 				}
 				// Second reserve should fail (would exceed if allowed)
-				return mgr.ReserveForCache("cache2", 50, 50)
+				return mgr.ReserveWithCallback("cache2", 50, 50, func() error { return nil })
 			},
 			expectedError: ErrBytesBudgetExceeded,
 			description:   "Strict mode should prevent any overshoot attempts",
@@ -495,7 +497,7 @@ func TestBudgetManager_StrictAdmission(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operations: func(mgr Manager) error {
-				return mgr.ReserveCountForCache("cache1", -10)
+				return mgr.ReserveCountWithCallback("cache1", -10, func() error { return nil })
 			},
 			expectedError: ErrInvalidValue,
 			description:   "Strict mode should reject negative count values",
@@ -545,7 +547,7 @@ func TestBudgetManager_Rollback(t *testing.T) {
 			capacityCount: 10,
 			admissionMode: AdmissionOptimistic,
 			operations: func(mgr Manager) (error, uint64, int64) {
-				err := mgr.ReserveForCache("cache1", 100, 20)
+				err := mgr.ReserveWithCallback("cache1", 100, 20, func() error { return nil })
 				return err, mgr.UsedBytes(), mgr.UsedCount()
 			},
 			expectedError: ErrCountBudgetExceeded,
@@ -559,7 +561,7 @@ func TestBudgetManager_Rollback(t *testing.T) {
 			capacityCount: 1000,
 			admissionMode: AdmissionOptimistic,
 			operations: func(mgr Manager) (error, uint64, int64) {
-				err := mgr.ReserveForCache("cache1", 200, 10)
+				err := mgr.ReserveWithCallback("cache1", 200, 10, func() error { return nil })
 				return err, mgr.UsedBytes(), mgr.UsedCount()
 			},
 			expectedError: ErrBytesBudgetExceeded,
@@ -683,7 +685,7 @@ func TestBudgetManager_ReserveOrReclaimSelfRelease(t *testing.T) {
 			requestBytes:  500,
 			requestCount:  50,
 			setupUsage: func(mgr Manager) {
-				mgr.ReserveForCache("other_cache", 600, 60)
+				mgr.ReserveWithCallback("other_cache", 600, 60, func() error { return nil })
 			},
 			reclaimFunc:   nil,
 			expectedError: ErrBytesBudgetExceeded,
@@ -699,7 +701,7 @@ func TestBudgetManager_ReserveOrReclaimSelfRelease(t *testing.T) {
 			requestBytes:  500,
 			requestCount:  50,
 			setupUsage: func(mgr Manager) {
-				mgr.ReserveForCache("cache1", 600, 60)
+				mgr.ReserveWithCallback("cache1", 600, 60, func() error { return nil })
 			},
 			reclaimFunc: func(needBytes uint64, needCount int64) {
 			},
@@ -716,7 +718,7 @@ func TestBudgetManager_ReserveOrReclaimSelfRelease(t *testing.T) {
 			requestBytes:  500,
 			requestCount:  50,
 			setupUsage: func(mgr Manager) {
-				mgr.ReserveForCache("cache1", 1000, 100)
+				mgr.ReserveWithCallback("cache1", 1000, 100, func() error { return nil })
 			},
 			reclaimFunc: func(needBytes uint64, needCount int64) {
 			},
@@ -733,8 +735,8 @@ func TestBudgetManager_ReserveOrReclaimSelfRelease(t *testing.T) {
 			requestBytes:  900,
 			requestCount:  90,
 			setupUsage: func(mgr Manager) {
-				mgr.ReserveForCache("cache1", 100, 10)
-				mgr.ReserveForCache("other_cache", 200, 20)
+				mgr.ReserveWithCallback("cache1", 100, 10, func() error { return nil })
+				mgr.ReserveWithCallback("other_cache", 200, 20, func() error { return nil })
 			},
 			reclaimFunc: func(needBytes uint64, needCount int64) {
 			},
@@ -767,7 +769,9 @@ func TestBudgetManager_ReserveOrReclaimSelfRelease(t *testing.T) {
 			if tt.reclaimFunc != nil {
 				reclaimFunc = func(needBytes uint64, needCount int64) {
 					reclaimCalled = true
-					mgr.ReleaseForCache("cache1", needBytes, needCount)
+					mgr.ReleaseWithCallback("cache1", func() (uint64, int64, error) {
+						return needBytes, needCount, nil
+					})
 				}
 			}
 
@@ -778,7 +782,7 @@ func TestBudgetManager_ReserveOrReclaimSelfRelease(t *testing.T) {
 				cancel()
 			}
 
-			err := mgr.ReserveOrReclaimSelfRelease(ctx, "cache1", tt.requestBytes, tt.requestCount, tt.retriable, reclaimFunc)
+			err := mgr.ReserveOrReclaimSelfReleaseWithCallback(ctx, "cache1", tt.requestBytes, tt.requestCount, tt.retriable, reclaimFunc, func() error { return nil })
 
 			assert.Equal(t, tt.expectedError, err, tt.description)
 			if tt.reclaimFunc != nil && tt.expectedError == nil {
@@ -828,7 +832,7 @@ func TestBudgetManager_ReserveOrReclaimManagerRelease(t *testing.T) {
 			requestBytes:  500,
 			requestCount:  50,
 			setupUsage: func(mgr Manager) {
-				mgr.ReserveForCache("other_cache", 600, 60)
+				mgr.ReserveWithCallback("other_cache", 600, 60, func() error { return nil })
 			},
 			reclaimFunc:   nil,
 			expectedError: ErrBytesBudgetExceeded,
@@ -844,7 +848,7 @@ func TestBudgetManager_ReserveOrReclaimManagerRelease(t *testing.T) {
 			requestBytes:  500,
 			requestCount:  50,
 			setupUsage: func(mgr Manager) {
-				mgr.ReserveForCache("cache1", 600, 60)
+				mgr.ReserveWithCallback("cache1", 600, 60, func() error { return nil })
 			},
 			reclaimFunc: func(needBytes uint64, needCount int64) (uint64, int64) {
 				return needBytes, needCount
@@ -862,7 +866,7 @@ func TestBudgetManager_ReserveOrReclaimManagerRelease(t *testing.T) {
 			requestBytes:  500,
 			requestCount:  50,
 			setupUsage: func(mgr Manager) {
-				mgr.ReserveForCache("cache1", 1000, 100)
+				mgr.ReserveWithCallback("cache1", 1000, 100, func() error { return nil })
 			},
 			reclaimFunc: func(needBytes uint64, needCount int64) (uint64, int64) {
 				return needBytes, needCount
@@ -880,8 +884,8 @@ func TestBudgetManager_ReserveOrReclaimManagerRelease(t *testing.T) {
 			requestBytes:  900,
 			requestCount:  90,
 			setupUsage: func(mgr Manager) {
-				mgr.ReserveForCache("cache1", 100, 10)
-				mgr.ReserveForCache("other_cache", 200, 20)
+				mgr.ReserveWithCallback("cache1", 100, 10, func() error { return nil })
+				mgr.ReserveWithCallback("other_cache", 200, 20, func() error { return nil })
 			},
 			reclaimFunc: func(needBytes uint64, needCount int64) (uint64, int64) {
 				return needBytes, needCount
@@ -899,7 +903,7 @@ func TestBudgetManager_ReserveOrReclaimManagerRelease(t *testing.T) {
 			requestBytes:  500,
 			requestCount:  50,
 			setupUsage: func(mgr Manager) {
-				mgr.ReserveForCache("cache1", 600, 60)
+				mgr.ReserveWithCallback("cache1", 600, 60, func() error { return nil })
 			},
 			reclaimFunc: func(needBytes uint64, needCount int64) (uint64, int64) {
 				return 0, 0
@@ -948,7 +952,7 @@ func TestBudgetManager_ReserveOrReclaimManagerRelease(t *testing.T) {
 				defer cancel()
 			}
 
-			err := mgr.ReserveOrReclaimManagerRelease(ctx, "cache1", tt.requestBytes, tt.requestCount, tt.retriable, reclaimFunc)
+			err := mgr.ReserveOrReclaimManagerReleaseWithCallback(ctx, "cache1", tt.requestBytes, tt.requestCount, tt.retriable, reclaimFunc, func() error { return nil })
 
 			if tt.name == "reclaim returns zero" {
 				assert.Error(t, err, tt.description)
@@ -1464,11 +1468,11 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operation: func(mgr Manager) error {
-				mgr.ReserveForCache("cache1", 100, 10)
+				mgr.ReserveWithCallback("cache1", 100, 10, func() error { return nil })
 				called := false
-				err := mgr.ReleaseWithCallback("cache1", 100, 10, func() error {
+				err := mgr.ReleaseWithCallback("cache1", func() (uint64, int64, error) {
 					called = true
-					return nil
+					return 100, 10, nil
 				})
 				if !called {
 					return errors.New("callback not called")
@@ -1485,9 +1489,9 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operation: func(mgr Manager) error {
-				mgr.ReserveForCache("cache1", 100, 10)
-				return mgr.ReleaseWithCallback("cache1", 100, 10, func() error {
-					return errors.New("callback failed")
+				mgr.ReserveWithCallback("cache1", 100, 10, func() error { return nil })
+				return mgr.ReleaseWithCallback("cache1", func() (uint64, int64, error) {
+					return 0, 0, errors.New("callback failed")
 				})
 			},
 			expectedError: errors.New("callback failed"),
@@ -1500,11 +1504,11 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operation: func(mgr Manager) error {
-				mgr.ReserveBytesForCache("cache1", 100)
+				mgr.ReserveBytesWithCallback("cache1", 100, func() error { return nil })
 				called := false
-				err := mgr.ReleaseBytesWithCallback("cache1", 100, func() error {
+				err := mgr.ReleaseBytesWithCallback("cache1", func() (uint64, error) {
 					called = true
-					return nil
+					return 100, nil
 				})
 				if !called {
 					return errors.New("callback not called")
@@ -1521,9 +1525,9 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operation: func(mgr Manager) error {
-				mgr.ReserveBytesForCache("cache1", 100)
-				return mgr.ReleaseBytesWithCallback("cache1", 100, func() error {
-					return errors.New("callback failed")
+				mgr.ReserveBytesWithCallback("cache1", 100, func() error { return nil })
+				return mgr.ReleaseBytesWithCallback("cache1", func() (uint64, error) {
+					return 0, errors.New("callback failed")
 				})
 			},
 			expectedError: errors.New("callback failed"),
@@ -1536,11 +1540,11 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operation: func(mgr Manager) error {
-				mgr.ReserveCountForCache("cache1", 10)
+				mgr.ReserveCountWithCallback("cache1", 10, func() error { return nil })
 				called := false
-				err := mgr.ReleaseCountWithCallback("cache1", 10, func() error {
+				err := mgr.ReleaseCountWithCallback("cache1", func() (int64, error) {
 					called = true
-					return nil
+					return 10, nil
 				})
 				if !called {
 					return errors.New("callback not called")
@@ -1557,9 +1561,9 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operation: func(mgr Manager) error {
-				mgr.ReserveCountForCache("cache1", 10)
-				return mgr.ReleaseCountWithCallback("cache1", 10, func() error {
-					return errors.New("callback failed")
+				mgr.ReserveCountWithCallback("cache1", 10, func() error { return nil })
+				return mgr.ReleaseCountWithCallback("cache1", func() (int64, error) {
+					return 0, errors.New("callback failed")
 				})
 			},
 			expectedError: errors.New("callback failed"),
@@ -1572,7 +1576,7 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operation: func(mgr Manager) error {
-				mgr.ReserveForCache("cache1", 600, 60)
+				mgr.ReserveWithCallback("cache1", 600, 60, func() error { return nil })
 				called := false
 				callbackCalled := false
 				err := mgr.ReserveOrReclaimSelfReleaseWithCallback(
@@ -1583,7 +1587,7 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 					true,
 					func(needBytes uint64, needCount int64) {
 						called = true
-						mgr.ReleaseForCache("cache1", needBytes, needCount)
+						mgr.ReleaseWithCallback("cache1", func() (uint64, int64, error) { return needBytes, needCount, nil })
 					},
 					func() error {
 						callbackCalled = true
@@ -1608,7 +1612,7 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operation: func(mgr Manager) error {
-				mgr.ReserveForCache("cache1", 600, 60)
+				mgr.ReserveWithCallback("cache1", 600, 60, func() error { return nil })
 				return mgr.ReserveOrReclaimSelfReleaseWithCallback(
 					context.Background(),
 					"cache1",
@@ -1616,7 +1620,7 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 					50,
 					true,
 					func(needBytes uint64, needCount int64) {
-						mgr.ReleaseForCache("cache1", needBytes, needCount)
+						mgr.ReleaseWithCallback("cache1", func() (uint64, int64, error) { return needBytes, needCount, nil })
 					},
 					func() error {
 						return errors.New("callback failed")
@@ -1633,7 +1637,7 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operation: func(mgr Manager) error {
-				mgr.ReserveForCache("cache1", 600, 60)
+				mgr.ReserveWithCallback("cache1", 600, 60, func() error { return nil })
 				called := false
 				callbackCalled := false
 				err := mgr.ReserveOrReclaimManagerReleaseWithCallback(
@@ -1669,7 +1673,7 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 			capacityBytes: 1000,
 			capacityCount: 100,
 			operation: func(mgr Manager) error {
-				mgr.ReserveForCache("cache1", 600, 60)
+				mgr.ReserveWithCallback("cache1", 600, 60, func() error { return nil })
 				return mgr.ReserveOrReclaimManagerReleaseWithCallback(
 					context.Background(),
 					"cache1",

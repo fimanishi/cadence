@@ -18,6 +18,16 @@ import (
 // This implements a generic host-scoped budget manager suitable for
 // both non-evicting caches (admission/backpressure) and evicting caches (e.g., LRU).
 //
+// Fair Share Logic:
+// The budget manager implements a two-tier soft cap system to fairly distribute capacity across
+// multiple active caches while preventing any single cache from monopolizing resources:
+//   • Free space tier: (threshold * capacity) - shared by all caches on a first-come basis
+//   • Fair share tier: ((1 - threshold) * capacity) / activeCaches - allocated per active cache
+//
+// An active cache is one that currently has non-zero usage (usedBytes > 0 or usedCount > 0).
+// This ensures that when multiple caches are active, each gets a guaranteed fair share of capacity,
+// preventing scenarios where one cache consumes all available space and starves others.
+//
 // There are two admission modes available:
 //   • AdmissionOptimistic => add-then-undo on failure; may briefly overshoot limits
 //   • AdmissionStrict     => pre-check with CAS; never overshoots limits
@@ -34,68 +44,69 @@ import (
 // How to use it:
 //
 // Manager is a means to track cache size across multiple caches at the Module or Host level.
-// It solves the problem of accounting memory multiple caches working with a limited total amount of memory
+// It solves the problem of accounting memory for multiple caches working with a limited total amount of memory
 // in a centralized way, allowing each cache to operate independently while respecting global limits.
 //
-// The cache implementation should call one of the Reserve...() methods before adding items to the cache and then call
-// one of the Release...() methods when items are evicted or removed from the cache.
+// The cache implementation should use the callback-based methods to ensure proper budget tracking
+// with automatic cleanup on errors.
 //
-// Example usage:
-//   err := mgr.ReserveForCache(cacheID, itemSizeBytes, 1)
-//   if err != nil {
-//       // handle admission failure (e.g., reject adding the item)
-//   }
-//   // proceed to add item to cache
-//   if error occurs while adding to cache {
-//       mgr.ReleaseForCache(cacheID, itemSizeBytes, 1)
-//   }
+// Example usage - Adding an item to the cache:
 //
-// Example usage with callback:
-//   err := mgr.ReserveWithCallback(cacheID, itemSizeBytes, 1, func() error {
-//       // proceed to add item to cache
-//       return nil // or error if adding fails
-//   })
-//   if err != nil {
-//       // handle admission failure (e.g., reject adding the item)
-//   }
+//	func (c *myCache) Put(key, value interface{}) error {
+//		itemSizeBytes := calculateSize(value)
+//		return c.budgetMgr.ReserveWithCallback(c.cacheID, itemSizeBytes, 1, func() error {
+//			return c.cache.Put(key, value)
+//		})
+//	}
 //
-//   err := mgr.ReleaseWithCallback(cacheID, itemSizeBytes, 1, func() error {
-//       // proceed to remove item from cache
-//       return nil // or error if removal fails
-//   })
-//   if err != nil {
-//       // handle removal failure
-//   }
+// Example usage - Removing an item from the cache:
 //
-// Example usage with reclaim self release:
-//   err := mgr.ReserveOrReclaimSelfRelease(ctx, cacheID, itemSizeBytes, 1, true, func(needBytes uint64, needCount int64) {
-//       // evict items from cache until needBytes and needCount are satisfied
-//       // for each evicted item, call mgr.ReleaseForCache(cacheID, evictedItemSizeBytes, 1)
-//   })
-//   if err != nil {
-//       // handle admission failure (e.g., reject adding the item)
-//   }
+//	func (c *myCache) Delete(key interface{}) error {
+//		return c.budgetMgr.ReleaseWithCallback(c.cacheID, func() (uint64, int64, error) {
+//			bytes, count, err := c.cache.Delete(key)
+//			return bytes, count, err
+//		})
+//	}
 //
-// Example usage with reclaim manager release:
-//   err := mgr.ReserveOrReclaimManagerRelease(ctx, cacheID, itemSizeBytes, 1, true, func(needBytes uint64, needCount int64) (freedBytes uint64, freedCount int64) {
-//       // evict items from cache until needBytes and needCount are satisfied
-//       // return total freedBytes and freedCount
-//   })
-//   if err != nil {
-//       // handle admission failure (e.g., reject adding the item)
-//   }
+// Example usage - Adding with automatic eviction (manager-release pattern):
 //
-// Example usage with reclaim manager release and callback:
-//   err := mgr.ReserveOrReclaimManagerReleaseWithCallback(ctx, cacheID, itemSizeBytes, 1, true, func(needBytes uint64, needCount int64) (freedBytes uint64, freedCount int64) {
-//       // evict items from cache until needBytes and needCount are satisfied
-//       // return total freedBytes and freedCount
-//   }, func() error {
-//       // proceed to add item to cache
-//       return nil // or error if adding fails
-//   })
-//   if err != nil {
-//       // handle admission failure (e.g., reject adding the item)
-//   }
+//	func (c *myCache) PutWithEviction(ctx context.Context, key, value interface{}) error {
+//		itemSizeBytes := calculateSize(value)
+//		return c.budgetMgr.ReserveOrReclaimManagerReleaseWithCallback(
+//			ctx, c.cacheID, itemSizeBytes, 1, true,
+//			func(needBytes uint64, needCount int64) (uint64, int64) {
+//				return c.cache.EvictLRU(needBytes, needCount)
+//			},
+//			func() error {
+//				return c.cache.Put(key, value)
+//			},
+//		)
+//	}
+//
+// Example usage - Adding with automatic eviction (self-release pattern):
+//
+//	func (c *myCache) PutWithEviction(ctx context.Context, key, value interface{}) error {
+//		itemSizeBytes := calculateSize(value)
+//		return c.budgetMgr.ReserveOrReclaimSelfReleaseWithCallback(
+//			ctx, c.cacheID, itemSizeBytes, 1, true,
+//			func(needBytes uint64, needCount int64) {
+//				// Evict items one-by-one until we've freed enough
+//				var freedBytes, freedCount uint64, int64
+//				for freedBytes < needBytes || freedCount < needCount {
+//					evictedBytes, evictedCount, err := c.cache.EvictOldest()
+//					if err != nil {
+//						break
+//					}
+//					c.budgetMgr.ReleaseForCache(c.cacheID, evictedBytes, evictedCount)
+//					freedBytes += evictedBytes
+//					freedCount += evictedCount
+//				}
+//			},
+//			func() error {
+//				return c.cache.Put(key, value)
+//			},
+//		)
+//	}
 
 type AdmissionMode uint8
 
@@ -120,38 +131,6 @@ var (
 )
 
 type Manager interface {
-	// Cache-aware reservation methods for two-tier soft cap enforcement
-
-	// ReserveForCache reserves usage for a specific cache, applying two-tier soft cap logic.
-	ReserveForCache(cacheID string, nBytes uint64, nCount int64) error
-	// ReserveBytesForCache reserves bytes for a specific cache, applying two-tier soft cap logic.
-	ReserveBytesForCache(cacheID string, nBytes uint64) error
-	// ReserveCountForCache reserves count for a specific cache, applying two-tier soft cap logic.
-	ReserveCountForCache(cacheID string, nBytes int64) error
-
-	// ReserveOrReclaimSelfRelease should be used when the caller can evict items individually or in small batches (self-release).
-	// The reclaim callback SHOULD evict and MUST call mgr.ReleaseForCache(...) for freed usage.
-	ReserveOrReclaimSelfRelease(ctx context.Context, cacheID string, nBytes uint64, nCount int64, retriable bool, reclaim ReclaimSelfRelease) error
-
-	// ReserveOrReclaimManagerRelease should be used when the caller evicts items in bulk (manager-owned release).
-	// The reclaim callback MUST NOT call ReleaseForCache. It only returns totals; the manager will call ReleaseForCache.
-	ReserveOrReclaimManagerRelease(ctx context.Context, cacheID string, nBytes uint64, nCount int64, retriable bool, reclaim ReclaimManagerRelease) error
-
-	// ReserveOrReclaimSelfReleaseWithCallback reserves/reclaims capacity, executes callback, releases on callback error.
-	ReserveOrReclaimSelfReleaseWithCallback(ctx context.Context, cacheID string, nBytes uint64, nCount int64, retriable bool, reclaim ReclaimSelfRelease, callback func() error) error
-
-	// ReserveOrReclaimManagerReleaseWithCallback reserves/reclaims capacity, executes callback, releases on callback error.
-	ReserveOrReclaimManagerReleaseWithCallback(ctx context.Context, cacheID string, nBytes uint64, nCount int64, retriable bool, reclaim ReclaimManagerRelease, callback func() error) error
-
-	// Cache-aware release methods
-
-	// ReleaseForCache releases usage for a specific cache.
-	ReleaseForCache(cacheID string, nBytes uint64, nCount int64)
-	// ReleaseBytesForCache releases bytes for a specific cache.
-	ReleaseBytesForCache(cacheID string, n uint64)
-	// ReleaseCountForCache releases count for a specific cache.
-	ReleaseCountForCache(cacheID string, n int64)
-
 	// Callback-based reserve methods (reserve -> callback -> release on error)
 
 	// ReserveWithCallback reserves capacity, executes callback, releases on callback error.
@@ -164,11 +143,19 @@ type Manager interface {
 	// Callback-based release methods (callback -> release on success)
 
 	// ReleaseWithCallback executes callback, releases capacity if callback succeeds.
-	ReleaseWithCallback(cacheID string, nBytes uint64, nCount int64, callback func() error) error
+	ReleaseWithCallback(cacheID string, callback func() (nBytes uint64, nCount int64, err error)) error
 	// ReleaseBytesWithCallback executes callback, releases bytes if callback succeeds.
-	ReleaseBytesWithCallback(cacheID string, nBytes uint64, callback func() error) error
+	ReleaseBytesWithCallback(cacheID string, callback func() (freedBytes uint64, err error)) error
 	// ReleaseCountWithCallback executes callback, releases count if callback succeeds.
-	ReleaseCountWithCallback(cacheID string, nCount int64, callback func() error) error
+	ReleaseCountWithCallback(cacheID string, callback func() (freedCount int64, err error)) error
+
+	// Callback-based reclaim methods
+
+	// ReserveOrReclaimSelfReleaseWithCallback reserves/reclaims capacity, executes callback, releases on callback error.
+	ReserveOrReclaimSelfReleaseWithCallback(ctx context.Context, cacheID string, nBytes uint64, nCount int64, retriable bool, reclaim ReclaimSelfRelease, callback func() error) error
+
+	// ReserveOrReclaimManagerReleaseWithCallback reserves/reclaims capacity, executes callback, releases on callback error.
+	ReserveOrReclaimManagerReleaseWithCallback(ctx context.Context, cacheID string, nBytes uint64, nCount int64, retriable bool, reclaim ReclaimManagerRelease, callback func() error) error
 
 	// UsedBytes returns current used bytes.
 	UsedBytes() uint64
@@ -982,27 +969,30 @@ func (m *manager) ReserveCountWithCallback(cacheID string, nCount int64, callbac
 	return nil
 }
 
-func (m *manager) ReleaseWithCallback(cacheID string, nBytes uint64, nCount int64, callback func() error) error {
-	if err := callback(); err != nil {
+func (m *manager) ReleaseWithCallback(cacheID string, callback func() (freedBytes uint64, freedCount int64, err error)) error {
+	freedBytes, freedCount, err := callback()
+	if err != nil {
 		return err
 	}
-	m.ReleaseForCache(cacheID, nBytes, nCount)
+	m.ReleaseForCache(cacheID, freedBytes, freedCount)
 	return nil
 }
 
-func (m *manager) ReleaseBytesWithCallback(cacheID string, nBytes uint64, callback func() error) error {
-	if err := callback(); err != nil {
+func (m *manager) ReleaseBytesWithCallback(cacheID string, callback func() (freedBytes uint64, err error)) error {
+	freedBytes, err := callback()
+	if err != nil {
 		return err
 	}
-	m.ReleaseBytesForCache(cacheID, nBytes)
+	m.ReleaseBytesForCache(cacheID, freedBytes)
 	return nil
 }
 
-func (m *manager) ReleaseCountWithCallback(cacheID string, nCount int64, callback func() error) error {
-	if err := callback(); err != nil {
+func (m *manager) ReleaseCountWithCallback(cacheID string, callback func() (freedCount int64, err error)) error {
+	freedCount, err := callback()
+	if err != nil {
 		return err
 	}
-	m.ReleaseCountForCache(cacheID, nCount)
+	m.ReleaseCountForCache(cacheID, freedCount)
 	return nil
 }
 
