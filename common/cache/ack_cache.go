@@ -95,7 +95,9 @@ type BoundedAckCache[T AckCacheItem] struct {
 	lastAck  int64
 	currSize uint64
 
-	logger log.Logger
+	logger        log.Logger
+	budgetManager Manager
+	cacheID       string
 }
 
 // NewBoundedAckCache creates a new bounded ack cache with the specified capacity limits.
@@ -104,20 +106,28 @@ type BoundedAckCache[T AckCacheItem] struct {
 //   - maxCount: maximum number of items (dynamic property)
 //   - maxSize: maximum total byte size (dynamic property)
 //   - logger: optional logger for diagnostics (can be nil)
+//   - budgetManager: optional budget manager for host-level capacity tracking (can be nil)
+//   - cacheID: cache identifier for budget manager (required if budgetManager is provided)
 //
 // The cache will reject new items when either limit would be exceeded.
+// If a budget manager is provided, Put and Ack operations will automatically
+// reserve and release capacity through the budget manager.
 func NewBoundedAckCache[T AckCacheItem](
 	maxCount dynamicproperties.IntPropertyFn,
 	maxSize dynamicproperties.IntPropertyFn,
 	logger log.Logger,
+	budgetManager Manager,
+	cacheID string,
 ) AckCache[T] {
 	initialCount := maxCount()
 	return &BoundedAckCache[T]{
-		maxCount: maxCount,
-		maxSize:  maxSize,
-		order:    make(sequenceHeap[T], 0, initialCount),
-		cache:    make(map[int64]T, initialCount),
-		logger:   logger,
+		maxCount:      maxCount,
+		maxSize:       maxSize,
+		order:         make(sequenceHeap[T], 0, initialCount),
+		cache:         make(map[int64]T, initialCount),
+		logger:        logger,
+		budgetManager: budgetManager,
+		cacheID:       cacheID,
 	}
 }
 
@@ -145,6 +155,15 @@ func (c *BoundedAckCache[T]) Put(item T, size uint64) error {
 		return ErrAckCacheFull
 	}
 
+	if c.budgetManager != nil {
+		return c.budgetManager.ReserveWithCallback(c.cacheID, size, 1, func() error {
+			c.cache[sequenceID] = item
+			heap.Push(&c.order, heapItem[T]{sequenceID: sequenceID, size: size})
+			c.currSize += size
+			return nil
+		})
+	}
+
 	// Add to both heap and map
 	c.cache[sequenceID] = item
 	heap.Push(&c.order, heapItem[T]{sequenceID: sequenceID, size: size})
@@ -165,6 +184,26 @@ func (c *BoundedAckCache[T]) Get(sequenceID int64) T {
 func (c *BoundedAckCache[T]) Ack(level int64) (uint64, int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	if c.budgetManager != nil {
+		var freedSize uint64
+		var removedCount int64
+		err := c.budgetManager.ReleaseWithCallback(c.cacheID, func() (uint64, int64, error) {
+			for c.order.Len() > 0 && c.order.Peek().sequenceID <= level {
+				item := heap.Pop(&c.order).(heapItem[T])
+				delete(c.cache, item.sequenceID)
+				c.currSize -= item.size
+				freedSize += item.size
+				removedCount++
+			}
+			c.lastAck = level
+			return freedSize, removedCount, nil
+		})
+		if err != nil {
+			return 0, 0
+		}
+		return freedSize, int(removedCount)
+	}
 
 	var freedSize uint64
 	var removedCount int

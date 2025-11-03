@@ -69,6 +69,8 @@ func TestBoundedAckCache_BasicOperations(t *testing.T) {
 		dynamicproperties.GetIntPropertyFn(10),   // max count
 		dynamicproperties.GetIntPropertyFn(1000), // max size
 		log.NewNoop(),
+		nil,
+		"",
 	)
 
 	// Test empty cache
@@ -107,6 +109,8 @@ func TestBoundedAckCache_Acknowledgment(t *testing.T) {
 		dynamicproperties.GetIntPropertyFn(10),
 		dynamicproperties.GetIntPropertyFn(1000),
 		log.NewNoop(),
+		nil,
+		"",
 	)
 
 	item1 := newTestItem(100, "item1")
@@ -166,6 +170,8 @@ func TestBoundedAckCache_AlreadyAcked(t *testing.T) {
 		dynamicproperties.GetIntPropertyFn(10),
 		dynamicproperties.GetIntPropertyFn(1000),
 		log.NewNoop(),
+		nil,
+		"",
 	)
 
 	item1 := newTestItem(100, "item1")
@@ -195,6 +201,8 @@ func TestBoundedAckCache_CountLimit(t *testing.T) {
 		dynamicproperties.GetIntPropertyFn(3),    // max count = 3
 		dynamicproperties.GetIntPropertyFn(1000), // large size limit
 		log.NewNoop(),
+		nil,
+		"",
 	)
 
 	item1 := newTestItem(100, "item1")
@@ -225,6 +233,8 @@ func TestBoundedAckCache_SizeLimit(t *testing.T) {
 		dynamicproperties.GetIntPropertyFn(10),  // large count limit
 		dynamicproperties.GetIntPropertyFn(100), // max size = 100
 		log.NewNoop(),
+		nil,
+		"",
 	)
 
 	item1 := newTestItemWithSize(100, "item1", 40)
@@ -255,7 +265,7 @@ func TestBoundedAckCache_DynamicLimits(t *testing.T) {
 	maxCount := dynamicproperties.GetIntPropertyFn(2)
 	maxSize := dynamicproperties.GetIntPropertyFn(100)
 
-	cache := NewBoundedAckCache[*testItem](maxCount, maxSize, log.NewNoop())
+	cache := NewBoundedAckCache[*testItem](maxCount, maxSize, log.NewNoop(), nil, "")
 
 	item1 := newTestItem(100, "item1")
 	item2 := newTestItem(200, "item2")
@@ -279,6 +289,8 @@ func TestBoundedAckCache_ConcurrentOperations(t *testing.T) {
 		dynamicproperties.GetIntPropertyFn(1000),
 		dynamicproperties.GetIntPropertyFn(100000),
 		log.NewNoop(),
+		nil,
+		"",
 	)
 
 	// This test ensures no race conditions with concurrent access
@@ -327,6 +339,8 @@ func BenchmarkBoundedAckCache(b *testing.B) {
 		dynamicproperties.GetIntPropertyFn(10000),
 		dynamicproperties.GetIntPropertyFn(1000000),
 		log.NewNoop(),
+		nil,
+		"",
 	)
 
 	// Pre-populate cache
