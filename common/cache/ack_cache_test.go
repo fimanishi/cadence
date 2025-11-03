@@ -334,6 +334,132 @@ func TestBoundedAckCache_ConcurrentOperations(t *testing.T) {
 	assert.Equal(t, uint64(0), cache.Size())
 }
 
+func TestBoundedAckCache_WithBudgetManager(t *testing.T) {
+	budgetMgr := NewBudgetManager(
+		"test-budget",
+		dynamicproperties.GetIntPropertyFn(1000),
+		dynamicproperties.GetIntPropertyFn(100),
+		AdmissionOptimistic,
+		0,
+		nil,
+		log.NewNoop(),
+		nil,
+	)
+
+	cache := NewBoundedAckCache[*testItem](
+		dynamicproperties.GetIntPropertyFn(10),
+		dynamicproperties.GetIntPropertyFn(1000),
+		log.NewNoop(),
+		budgetMgr,
+		"cache1",
+	)
+
+	item1 := newTestItemWithSize(100, "item1", 100)
+	item2 := newTestItemWithSize(200, "item2", 150)
+
+	require.NoError(t, cache.Put(item1, item1.ByteSize()))
+	assert.Equal(t, uint64(100), budgetMgr.UsedBytes())
+	assert.Equal(t, int64(1), budgetMgr.UsedCount())
+
+	require.NoError(t, cache.Put(item2, item2.ByteSize()))
+	assert.Equal(t, uint64(250), budgetMgr.UsedBytes())
+	assert.Equal(t, int64(2), budgetMgr.UsedCount())
+
+	freedSize, freedCount := cache.Ack(100)
+	assert.Equal(t, uint64(100), freedSize)
+	assert.Equal(t, 1, freedCount)
+	assert.Equal(t, uint64(150), budgetMgr.UsedBytes())
+	assert.Equal(t, int64(1), budgetMgr.UsedCount())
+
+	freedSize, freedCount = cache.Ack(200)
+	assert.Equal(t, uint64(150), freedSize)
+	assert.Equal(t, 1, freedCount)
+	assert.Equal(t, uint64(0), budgetMgr.UsedBytes())
+	assert.Equal(t, int64(0), budgetMgr.UsedCount())
+}
+
+func TestBoundedAckCache_WithBudgetManager_BudgetExceeded(t *testing.T) {
+	budgetMgr := NewBudgetManager(
+		"test-budget",
+		dynamicproperties.GetIntPropertyFn(200),
+		dynamicproperties.GetIntPropertyFn(10),
+		AdmissionOptimistic,
+		0,
+		nil,
+		log.NewNoop(),
+		nil,
+	)
+
+	cache := NewBoundedAckCache[*testItem](
+		dynamicproperties.GetIntPropertyFn(10),
+		dynamicproperties.GetIntPropertyFn(1000),
+		log.NewNoop(),
+		budgetMgr,
+		"cache1",
+	)
+
+	item1 := newTestItemWithSize(100, "item1", 150)
+	item2 := newTestItemWithSize(200, "item2", 100)
+
+	require.NoError(t, cache.Put(item1, item1.ByteSize()))
+	assert.Equal(t, uint64(150), budgetMgr.UsedBytes())
+
+	err := cache.Put(item2, item2.ByteSize())
+	assert.Equal(t, ErrBytesBudgetExceeded, err)
+	assert.Equal(t, uint64(150), budgetMgr.UsedBytes())
+	assert.Equal(t, int64(1), budgetMgr.UsedCount())
+	assert.Equal(t, 1, cache.Count())
+	assert.Nil(t, cache.Get(200))
+}
+
+func TestBoundedAckCache_WithBudgetManager_MultipleCaches(t *testing.T) {
+	budgetMgr := NewBudgetManager(
+		"test-budget",
+		dynamicproperties.GetIntPropertyFn(500),
+		dynamicproperties.GetIntPropertyFn(100),
+		AdmissionOptimistic,
+		0,
+		nil,
+		log.NewNoop(),
+		nil,
+	)
+
+	cache1 := NewBoundedAckCache[*testItem](
+		dynamicproperties.GetIntPropertyFn(10),
+		dynamicproperties.GetIntPropertyFn(1000),
+		log.NewNoop(),
+		budgetMgr,
+		"cache1",
+	)
+
+	cache2 := NewBoundedAckCache[*testItem](
+		dynamicproperties.GetIntPropertyFn(10),
+		dynamicproperties.GetIntPropertyFn(1000),
+		log.NewNoop(),
+		budgetMgr,
+		"cache2",
+	)
+
+	item1 := newTestItemWithSize(100, "item1", 200)
+	item2 := newTestItemWithSize(200, "item2", 200)
+
+	require.NoError(t, cache1.Put(item1, item1.ByteSize()))
+	assert.Equal(t, uint64(200), budgetMgr.UsedBytes())
+
+	require.NoError(t, cache2.Put(item2, item2.ByteSize()))
+	assert.Equal(t, uint64(400), budgetMgr.UsedBytes())
+
+	freedSize, freedCount := cache1.Ack(100)
+	assert.Equal(t, uint64(200), freedSize)
+	assert.Equal(t, 1, freedCount)
+	assert.Equal(t, uint64(200), budgetMgr.UsedBytes())
+
+	freedSize, freedCount = cache2.Ack(200)
+	assert.Equal(t, uint64(200), freedSize)
+	assert.Equal(t, 1, freedCount)
+	assert.Equal(t, uint64(0), budgetMgr.UsedBytes())
+}
+
 func BenchmarkBoundedAckCache(b *testing.B) {
 	cache := NewBoundedAckCache[*testItem](
 		dynamicproperties.GetIntPropertyFn(10000),
