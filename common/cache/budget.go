@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"math"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,28 +14,28 @@ import (
 	"github.com/uber/cadence/common/metrics"
 )
 
-// This implements a generic host-scoped budget manager suitable for
+// Manager implements a generic host-scoped budget manager suitable for
 // both non-evicting caches (admission/backpressure) and evicting caches (e.g., LRU).
 //
 // Fair Share Logic:
 // The budget manager implements a two-tier soft cap system to fairly distribute capacity across
 // multiple active caches while preventing any single cache from monopolizing resources:
-//   • Free space tier: (threshold * capacity) - shared by all caches on a first-come basis
-//   • Fair share tier: ((1 - threshold) * capacity) / activeCaches - allocated per active cache
+//   - Free space tier: (threshold * capacity) - shared by all caches on a first-come basis
+//   - Fair share tier: ((1 - threshold) * capacity) / activeCaches - allocated per active cache
 //
 // An active cache is one that currently has non-zero usage (usedBytes > 0 or usedCount > 0).
 // This ensures that when multiple caches are active, each gets a guaranteed fair share of capacity,
 // preventing scenarios where one cache consumes all available space and starves others.
 //
 // There are two admission modes available:
-//   • AdmissionOptimistic => add-then-undo on failure; may briefly overshoot limits
-//   • AdmissionStrict     => pre-check with CAS; never overshoots limits
+//   - AdmissionOptimistic => add-then-undo on failure; may briefly overshoot limits
+//   - AdmissionStrict     => pre-check with CAS; never overshoots limits
 //
 // Note: Soft cap admission is always optimistic regardless of the configured mode.
 //
 // There are two modes available for reclaiming memory from the cache:
-//   • ReserveOrReclaimSelfRelease    => reclaim does its own Release() calls (per-item or per-batch).
-//   • ReserveOrReclaimManagerRelease => reclaim returns totals; manager calls Release() once.
+//   - ReserveOrReclaimSelfRelease    => reclaim does its own Release() calls (per-item or per-batch).
+//   - ReserveOrReclaimManagerRelease => reclaim returns totals; manager calls Release() once.
 //
 // Pick the reclaim mode that fits the cache's eviction style (self-release vs manager-release)
 // and admission mode based on whether temporary overshooting is acceptable (Optimistic vs Strict).
@@ -107,29 +106,6 @@ import (
 //			},
 //		)
 //	}
-
-type AdmissionMode uint8
-
-const (
-	AdmissionOptimistic AdmissionMode = iota // add-then-undo; may overshoot briefly
-	AdmissionStrict                          // CAS pre-check; never overshoots
-)
-
-const (
-	budgetTypeBytes = "bytes"
-	budgetTypeCount = "count"
-)
-
-var (
-	ErrBytesBudgetExceeded        = errors.New("bytes budget exceeded")
-	ErrCountBudgetExceeded        = errors.New("count budget exceeded")
-	ErrBytesSoftCapExceeded       = errors.New("bytes soft cap threshold exceeded")
-	ErrCountSoftCapExceeded       = errors.New("count soft cap threshold exceeded")
-	ErrOverflow                   = errors.New("budget counter overflow")
-	ErrInvalidValue               = errors.New("invalid negative reserve value")
-	ErrInsufficientUsageToReclaim = errors.New("insufficient usage to reclaim")
-)
-
 type Manager interface {
 	// Callback-based reserve methods (reserve -> callback -> release on error)
 
@@ -167,7 +143,29 @@ type Manager interface {
 	CapacityCount() int64
 }
 
-// ReclaimSelfRelease is used when the caller will call mgr.Release(...) per item or per batch.
+type AdmissionMode uint8
+
+const (
+	AdmissionOptimistic AdmissionMode = iota // add-then-undo; may overshoot briefly
+	AdmissionStrict                          // CAS pre-check; never overshoots
+)
+
+const (
+	budgetTypeBytes = "bytes"
+	budgetTypeCount = "count"
+)
+
+var (
+	ErrBytesBudgetExceeded        = errors.New("bytes budget exceeded")
+	ErrCountBudgetExceeded        = errors.New("count budget exceeded")
+	ErrBytesSoftCapExceeded       = errors.New("bytes soft cap threshold exceeded")
+	ErrCountSoftCapExceeded       = errors.New("count soft cap threshold exceeded")
+	ErrOverflow                   = errors.New("budget counter overflow")
+	ErrInvalidValue               = errors.New("invalid negative reserve value")
+	ErrInsufficientUsageToReclaim = errors.New("insufficient usage to reclaim")
+	ErrInvalidRequest             = errors.New("invalid request: both additionalBytes and additionalCount are zero")
+)
+
 type ReclaimSelfRelease func(needBytes uint64, needCount int64)
 
 // ReclaimManagerRelease is used when the manager should call Release once with totals.
@@ -176,7 +174,6 @@ type ReclaimManagerRelease func(needBytes uint64, needCount int64) (freedBytes u
 
 // CapEnforcementResult contains the result of capacity enforcement (both hard and soft cap) for a cache
 type CapEnforcementResult struct {
-	Error          error  // nil if allowed, specific error if not allowed
 	FreeBytes      uint64 // bytes allocated from free capacity (on success only)
 	FairShareBytes uint64 // bytes allocated from fair share capacity (on success only)
 	FreeCount      int64  // count allocated from free capacity (on success only)
@@ -356,10 +353,10 @@ func (m *manager) emitCapacityExceeded(cacheID string, err error, requestedBytes
 
 func (m *manager) ReserveForCache(cacheID string, nBytes uint64, nCount int64) error {
 	// Check capacity constraints (both hard and soft cap)
-	capResult := m.enforceCapForCache(cacheID, nBytes, nCount)
-	if capResult.Error != nil {
-		m.emitCapacityExceeded(cacheID, capResult.Error, nBytes, nCount, capResult)
-		return capResult.Error
+	capResult, err := m.enforceCapForCache(cacheID, nBytes, nCount)
+	if err != nil {
+		m.emitCapacityExceeded(cacheID, err, nBytes, nCount, capResult)
+		return err
 	}
 
 	cacheUsage := m.getCacheUsage(cacheID)
@@ -392,10 +389,13 @@ func (m *manager) ReserveForCache(cacheID string, nBytes uint64, nCount int64) e
 		cacheUsage.freeCapacityCount += capResult.FreeCount
 	}
 
-	cacheUsage.mu.Unlock()
+	// Update active cache count while still holding the lock to prevent races
+	isActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
+	if !wasActive && isActive {
+		atomic.AddInt64(&m.activeCacheCount, 1)
+	}
 
-	// Update active cache count after all operations succeed
-	m.updateActiveCacheCount(cacheUsage, wasActive)
+	cacheUsage.mu.Unlock()
 
 	// Update metrics after successful reservation
 	m.updateMetrics()
@@ -405,10 +405,10 @@ func (m *manager) ReserveForCache(cacheID string, nBytes uint64, nCount int64) e
 
 func (m *manager) ReserveBytesForCache(cacheID string, nBytes uint64) error {
 	// Check capacity constraints (both hard and soft cap)
-	capResult := m.enforceCapForCache(cacheID, nBytes, 0)
-	if capResult.Error != nil {
-		m.emitCapacityExceeded(cacheID, capResult.Error, nBytes, 0, capResult)
-		return capResult.Error
+	capResult, err := m.enforceCapForCache(cacheID, nBytes, 0)
+	if err != nil {
+		m.emitCapacityExceeded(cacheID, err, nBytes, 0, capResult)
+		return err
 	}
 
 	cacheUsage := m.getCacheUsage(cacheID)
@@ -424,9 +424,14 @@ func (m *manager) ReserveBytesForCache(cacheID string, nBytes uint64) error {
 	cacheUsage.usedBytes += nBytes
 	cacheUsage.fairShareCapacityBytes += capResult.FairShareBytes
 	cacheUsage.freeCapacityBytes += capResult.FreeBytes
-	cacheUsage.mu.Unlock()
 
-	m.updateActiveCacheCount(cacheUsage, wasActive)
+	// Update active cache count while still holding the lock to prevent races
+	isActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
+	if !wasActive && isActive {
+		atomic.AddInt64(&m.activeCacheCount, 1)
+	}
+
+	cacheUsage.mu.Unlock()
 
 	// Update metrics after successful reservation
 	m.updateMetrics()
@@ -445,10 +450,10 @@ func (m *manager) ReserveCountForCache(cacheID string, nCount int64) error {
 		return ErrInvalidValue
 	}
 	// Check capacity constraints (both hard and soft cap)
-	capResult := m.enforceCapForCache(cacheID, 0, nCount)
-	if capResult.Error != nil {
-		m.emitCapacityExceeded(cacheID, capResult.Error, 0, nCount, capResult)
-		return capResult.Error
+	capResult, err := m.enforceCapForCache(cacheID, 0, nCount)
+	if err != nil {
+		m.emitCapacityExceeded(cacheID, err, 0, nCount, capResult)
+		return err
 	}
 
 	cacheUsage := m.getCacheUsage(cacheID)
@@ -464,9 +469,14 @@ func (m *manager) ReserveCountForCache(cacheID string, nCount int64) error {
 	cacheUsage.usedCount += nCount
 	cacheUsage.fairShareCapacityCount += capResult.FairShareCount
 	cacheUsage.freeCapacityCount += capResult.FreeCount
-	cacheUsage.mu.Unlock()
 
-	m.updateActiveCacheCount(cacheUsage, wasActive)
+	// Update active cache count while still holding the lock to prevent races
+	isActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
+	if !wasActive && isActive {
+		atomic.AddInt64(&m.activeCacheCount, 1)
+	}
+
+	cacheUsage.mu.Unlock()
 
 	// Update metrics after successful reservation
 	m.updateMetrics()
@@ -603,8 +613,8 @@ func (m *manager) ReserveOrReclaimSelfRelease(
 		var needC int64
 
 		// Check capacity constraints (both soft and hard cap)
-		capResult := m.enforceCapForCache(cacheID, nBytes, nCount)
-		if capResult.Error == nil {
+		capResult, err := m.enforceCapForCache(cacheID, nBytes, nCount)
+		if err == nil {
 			// Capacity available - try to reserve
 			if err := m.ReserveForCache(cacheID, nBytes, nCount); err == nil {
 				return nil
@@ -674,8 +684,8 @@ func (m *manager) ReserveOrReclaimManagerRelease(
 		var needC int64
 
 		// Check capacity constraints (both soft and hard cap)
-		capResult := m.enforceCapForCache(cacheID, nBytes, nCount)
-		if capResult.Error == nil {
+		capResult, err := m.enforceCapForCache(cacheID, nBytes, nCount)
+		if err == nil {
 			// Capacity available - try to reserve
 			if err := m.ReserveForCache(cacheID, nBytes, nCount); err == nil {
 				return nil
@@ -720,7 +730,6 @@ func (m *manager) ReserveOrReclaimManagerRelease(
 }
 
 func (m *manager) yield() {
-	runtime.Gosched()
 	if m.reclaimBackoff > 0 {
 		time.Sleep(m.reclaimBackoff)
 		return
@@ -792,10 +801,14 @@ func (m *manager) ReleaseForCache(cacheID string, nBytes uint64, nCount int64) {
 			}
 		}
 	}
-	cacheUsage.mu.Unlock()
 
-	// Update active cache count after all operations
-	m.updateActiveCacheCount(cacheUsage, wasActive)
+	// Update active cache count while still holding the lock to prevent races
+	isActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
+	if wasActive && !isActive {
+		atomic.AddInt64(&m.activeCacheCount, -1)
+	}
+
+	cacheUsage.mu.Unlock()
 
 	// Update metrics after successful release
 	m.updateMetrics()
@@ -833,9 +846,14 @@ func (m *manager) ReleaseBytesForCache(cacheID string, n uint64) {
 			cacheUsage.freeCapacityBytes -= remainingBytes
 		}
 	}
-	cacheUsage.mu.Unlock()
 
-	m.updateActiveCacheCount(cacheUsage, wasActive)
+	// Update active cache count while still holding the lock to prevent races
+	isActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
+	if wasActive && !isActive {
+		atomic.AddInt64(&m.activeCacheCount, -1)
+	}
+
+	cacheUsage.mu.Unlock()
 
 	// Update metrics after successful release
 	m.updateMetrics()
@@ -873,9 +891,14 @@ func (m *manager) ReleaseCountForCache(cacheID string, n int64) {
 			cacheUsage.freeCapacityCount -= remainingCount
 		}
 	}
-	cacheUsage.mu.Unlock()
 
-	m.updateActiveCacheCount(cacheUsage, wasActive)
+	// Update active cache count while still holding the lock to prevent races
+	isActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
+	if wasActive && !isActive {
+		atomic.AddInt64(&m.activeCacheCount, -1)
+	}
+
+	cacheUsage.mu.Unlock()
 
 	// Update metrics after successful release
 	m.updateMetrics()
@@ -1081,21 +1104,8 @@ func (m *manager) getActiveCacheCount() int64 {
 	return atomic.LoadInt64(&m.activeCacheCount)
 }
 
-// updateActiveCacheCount updates the active cache count when a cache transitions between active/inactive
-func (m *manager) updateActiveCacheCount(cacheUsage *Usage, wasActive bool) {
-	cacheUsage.mu.Lock()
-	isActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
-	cacheUsage.mu.Unlock()
-
-	if !wasActive && isActive {
-		atomic.AddInt64(&m.activeCacheCount, 1)
-	} else if wasActive && !isActive {
-		atomic.AddInt64(&m.activeCacheCount, -1)
-	}
-}
-
 // enforceCapForCache implements both hard and soft cap logic
-func (m *manager) enforceCapForCache(cacheID string, additionalBytes uint64, additionalCount int64) CapEnforcementResult {
+func (m *manager) enforceCapForCache(cacheID string, additionalBytes uint64, additionalCount int64) (CapEnforcementResult, error) {
 	// Check if caching is completely disabled (zero capacity)
 	if m.CapacityBytes() == 0 || m.CapacityCount() == 0 {
 		var err error
@@ -1105,14 +1115,25 @@ func (m *manager) enforceCapForCache(cacheID string, additionalBytes uint64, add
 			err = ErrCountBudgetExceeded
 		}
 		return CapEnforcementResult{
-			Error:          err,
 			FreeBytes:      0,
 			FairShareBytes: 0,
 			FreeCount:      0,
 			FairShareCount: 0,
 			AvailableBytes: 0,
 			AvailableCount: 0,
-		}
+		}, err
+	}
+
+	// Reject requests with zero bytes AND zero count
+	if additionalBytes == 0 && additionalCount == 0 {
+		return CapEnforcementResult{
+			FreeBytes:      0,
+			FairShareBytes: 0,
+			FreeCount:      0,
+			FairShareCount: 0,
+			AvailableBytes: 0,
+			AvailableCount: 0,
+		}, ErrInvalidRequest
 	}
 
 	// Get hard cap constraints
@@ -1147,9 +1168,14 @@ func (m *manager) enforceCapForCache(cacheID string, additionalBytes uint64, add
 		currentFairShareCount := cacheUsage.fairShareCapacityCount
 		cacheUsage.mu.Unlock()
 
-		if !cacheIsActive && (additionalBytes > 0 || additionalCount > 0) {
+		if !cacheIsActive {
 			// Cache will become active, include it in the count
 			activeCaches++
+		} else if activeCaches == 0 {
+			// Cache is already active but global counter hasn't been updated yet.
+			// This happens because we update activeCacheCount under per-cache lock,
+			// but read it without any lock. Ensure we count at least this active cache.
+			activeCaches = 1
 		}
 
 		fairShareCapacityBytes := uint64(float64(m.CapacityBytes()) * (1.0 - managerThreshold))
@@ -1184,14 +1210,13 @@ func (m *manager) enforceCapForCache(cacheID string, additionalBytes uint64, add
 			fairShareCountUsage := additionalCount - freeCountUsage
 
 			return CapEnforcementResult{
-				Error:          nil,
 				FreeBytes:      freeBytesUsage,
 				FairShareBytes: fairShareBytesUsage,
 				FreeCount:      freeCountUsage,
 				FairShareCount: fairShareCountUsage,
 				AvailableBytes: availableBytes,
 				AvailableCount: availableCount,
-			}
+			}, nil
 		}
 
 		// Determine which constraint failed
@@ -1213,14 +1238,13 @@ func (m *manager) enforceCapForCache(cacheID string, additionalBytes uint64, add
 		}
 
 		return CapEnforcementResult{
-			Error:          err,
 			FreeBytes:      0, // No allocation on failure
 			FairShareBytes: 0, // No allocation on failure
 			FreeCount:      0, // No allocation on failure
 			FairShareCount: 0, // No allocation on failure
 			AvailableBytes: availableBytes,
 			AvailableCount: availableCount,
-		}
+		}, err
 	}
 
 	// Soft caps disabled - only check hard cap
@@ -1230,14 +1254,13 @@ func (m *manager) enforceCapForCache(cacheID string, additionalBytes uint64, add
 	if additionalBytes <= hardCapAvailableBytes && additionalCount <= hardCapAvailableCount {
 		// Success - all allocation goes to fair share when soft caps disabled
 		return CapEnforcementResult{
-			Error:          nil,
 			FreeBytes:      0, // No free space allocation when soft caps disabled
 			FairShareBytes: additionalBytes,
 			FreeCount:      0, // No free space allocation when soft caps disabled
 			FairShareCount: additionalCount,
 			AvailableBytes: availableBytes,
 			AvailableCount: availableCount,
-		}
+		}, nil
 	}
 
 	// Hard cap exceeded
@@ -1249,12 +1272,11 @@ func (m *manager) enforceCapForCache(cacheID string, additionalBytes uint64, add
 	}
 
 	return CapEnforcementResult{
-		Error:          err,
 		FreeBytes:      0, // No allocation on failure
 		FairShareBytes: 0, // No allocation on failure
 		FreeCount:      0, // No allocation on failure
 		FairShareCount: 0, // No allocation on failure
 		AvailableBytes: availableBytes,
 		AvailableCount: availableCount,
-	}
+	}, err
 }

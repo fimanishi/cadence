@@ -3,7 +3,9 @@ package cache
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -782,7 +784,7 @@ func TestBudgetManager_ReserveOrReclaimSelfRelease(t *testing.T) {
 				cancel()
 			}
 
-			err := mgr.ReserveOrReclaimSelfReleaseWithCallback(ctx, "cache1", tt.requestBytes, tt.requestCount, tt.retriable, reclaimFunc, func() error { return nil })
+			err := mgr.(*manager).ReserveOrReclaimSelfReleaseWithCallback(ctx, "cache1", tt.requestBytes, tt.requestCount, tt.retriable, reclaimFunc, func() error { return nil })
 
 			assert.Equal(t, tt.expectedError, err, tt.description)
 			if tt.reclaimFunc != nil && tt.expectedError == nil {
@@ -952,7 +954,7 @@ func TestBudgetManager_ReserveOrReclaimManagerRelease(t *testing.T) {
 				defer cancel()
 			}
 
-			err := mgr.ReserveOrReclaimManagerReleaseWithCallback(ctx, "cache1", tt.requestBytes, tt.requestCount, tt.retriable, reclaimFunc, func() error { return nil })
+			err := mgr.(*manager).ReserveOrReclaimManagerReleaseWithCallback(ctx, "cache1", tt.requestBytes, tt.requestCount, tt.retriable, reclaimFunc, func() error { return nil })
 
 			if tt.name == "reclaim returns zero" {
 				assert.Error(t, err, tt.description)
@@ -1579,7 +1581,7 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 				mgr.ReserveWithCallback("cache1", 600, 60, func() error { return nil })
 				called := false
 				callbackCalled := false
-				err := mgr.ReserveOrReclaimSelfReleaseWithCallback(
+				err := mgr.(*manager).ReserveOrReclaimSelfReleaseWithCallback(
 					context.Background(),
 					"cache1",
 					500,
@@ -1613,7 +1615,7 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 			capacityCount: 100,
 			operation: func(mgr Manager) error {
 				mgr.ReserveWithCallback("cache1", 600, 60, func() error { return nil })
-				return mgr.ReserveOrReclaimSelfReleaseWithCallback(
+				return mgr.(*manager).ReserveOrReclaimSelfReleaseWithCallback(
 					context.Background(),
 					"cache1",
 					500,
@@ -1640,7 +1642,7 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 				mgr.ReserveWithCallback("cache1", 600, 60, func() error { return nil })
 				called := false
 				callbackCalled := false
-				err := mgr.ReserveOrReclaimManagerReleaseWithCallback(
+				err := mgr.(*manager).ReserveOrReclaimManagerReleaseWithCallback(
 					context.Background(),
 					"cache1",
 					500,
@@ -1674,7 +1676,7 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 			capacityCount: 100,
 			operation: func(mgr Manager) error {
 				mgr.ReserveWithCallback("cache1", 600, 60, func() error { return nil })
-				return mgr.ReserveOrReclaimManagerReleaseWithCallback(
+				return mgr.(*manager).ReserveOrReclaimManagerReleaseWithCallback(
 					context.Background(),
 					"cache1",
 					500,
@@ -1721,4 +1723,483 @@ func TestBudgetManager_CallbackMethods(t *testing.T) {
 			assert.Equal(t, tt.expectedCount, mgr.UsedCount(), "Used count mismatch")
 		})
 	}
+}
+
+func TestBudgetManager_ConcurrentCorrectness(t *testing.T) {
+	mgr := NewBudgetManager(
+		"test",
+		dynamicproperties.GetIntPropertyFn(1000000),
+		dynamicproperties.GetIntPropertyFn(100000),
+		AdmissionOptimistic,
+		0,
+		nil,
+		testlogger.New(t),
+		nil,
+	)
+
+	const (
+		numGoroutines = 100
+		numOperations = 1000
+		reserveBytes  = 100
+		reserveCount  = 1
+	)
+
+	// Track total operations for verification
+	var totalReservedBytes atomic.Uint64
+	var totalReservedCount atomic.Int64
+	var totalReleasedBytes atomic.Uint64
+	var totalReleasedCount atomic.Int64
+
+	// Run concurrent reserve/release operations
+	// Each goroutine will reserve some and release some (but not all)
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+
+	for g := 0; g < numGoroutines; g++ {
+		go func(goroutineID int) {
+			defer wg.Done()
+			cacheID := fmt.Sprintf("cache%d", goroutineID%10)
+
+			for i := 0; i < numOperations; i++ {
+				// Reserve
+				err := mgr.(*manager).ReserveForCache(cacheID, reserveBytes, reserveCount)
+				if err == nil {
+					totalReservedBytes.Add(reserveBytes)
+					totalReservedCount.Add(reserveCount)
+
+					// Release only half the time to maintain non-zero state
+					if i%2 == 0 {
+						mgr.(*manager).ReleaseForCache(cacheID, reserveBytes, reserveCount)
+						totalReleasedBytes.Add(reserveBytes)
+						totalReleasedCount.Add(reserveCount)
+					}
+				}
+			}
+		}(g)
+	}
+
+	wg.Wait()
+
+	// Verify invariants without assuming zero state
+	// 1. Manager's used bytes should equal total reserved - total released
+	expectedBytes := totalReservedBytes.Load() - totalReleasedBytes.Load()
+	expectedCount := totalReservedCount.Load() - totalReleasedCount.Load()
+
+	assert.Equal(t, expectedBytes, mgr.UsedBytes(),
+		"Used bytes should equal total reserved minus total released")
+	assert.Equal(t, expectedCount, mgr.UsedCount(),
+		"Used count should equal total reserved minus total released")
+
+	// 2. Available capacity should equal total - used
+	assert.Equal(t, uint64(1000000)-expectedBytes, mgr.(*manager).AvailableBytes(),
+		"Available bytes should equal capacity minus used")
+	assert.Equal(t, int64(100000)-expectedCount, mgr.(*manager).AvailableCount(),
+		"Available count should equal capacity minus used")
+
+	// 3. Active cache count should be > 0 since we have unreleased capacity
+	if expectedBytes > 0 || expectedCount > 0 {
+		assert.Greater(t, mgr.(*manager).getActiveCacheCount(), int64(0),
+			"Should have active caches when capacity is in use")
+	}
+
+	// 4. Log final state for debugging
+	t.Logf("Final state: reserved=%d bytes, released=%d bytes, used=%d bytes, active_caches=%d",
+		totalReservedBytes.Load(), totalReleasedBytes.Load(), mgr.UsedBytes(),
+		mgr.(*manager).getActiveCacheCount())
+}
+
+func TestBudgetManager_ConcurrentSoftCapCorrectness(t *testing.T) {
+	mgr := NewBudgetManager(
+		"test",
+		dynamicproperties.GetIntPropertyFn(10000), // Smaller capacity
+		dynamicproperties.GetIntPropertyFn(1000),
+		AdmissionOptimistic,
+		0,
+		nil,
+		testlogger.New(t),
+		dynamicproperties.GetFloatPropertyFn(0.5), // 50% soft cap = 5000 bytes free
+	)
+
+	const (
+		numGoroutines = 50
+		numOperations = 100
+		reserveBytes  = 200
+		reserveCount  = 2
+	)
+
+	var totalSuccessful atomic.Int64
+	var totalFailed atomic.Int64
+
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+
+	// Try to reserve concurrently - soft cap should cause some failures
+	for g := 0; g < numGoroutines; g++ {
+		go func(goroutineID int) {
+			defer wg.Done()
+			cacheID := fmt.Sprintf("cache%d", goroutineID%10)
+
+			for i := 0; i < numOperations; i++ {
+				err := mgr.(*manager).ReserveForCache(cacheID, reserveBytes, reserveCount)
+				if err == nil {
+					totalSuccessful.Add(1)
+				} else {
+					totalFailed.Add(1)
+				}
+			}
+		}(g)
+	}
+
+	wg.Wait()
+
+	// Now release everything
+	for g := 0; g < numGoroutines; g++ {
+		cacheID := fmt.Sprintf("cache%d", g%10)
+		for i := 0; i < numOperations; i++ {
+			mgr.(*manager).ReleaseForCache(cacheID, reserveBytes, reserveCount)
+		}
+	}
+
+	// Verify invariants
+	assert.Equal(t, uint64(0), mgr.UsedBytes(),
+		"All bytes should be released at the end")
+	assert.Equal(t, int64(0), mgr.UsedCount(),
+		"All count should be released at the end")
+	assert.Equal(t, int64(0), mgr.(*manager).getActiveCacheCount(),
+		"No caches should be active")
+
+	// Log statistics
+	t.Logf("Successful: %d, Failed: %d, Total: %d",
+		totalSuccessful.Load(), totalFailed.Load(),
+		totalSuccessful.Load()+totalFailed.Load())
+
+	// At least some operations should have succeeded
+	assert.Greater(t, totalSuccessful.Load(), int64(0),
+		"Some operations should succeed")
+}
+
+func TestBudgetManager_ConcurrentActiveCacheCount(t *testing.T) {
+	mgr := NewBudgetManager(
+		"test",
+		dynamicproperties.GetIntPropertyFn(1000000),
+		dynamicproperties.GetIntPropertyFn(100000),
+		AdmissionOptimistic,
+		0,
+		nil,
+		testlogger.New(t),
+		dynamicproperties.GetFloatPropertyFn(0.5),
+	)
+
+	const numCaches = 20
+
+	// Activate all caches
+	for i := 0; i < numCaches; i++ {
+		cacheID := fmt.Sprintf("cache%d", i)
+		err := mgr.(*manager).ReserveForCache(cacheID, 100, 1)
+		assert.NoError(t, err)
+	}
+
+	// Verify active cache count
+	assert.Equal(t, int64(numCaches), mgr.(*manager).getActiveCacheCount(),
+		"All caches should be active")
+
+	// Deactivate all caches concurrently
+	var wg sync.WaitGroup
+	wg.Add(numCaches)
+	for i := 0; i < numCaches; i++ {
+		go func(cacheID string) {
+			defer wg.Done()
+			mgr.(*manager).ReleaseForCache(cacheID, 100, 1)
+		}(fmt.Sprintf("cache%d", i))
+	}
+	wg.Wait()
+
+	// Verify all caches are inactive
+	assert.Equal(t, int64(0), mgr.(*manager).getActiveCacheCount(),
+		"All caches should be inactive after release")
+	assert.Equal(t, uint64(0), mgr.UsedBytes(),
+		"All bytes should be released")
+}
+
+func BenchmarkBudgetManager_ReserveRelease(b *testing.B) {
+	mgr := NewBudgetManager(
+		"benchmark",
+		dynamicproperties.GetIntPropertyFn(1000000),
+		dynamicproperties.GetIntPropertyFn(100000),
+		AdmissionOptimistic,
+		0,
+		nil,
+		testlogger.New(b),
+		nil,
+	)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			cacheID := "cache" + string(rune(i%10))
+			mgr.(*manager).ReserveForCache(cacheID, 100, 1)
+			mgr.(*manager).ReleaseForCache(cacheID, 100, 1)
+			i++
+		}
+	})
+}
+
+func BenchmarkBudgetManager_ReserveBytes(b *testing.B) {
+	mgr := NewBudgetManager(
+		"benchmark",
+		dynamicproperties.GetIntPropertyFn(1000000),
+		dynamicproperties.GetIntPropertyFn(100000),
+		AdmissionOptimistic,
+		0,
+		nil,
+		testlogger.New(b),
+		nil,
+	)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			cacheID := "cache" + string(rune(i%10))
+			mgr.(*manager).ReserveBytesForCache(cacheID, 100)
+			mgr.(*manager).ReleaseBytesForCache(cacheID, 100)
+			i++
+		}
+	})
+}
+
+func BenchmarkBudgetManager_ReserveCount(b *testing.B) {
+	mgr := NewBudgetManager(
+		"benchmark",
+		dynamicproperties.GetIntPropertyFn(1000000),
+		dynamicproperties.GetIntPropertyFn(100000),
+		AdmissionOptimistic,
+		0,
+		nil,
+		testlogger.New(b),
+		nil,
+	)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			cacheID := "cache" + string(rune(i%10))
+			mgr.(*manager).ReserveCountForCache(cacheID, 1)
+			mgr.(*manager).ReleaseCountForCache(cacheID, 1)
+			i++
+		}
+	})
+}
+
+func BenchmarkBudgetManager_ReserveWithCallback(b *testing.B) {
+	mgr := NewBudgetManager(
+		"benchmark",
+		dynamicproperties.GetIntPropertyFn(1000000),
+		dynamicproperties.GetIntPropertyFn(100000),
+		AdmissionOptimistic,
+		0,
+		nil,
+		testlogger.New(b),
+		nil,
+	)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			cacheID := "cache" + string(rune(i%10))
+			mgr.ReserveWithCallback(cacheID, 100, 1, func() error {
+				return nil
+			})
+			mgr.(*manager).ReleaseForCache(cacheID, 100, 1)
+			i++
+		}
+	})
+}
+
+func BenchmarkBudgetManager_ReleaseWithCallback(b *testing.B) {
+	mgr := NewBudgetManager(
+		"benchmark",
+		dynamicproperties.GetIntPropertyFn(1000000),
+		dynamicproperties.GetIntPropertyFn(100000),
+		AdmissionOptimistic,
+		0,
+		nil,
+		testlogger.New(b),
+		nil,
+	)
+
+	for i := 0; i < 1000; i++ {
+		cacheID := "cache" + string(rune(i%10))
+		mgr.(*manager).ReserveForCache(cacheID, 100, 1)
+	}
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			cacheID := "cache" + string(rune(i%10))
+			mgr.ReleaseWithCallback(cacheID, func() (uint64, int64, error) {
+				return 100, 1, nil
+			})
+			mgr.(*manager).ReserveForCache(cacheID, 100, 1)
+			i++
+		}
+	})
+}
+
+func BenchmarkBudgetManager_ReserveOrReclaimSelfRelease(b *testing.B) {
+	mgr := NewBudgetManager(
+		"benchmark",
+		dynamicproperties.GetIntPropertyFn(10000),
+		dynamicproperties.GetIntPropertyFn(1000),
+		AdmissionOptimistic,
+		0,
+		nil,
+		testlogger.New(b),
+		nil,
+	)
+
+	mgr.(*manager).ReserveForCache("cache1", 9000, 900)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		mgr.(*manager).ReserveOrReclaimSelfRelease(
+			context.Background(),
+			"cache1",
+			2000,
+			200,
+			true,
+			func(needBytes uint64, needCount int64) {
+				mgr.(*manager).ReleaseForCache("cache1", needBytes, needCount)
+			},
+		)
+		mgr.(*manager).ReleaseForCache("cache1", 2000, 200)
+	}
+}
+
+func BenchmarkBudgetManager_ReserveOrReclaimManagerRelease(b *testing.B) {
+	mgr := NewBudgetManager(
+		"benchmark",
+		dynamicproperties.GetIntPropertyFn(10000),
+		dynamicproperties.GetIntPropertyFn(1000),
+		AdmissionOptimistic,
+		0,
+		nil,
+		testlogger.New(b),
+		nil,
+	)
+
+	mgr.(*manager).ReserveForCache("cache1", 9000, 900)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		mgr.(*manager).ReserveOrReclaimManagerRelease(
+			context.Background(),
+			"cache1",
+			2000,
+			200,
+			true,
+			func(needBytes uint64, needCount int64) (uint64, int64) {
+				return needBytes, needCount
+			},
+		)
+		mgr.(*manager).ReleaseForCache("cache1", 2000, 200)
+	}
+}
+
+func BenchmarkBudgetManager_MultipleCaches(b *testing.B) {
+	mgr := NewBudgetManager(
+		"benchmark",
+		dynamicproperties.GetIntPropertyFn(1000000),
+		dynamicproperties.GetIntPropertyFn(100000),
+		AdmissionOptimistic,
+		0,
+		nil,
+		testlogger.New(b),
+		nil,
+	)
+
+	numCaches := 100
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			cacheID := "cache" + string(rune(i%numCaches))
+			mgr.(*manager).ReserveForCache(cacheID, 1000, 10)
+			mgr.(*manager).ReleaseForCache(cacheID, 1000, 10)
+			i++
+		}
+	})
+}
+
+func BenchmarkBudgetManager_StrictMode(b *testing.B) {
+	mgr := NewBudgetManager(
+		"benchmark",
+		dynamicproperties.GetIntPropertyFn(1000000),
+		dynamicproperties.GetIntPropertyFn(100000),
+		AdmissionStrict,
+		0,
+		nil,
+		testlogger.New(b),
+		nil,
+	)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			cacheID := "cache" + string(rune(i%10))
+			mgr.(*manager).ReserveForCache(cacheID, 100, 1)
+			mgr.(*manager).ReleaseForCache(cacheID, 100, 1)
+			i++
+		}
+	})
+}
+
+func BenchmarkBudgetManager_SoftCap(b *testing.B) {
+	mgr := NewBudgetManager(
+		"benchmark",
+		dynamicproperties.GetIntPropertyFn(1000000),
+		dynamicproperties.GetIntPropertyFn(100000),
+		AdmissionOptimistic,
+		0,
+		nil,
+		testlogger.New(b),
+		dynamicproperties.GetFloatPropertyFn(0.5),
+	)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			cacheID := fmt.Sprintf("cache%d", i%10)
+			mgr.(*manager).ReserveForCache(cacheID, 100, 1)
+			mgr.(*manager).ReleaseForCache(cacheID, 100, 1)
+			i++
+		}
+	})
+}
+
+func BenchmarkBudgetManager_HighContention(b *testing.B) {
+	mgr := NewBudgetManager(
+		"benchmark",
+		dynamicproperties.GetIntPropertyFn(100000),
+		dynamicproperties.GetIntPropertyFn(10000),
+		AdmissionOptimistic,
+		0,
+		nil,
+		testlogger.New(b),
+		nil,
+	)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			mgr.(*manager).ReserveForCache("shared-cache", 100, 1)
+			mgr.(*manager).ReleaseForCache("shared-cache", 100, 1)
+		}
+	})
 }
