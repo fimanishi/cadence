@@ -143,6 +143,8 @@ type Manager interface {
 	CapacityBytes() uint64
 	// CapacityCount returns the current effective count capacity (math.MaxInt64 means "unlimited").
 	CapacityCount() int64
+	// Stop stops the metrics ticker and releases resources.
+	Stop()
 }
 
 type AdmissionMode uint8
@@ -216,6 +218,10 @@ type manager struct {
 
 	// Optimistic tracking of active caches (usage > 0)
 	activeCacheCount int64 // atomic
+
+	// Metrics ticker
+	metricsTicker *time.Ticker
+	metricsStop   chan struct{}
 }
 
 // NewBudgetManager creates a new Manager.
@@ -271,12 +277,35 @@ func NewBudgetManager(
 		scope:                       scope.Tagged(metrics.BudgetManagerNameTag(name)),
 		logger:                      logger,
 		enforcementSoftCapThreshold: softCapThreshold,
+		metricsTicker:               time.NewTicker(10 * time.Second),
+		metricsStop:                 make(chan struct{}),
 	}
 
 	// Emit initial metrics
 	mgr.updateMetrics()
 
+	// Start metrics update goroutine
+	go mgr.metricsLoop()
+
 	return mgr
+}
+
+// Stop stops the metrics ticker and releases resources
+func (m *manager) Stop() {
+	m.metricsTicker.Stop()
+	close(m.metricsStop)
+}
+
+// metricsLoop periodically updates metrics every 10 seconds
+func (m *manager) metricsLoop() {
+	for {
+		select {
+		case <-m.metricsTicker.C:
+			m.updateMetrics()
+		case <-m.metricsStop:
+			return
+		}
+	}
 }
 
 // updateMetrics emits current state metrics
@@ -366,11 +395,12 @@ func (m *manager) ReserveForCache(cacheID string, nBytes uint64, nCount int64) e
 	cacheUsage := m.getCacheUsage(cacheID)
 
 	cacheUsage.mu.Lock()
+	defer cacheUsage.mu.Unlock()
+
 	wasActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
 
 	if nBytes > 0 {
 		if err := m.reserveBytes(nBytes); err != nil {
-			cacheUsage.mu.Unlock()
 			return err
 		}
 		cacheUsage.usedBytes += nBytes
@@ -385,7 +415,6 @@ func (m *manager) ReserveForCache(cacheID string, nBytes uint64, nCount int64) e
 				cacheUsage.fairShareCapacityBytes -= capResult.FairShareBytes
 				cacheUsage.freeCapacityBytes -= capResult.FreeBytes
 			}
-			cacheUsage.mu.Unlock()
 			return err
 		}
 		cacheUsage.usedCount += nCount
@@ -398,11 +427,6 @@ func (m *manager) ReserveForCache(cacheID string, nBytes uint64, nCount int64) e
 	if !wasActive && isActive {
 		atomic.AddInt64(&m.activeCacheCount, 1)
 	}
-
-	cacheUsage.mu.Unlock()
-
-	// Update metrics after successful reservation
-	m.updateMetrics()
 
 	return nil
 }
@@ -418,10 +442,11 @@ func (m *manager) ReserveBytesForCache(cacheID string, nBytes uint64) error {
 	cacheUsage := m.getCacheUsage(cacheID)
 
 	cacheUsage.mu.Lock()
+	defer cacheUsage.mu.Unlock()
+
 	wasActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
 
 	if err := m.reserveBytes(nBytes); err != nil {
-		cacheUsage.mu.Unlock()
 		return err
 	}
 
@@ -434,11 +459,6 @@ func (m *manager) ReserveBytesForCache(cacheID string, nBytes uint64) error {
 	if !wasActive && isActive {
 		atomic.AddInt64(&m.activeCacheCount, 1)
 	}
-
-	cacheUsage.mu.Unlock()
-
-	// Update metrics after successful reservation
-	m.updateMetrics()
 
 	return nil
 }
@@ -463,10 +483,11 @@ func (m *manager) ReserveCountForCache(cacheID string, nCount int64) error {
 	cacheUsage := m.getCacheUsage(cacheID)
 
 	cacheUsage.mu.Lock()
+	defer cacheUsage.mu.Unlock()
+
 	wasActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
 
 	if err := m.reserveCount(nCount); err != nil {
-		cacheUsage.mu.Unlock()
 		return err
 	}
 
@@ -479,11 +500,6 @@ func (m *manager) ReserveCountForCache(cacheID string, nCount int64) error {
 	if !wasActive && isActive {
 		atomic.AddInt64(&m.activeCacheCount, 1)
 	}
-
-	cacheUsage.mu.Unlock()
-
-	// Update metrics after successful reservation
-	m.updateMetrics()
 
 	return nil
 }
@@ -592,6 +608,56 @@ func (m *manager) reserveCountOptimistic(n int64) error {
 	return ErrCountBudgetExceeded
 }
 
+// reclaimNeeds holds the calculated reclaim requirements
+type reclaimNeeds struct {
+	needBytes uint64
+	needCount int64
+}
+
+// tryReserveOrCalculateReclaimNeeds attempts to reserve capacity immediately.
+// If capacity is not available, it calculates how much the cache needs to reclaim
+// and validates that the cache has enough usage to satisfy the reclaim requirement.
+// Returns:
+// - nil, nil if reservation succeeded immediately
+// - reclaimNeeds, nil if reclaim is needed and cache has sufficient usage
+// - nil, error if reservation failed and cannot be satisfied via reclaim
+func (m *manager) tryReserveOrCalculateReclaimNeeds(cacheID string, nBytes uint64, nCount int64) (*reclaimNeeds, error) {
+	// Check capacity constraints (both soft and hard cap)
+	capResult, err := m.enforceCapForCache(cacheID, nBytes, nCount)
+	if err == nil {
+		// Capacity available - try to reserve
+		if err := m.ReserveForCache(cacheID, nBytes, nCount); err == nil {
+			return nil, nil
+		}
+		// lost the race; caller should retry
+		return nil, err
+	}
+
+	// Calculate reclaim amounts based on available capacity
+	allowedBytes := capResult.AvailableBytes
+	allowedCount := capResult.AvailableCount
+	needB := nBytes - allowedBytes
+	needC := nCount - allowedCount
+
+	// Check if this cache can reclaim enough to satisfy the constraint
+	cacheUsage := m.getCacheUsage(cacheID)
+	cacheUsage.mu.Lock()
+	defer cacheUsage.mu.Unlock()
+
+	currentCacheBytes := cacheUsage.usedBytes
+	currentCacheCount := cacheUsage.usedCount
+
+	if (currentCacheBytes+allowedBytes < nBytes) || (currentCacheCount+allowedCount < nCount) {
+		// Cache doesn't have enough to reclaim
+		return nil, ErrInsufficientUsageToReclaim
+	}
+
+	return &reclaimNeeds{
+		needBytes: needB,
+		needCount: needC,
+	}, nil
+}
+
 func (m *manager) ReserveOrReclaimSelfRelease(
 	ctx context.Context,
 	cacheID string,
@@ -613,45 +679,21 @@ func (m *manager) ReserveOrReclaimSelfRelease(
 		default:
 		}
 
-		var needB uint64
-		var needC int64
-
-		// Check capacity constraints (both soft and hard cap)
-		capResult, err := m.enforceCapForCache(cacheID, nBytes, nCount)
-		if err == nil {
-			// Capacity available - try to reserve
-			if err := m.ReserveForCache(cacheID, nBytes, nCount); err == nil {
-				return nil
-			}
-			// lost the race; loop
-			continue
+		needs, err := m.tryReserveOrCalculateReclaimNeeds(cacheID, nBytes, nCount)
+		if err != nil {
+			return err
+		}
+		if needs == nil {
+			// Reservation succeeded immediately
+			return nil
 		}
 
-		// Calculate reclaim amounts based on available capacity
-		allowedBytes := capResult.AvailableBytes
-		allowedCount := capResult.AvailableCount
-		needB = nBytes - allowedBytes
-		needC = nCount - allowedCount
-
-		// Check if this cache can reclaim enough to satisfy the constraint
-		cacheUsage := m.getCacheUsage(cacheID)
-		cacheUsage.mu.Lock()
-		currentCacheBytes := cacheUsage.usedBytes
-		currentCacheCount := cacheUsage.usedCount
-
-		if (currentCacheBytes+allowedBytes < nBytes) || (currentCacheCount+allowedCount < nCount) {
-			cacheUsage.mu.Unlock()
-			// Cache doesn't have enough to reclaim
-			return ErrInsufficientUsageToReclaim
-		}
-		cacheUsage.mu.Unlock()
-
-		if reclaim != nil && (needB > 0 || needC > 0) {
+		if reclaim != nil && (needs.needBytes > 0 || needs.needCount > 0) {
 			// The manager uses only atomic operations (no locks), so the cache
 			// can safely take its own locks (e.g., for protecting internal data structures
 			// during eviction) without risk of deadlock. The cache must call ReleaseForCache
 			// separately after evicting items.
-			reclaim(needB, needC)
+			reclaim(needs.needBytes, needs.needCount)
 
 			// Fast path: try to consume immediately after reclaim before yielding.
 			if err := m.ReserveForCache(cacheID, nBytes, nCount); err == nil {
@@ -684,41 +726,17 @@ func (m *manager) ReserveOrReclaimManagerRelease(
 		default:
 		}
 
-		var needB uint64
-		var needC int64
-
-		// Check capacity constraints (both soft and hard cap)
-		capResult, err := m.enforceCapForCache(cacheID, nBytes, nCount)
-		if err == nil {
-			// Capacity available - try to reserve
-			if err := m.ReserveForCache(cacheID, nBytes, nCount); err == nil {
-				return nil
-			}
-			// lost the race; loop
-			continue
+		needs, err := m.tryReserveOrCalculateReclaimNeeds(cacheID, nBytes, nCount)
+		if err != nil {
+			return err
+		}
+		if needs == nil {
+			// Reservation succeeded immediately
+			return nil
 		}
 
-		// Calculate reclaim amounts based on available capacity
-		allowedBytes := capResult.AvailableBytes
-		allowedCount := capResult.AvailableCount
-		needB = nBytes - allowedBytes
-		needC = nCount - allowedCount
-
-		// Check if this cache can reclaim enough to satisfy the constraint
-		cacheUsage := m.getCacheUsage(cacheID)
-		cacheUsage.mu.Lock()
-		currentCacheBytes := cacheUsage.usedBytes
-		currentCacheCount := cacheUsage.usedCount
-
-		if (currentCacheBytes+allowedBytes < nBytes) || (currentCacheCount+allowedCount < nCount) {
-			cacheUsage.mu.Unlock()
-			// Cache doesn't have enough to reclaim
-			return ErrInsufficientUsageToReclaim
-		}
-		cacheUsage.mu.Unlock()
-
-		if reclaim != nil && (needB > 0 || needC > 0) {
-			fb, fc := reclaim(needB, needC)
+		if reclaim != nil && (needs.needBytes > 0 || needs.needCount > 0) {
+			fb, fc := reclaim(needs.needBytes, needs.needCount)
 			if fb > 0 || fc > 0 {
 				m.ReleaseForCache(cacheID, fb, fc)
 
@@ -747,6 +765,8 @@ func (m *manager) ReleaseForCache(cacheID string, nBytes uint64, nCount int64) {
 	cacheUsage := m.getCacheUsage(cacheID)
 
 	cacheUsage.mu.Lock()
+	defer cacheUsage.mu.Unlock()
+
 	wasActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
 
 	if nBytes > 0 {
@@ -811,11 +831,6 @@ func (m *manager) ReleaseForCache(cacheID string, nBytes uint64, nCount int64) {
 	if wasActive && !isActive {
 		atomic.AddInt64(&m.activeCacheCount, -1)
 	}
-
-	cacheUsage.mu.Unlock()
-
-	// Update metrics after successful release
-	m.updateMetrics()
 }
 
 func (m *manager) ReleaseBytesForCache(cacheID string, n uint64) {
@@ -824,6 +839,8 @@ func (m *manager) ReleaseBytesForCache(cacheID string, n uint64) {
 	cacheUsage := m.getCacheUsage(cacheID)
 
 	cacheUsage.mu.Lock()
+	defer cacheUsage.mu.Unlock()
+
 	wasActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
 	// Update cache-specific usage tracking with over-release protection
 	if n > cacheUsage.usedBytes {
@@ -856,11 +873,6 @@ func (m *manager) ReleaseBytesForCache(cacheID string, n uint64) {
 	if wasActive && !isActive {
 		atomic.AddInt64(&m.activeCacheCount, -1)
 	}
-
-	cacheUsage.mu.Unlock()
-
-	// Update metrics after successful release
-	m.updateMetrics()
 }
 
 func (m *manager) ReleaseCountForCache(cacheID string, n int64) {
@@ -869,6 +881,8 @@ func (m *manager) ReleaseCountForCache(cacheID string, n int64) {
 	cacheUsage := m.getCacheUsage(cacheID)
 
 	cacheUsage.mu.Lock()
+	defer cacheUsage.mu.Unlock()
+
 	wasActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
 	// Update cache-specific usage tracking with over-release protection
 	if n > cacheUsage.usedCount {
@@ -902,10 +916,6 @@ func (m *manager) ReleaseCountForCache(cacheID string, n int64) {
 		atomic.AddInt64(&m.activeCacheCount, -1)
 	}
 
-	cacheUsage.mu.Unlock()
-
-	// Update metrics after successful release
-	m.updateMetrics()
 }
 
 func (m *manager) releaseBytes(n uint64) {
@@ -1108,6 +1118,18 @@ func (m *manager) getActiveCacheCount() int64 {
 	return atomic.LoadInt64(&m.activeCacheCount)
 }
 
+// getCacheState safely reads the current state of a cache with defer unlock
+func (m *manager) getCacheState(cacheID string) (isActive bool, fairShareBytes uint64, fairShareCount int64) {
+	cacheUsage := m.getCacheUsage(cacheID)
+	cacheUsage.mu.Lock()
+	defer cacheUsage.mu.Unlock()
+
+	isActive = cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
+	fairShareBytes = cacheUsage.fairShareCapacityBytes
+	fairShareCount = cacheUsage.fairShareCapacityCount
+	return
+}
+
 // enforceCapForCache implements both hard and soft cap logic
 func (m *manager) enforceCapForCache(cacheID string, additionalBytes uint64, additionalCount int64) (CapEnforcementResult, error) {
 	// Check if caching is completely disabled (zero capacity)
@@ -1165,18 +1187,13 @@ func (m *manager) enforceCapForCache(cacheID string, additionalBytes uint64, add
 		activeCaches := m.getActiveCacheCount()
 
 		// Check if this cache is currently inactive but will become active
-		cacheUsage := m.getCacheUsage(cacheID)
-		cacheUsage.mu.Lock()
-		cacheIsActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
-		currentFairShareBytes := cacheUsage.fairShareCapacityBytes
-		currentFairShareCount := cacheUsage.fairShareCapacityCount
-		cacheUsage.mu.Unlock()
+		cacheIsActive, currentFairShareBytes, currentFairShareCount := m.getCacheState(cacheID)
 
 		if !cacheIsActive {
 			// Cache will become active, include it in the count
 			activeCaches++
 		} else if activeCaches == 0 {
-			// Cache is already active but global counter hasn't been updated yet.
+			// Cache is already active, but global counter hasn't been updated yet.
 			// This happens because we update activeCacheCount under per-cache lock,
 			// but read it without any lock. Ensure we count at least this active cache.
 			activeCaches = 1
