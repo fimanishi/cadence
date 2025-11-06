@@ -1827,6 +1827,10 @@ func TestBudgetManager_ConcurrentSoftCapCorrectness(t *testing.T) {
 		reserveCount  = 2
 	)
 
+	var totalReservedBytes atomic.Uint64
+	var totalReservedCount atomic.Int64
+	var totalReleasedBytes atomic.Uint64
+	var totalReleasedCount atomic.Int64
 	var totalSuccessful atomic.Int64
 	var totalFailed atomic.Int64
 
@@ -1834,6 +1838,7 @@ func TestBudgetManager_ConcurrentSoftCapCorrectness(t *testing.T) {
 	wg.Add(numGoroutines)
 
 	// Try to reserve concurrently - soft cap should cause some failures
+	// Release only half to maintain non-zero state
 	for g := 0; g < numGoroutines; g++ {
 		go func(goroutineID int) {
 			defer wg.Done()
@@ -1843,6 +1848,15 @@ func TestBudgetManager_ConcurrentSoftCapCorrectness(t *testing.T) {
 				err := mgr.(*manager).ReserveForCache(cacheID, reserveBytes, reserveCount)
 				if err == nil {
 					totalSuccessful.Add(1)
+					totalReservedBytes.Add(reserveBytes)
+					totalReservedCount.Add(reserveCount)
+
+					// Release only half the time to maintain non-zero state
+					if i%2 == 0 {
+						mgr.(*manager).ReleaseForCache(cacheID, reserveBytes, reserveCount)
+						totalReleasedBytes.Add(reserveBytes)
+						totalReleasedCount.Add(reserveCount)
+					}
 				} else {
 					totalFailed.Add(1)
 				}
@@ -1852,30 +1866,43 @@ func TestBudgetManager_ConcurrentSoftCapCorrectness(t *testing.T) {
 
 	wg.Wait()
 
-	// Now release everything
-	for g := 0; g < numGoroutines; g++ {
-		cacheID := fmt.Sprintf("cache%d", g%10)
-		for i := 0; i < numOperations; i++ {
-			mgr.(*manager).ReleaseForCache(cacheID, reserveBytes, reserveCount)
-		}
+	// Verify invariants without assuming zero state
+	expectedBytes := totalReservedBytes.Load() - totalReleasedBytes.Load()
+	expectedCount := totalReservedCount.Load() - totalReleasedCount.Load()
+
+	assert.Equal(t, expectedBytes, mgr.UsedBytes(),
+		"Used bytes should equal total reserved minus total released")
+	assert.Equal(t, expectedCount, mgr.UsedCount(),
+		"Used count should equal total reserved minus total released")
+
+	// Available capacity should equal total - used
+	assert.Equal(t, uint64(10000)-expectedBytes, mgr.(*manager).AvailableBytes(),
+		"Available bytes should equal capacity minus used")
+	assert.Equal(t, int64(1000)-expectedCount, mgr.(*manager).AvailableCount(),
+		"Available count should equal capacity minus used")
+
+	// Active cache count should be > 0 since we have unreleased capacity
+	if expectedBytes > 0 || expectedCount > 0 {
+		assert.Greater(t, mgr.(*manager).getActiveCacheCount(), int64(0),
+			"Should have active caches when capacity is in use")
+		assert.NotZero(t, mgr.UsedBytes(), "Should have non-zero bytes in use")
+		assert.NotZero(t, mgr.UsedCount(), "Should have non-zero count in use")
 	}
 
-	// Verify invariants
-	assert.Equal(t, uint64(0), mgr.UsedBytes(),
-		"All bytes should be released at the end")
-	assert.Equal(t, int64(0), mgr.UsedCount(),
-		"All count should be released at the end")
-	assert.Equal(t, int64(0), mgr.(*manager).getActiveCacheCount(),
-		"No caches should be active")
-
 	// Log statistics
-	t.Logf("Successful: %d, Failed: %d, Total: %d",
+	t.Logf("Final state: reserved=%d bytes, released=%d bytes, used=%d bytes, active_caches=%d",
+		totalReservedBytes.Load(), totalReleasedBytes.Load(), mgr.UsedBytes(),
+		mgr.(*manager).getActiveCacheCount())
+	t.Logf("Operations: successful=%d, failed=%d, total=%d",
 		totalSuccessful.Load(), totalFailed.Load(),
 		totalSuccessful.Load()+totalFailed.Load())
 
 	// At least some operations should have succeeded
 	assert.Greater(t, totalSuccessful.Load(), int64(0),
 		"Some operations should succeed")
+	// Soft cap should have caused some failures
+	assert.Greater(t, totalFailed.Load(), int64(0),
+		"Soft cap should cause some failures")
 }
 
 func TestBudgetManager_ConcurrentActiveCacheCount(t *testing.T) {
