@@ -314,7 +314,7 @@ func (m *manager) emitHardCapExceeded(cacheID, budgetType string, requested, ava
 	if m.logger != nil {
 		m.logger.Debug("Hard capacity limit exceeded",
 			tag.Name(m.name),
-			tag.Dynamic("cache_id", cacheID),
+			tag.CacheID(cacheID),
 			tag.Value(budgetType),
 			tag.Counter(int(requested)),
 			tag.Number(int64(available)),
@@ -331,7 +331,7 @@ func (m *manager) emitSoftCapExceeded(cacheID, budgetType string, requested, ava
 	if m.logger != nil {
 		m.logger.Warn("Soft capacity limit exceeded",
 			tag.Name(m.name),
-			tag.Dynamic("cache_id", cacheID),
+			tag.CacheID(cacheID),
 			tag.Value(budgetType),
 			tag.Counter(int(requested)),
 			tag.Number(int64(available)),
@@ -447,7 +447,7 @@ func (m *manager) ReserveCountForCache(cacheID string, nCount int64) error {
 	if nCount < 0 {
 		if m.logger != nil {
 			m.logger.Error("Invalid negative count value in ReserveCountForCache",
-				tag.Dynamic("cache_id", cacheID),
+				tag.CacheID(cacheID),
 				tag.Key("requested"), tag.Value(nCount),
 			)
 		}
@@ -755,7 +755,7 @@ func (m *manager) ReleaseForCache(cacheID string, nBytes uint64, nCount int64) {
 		if nBytes > cacheUsage.usedBytes {
 			if m.logger != nil {
 				m.logger.Warn("Cache bytes over-release detected",
-					tag.Key("cache_id"), tag.Value(cacheID),
+					tag.CacheID(cacheID),
 					tag.Key("requested-release"), tag.Value(nBytes),
 					tag.Key("current-used"), tag.Value(cacheUsage.usedBytes),
 				)
@@ -783,7 +783,7 @@ func (m *manager) ReleaseForCache(cacheID string, nBytes uint64, nCount int64) {
 		if nCount > cacheUsage.usedCount {
 			if m.logger != nil {
 				m.logger.Warn("Cache count over-release detected",
-					tag.Key("cache_id"), tag.Value(cacheID),
+					tag.CacheID(cacheID),
 					tag.Key("requested-release"), tag.Value(nCount),
 					tag.Key("current-used"), tag.Value(cacheUsage.usedCount),
 				)
@@ -829,7 +829,7 @@ func (m *manager) ReleaseBytesForCache(cacheID string, n uint64) {
 	if n > cacheUsage.usedBytes {
 		if m.logger != nil {
 			m.logger.Warn("Cache bytes over-release detected",
-				tag.Key("cache_id"), tag.Value(cacheID),
+				tag.CacheID(cacheID),
 				tag.Key("requested-release"), tag.Value(n),
 				tag.Key("current-used"), tag.Value(cacheUsage.usedBytes),
 			)
@@ -874,7 +874,7 @@ func (m *manager) ReleaseCountForCache(cacheID string, n int64) {
 	if n > cacheUsage.usedCount {
 		if m.logger != nil {
 			m.logger.Warn("Cache count over-release detected",
-				tag.Key("cache_id"), tag.Value(cacheID),
+				tag.CacheID(cacheID),
 				tag.Key("requested-release"), tag.Value(n),
 				tag.Key("current-used"), tag.Value(cacheUsage.usedCount),
 			)
