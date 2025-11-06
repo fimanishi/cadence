@@ -128,9 +128,11 @@ type Manager interface {
 	// Callback-based reclaim methods
 
 	// ReserveOrReclaimSelfReleaseWithCallback reserves/reclaims capacity, executes callback, releases on callback error.
+	// todo: make sure to test before implementing caches that use this, for example LRU caches. Tests have only been done in unit tests
 	ReserveOrReclaimSelfReleaseWithCallback(ctx context.Context, cacheID string, nBytes uint64, nCount int64, retriable bool, reclaim ReclaimSelfRelease, callback func() error) error
 
 	// ReserveOrReclaimManagerReleaseWithCallback reserves/reclaims capacity, executes callback, releases on callback error.
+	// todo: make sure to test before implementing caches that use this, for example LRU caches. Tests have only been done in unit tests
 	ReserveOrReclaimManagerReleaseWithCallback(ctx context.Context, cacheID string, nBytes uint64, nCount int64, retriable bool, reclaim ReclaimManagerRelease, callback func() error) error
 
 	// UsedBytes returns current used bytes.
@@ -281,11 +283,13 @@ func NewBudgetManager(
 func (m *manager) updateMetrics() {
 	// Emit capacity metrics
 	capacityBytes := m.CapacityBytes()
+	// Only emit if not unlimited
 	if capacityBytes != math.MaxUint64 {
 		m.scope.UpdateGauge(metrics.BudgetManagerCapacityBytes, float64(capacityBytes))
 	}
 
 	capacityCount := m.CapacityCount()
+	// Only emit if not unlimited
 	if capacityCount != math.MaxInt64 {
 		m.scope.UpdateGauge(metrics.BudgetManagerCapacityCount, float64(capacityCount))
 	}
