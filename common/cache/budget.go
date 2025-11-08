@@ -207,7 +207,7 @@ type manager struct {
 	reclaimBackoff              time.Duration
 	admission                   AdmissionMode
 	scope                       metrics.Scope
-	logger                      log.Logger
+	logger                      log.Logger // Rate-limited logger (1 RPS)
 	enforcementSoftCapThreshold dynamicproperties.FloatPropertyFn
 
 	usedBytes uint64 // atomic - total usage across all caches
@@ -268,6 +268,12 @@ func NewBudgetManager(
 		admission = AdmissionOptimistic
 	}
 
+	// Create throttled logger (1 log per second)
+	var throttledLogger log.Logger
+	if logger != nil {
+		throttledLogger = log.NewThrottledLogger(logger, dynamicproperties.GetIntPropertyFn(1))
+	}
+
 	mgr := &manager{
 		name:                        name,
 		maxBytes:                    maxBytes,
@@ -275,7 +281,7 @@ func NewBudgetManager(
 		reclaimBackoff:              reclaimBackoff,
 		admission:                   admission,
 		scope:                       scope.Tagged(metrics.BudgetManagerNameTag(name)),
-		logger:                      logger,
+		logger:                      throttledLogger,
 		enforcementSoftCapThreshold: softCapThreshold,
 		metricsTicker:               time.NewTicker(10 * time.Second),
 		metricsStop:                 make(chan struct{}),
@@ -358,7 +364,7 @@ func (m *manager) emitSoftCapExceeded(cacheID, budgetType string, requested, ava
 	}
 
 	if m.logger != nil {
-		m.logger.Warn("Soft capacity limit exceeded",
+		m.logger.Debug("Soft capacity limit exceeded",
 			tag.Name(m.name),
 			tag.CacheID(cacheID),
 			tag.Value(budgetType),
@@ -504,58 +510,58 @@ func (m *manager) ReserveCountForCache(cacheID string, nCount int64) error {
 	return nil
 }
 
-func (m *manager) reserveBytes(n uint64) error {
+func (m *manager) reserveBytes(nBytes uint64) error {
 	switch m.admission {
 	case AdmissionStrict:
-		return m.reserveBytesStrict(n)
+		return m.reserveBytesStrict(nBytes)
 	default:
-		return m.reserveBytesOptimistic(n)
+		return m.reserveBytesOptimistic(nBytes)
 	}
 }
 
-func (m *manager) reserveCount(n int64) error {
+func (m *manager) reserveCount(nCount int64) error {
 	switch m.admission {
 	case AdmissionStrict:
-		return m.reserveCountStrict(n)
+		return m.reserveCountStrict(nCount)
 	default:
-		return m.reserveCountOptimistic(n)
+		return m.reserveCountOptimistic(nCount)
 	}
 }
 
-func (m *manager) reserveBytesStrict(n uint64) error {
+func (m *manager) reserveBytesStrict(nBytes uint64) error {
 	capB := m.CapacityBytes()
 	for {
 		old := atomic.LoadUint64(&m.usedBytes)
 
-		if old > math.MaxUint64-n {
+		if old > math.MaxUint64-nBytes {
 			if m.logger != nil {
 				m.logger.Error("Bytes budget overflow detected in strict mode",
-					tag.Key("requested"), tag.Value(n),
+					tag.Key("requested"), tag.Value(nBytes),
 					tag.Key("current-used"), tag.Value(old),
 				)
 			}
 			return ErrOverflow
 		}
-		if old+n > capB {
-			m.emitHardCapExceeded("", budgetTypeBytes, old+n, capB)
+		if old+nBytes > capB {
+			m.emitHardCapExceeded("", budgetTypeBytes, old+nBytes, capB)
 			return ErrBytesBudgetExceeded
 		}
-		if atomic.CompareAndSwapUint64(&m.usedBytes, old, old+n) {
+		if atomic.CompareAndSwapUint64(&m.usedBytes, old, old+nBytes) {
 			return nil
 		}
 		// retry on contention
 	}
 }
 
-func (m *manager) reserveBytesOptimistic(n uint64) error {
+func (m *manager) reserveBytesOptimistic(nBytes uint64) error {
 	capB := m.CapacityBytes()
-	newVal := atomic.AddUint64(&m.usedBytes, n)
-	if newVal < n { // wrap-around
-		m.releaseBytes(n)
+	newVal := atomic.AddUint64(&m.usedBytes, nBytes)
+	if newVal < nBytes { // wrap-around
+		m.releaseBytes(nBytes)
 		if m.logger != nil {
-			m.logger.Error("Bytes budget overflow detected",
-				tag.Key("requested"), tag.Value(n),
-				tag.Key("previous-used"), tag.Value(newVal-n),
+			m.logger.Debug("Bytes budget overflow detected",
+				tag.Key("requested"), tag.Value(nBytes),
+				tag.Key("previous-used"), tag.Value(newVal-nBytes),
 			)
 		}
 		return ErrOverflow
@@ -563,47 +569,47 @@ func (m *manager) reserveBytesOptimistic(n uint64) error {
 	if newVal <= capB {
 		return nil
 	}
-	m.releaseBytes(n)
+	m.releaseBytes(nBytes)
 	m.emitHardCapExceeded("", budgetTypeBytes, newVal, capB)
 	return ErrBytesBudgetExceeded
 }
 
-func (m *manager) reserveCountStrict(n int64) error {
+func (m *manager) reserveCountStrict(nCount int64) error {
 	capC := m.CapacityCount()
 	for {
 		old := atomic.LoadInt64(&m.usedCount)
 
-		if old > math.MaxInt64-n {
+		if old > math.MaxInt64-nCount {
 			if m.logger != nil {
 				m.logger.Error("Count budget overflow detected in strict mode",
-					tag.Key("requested"), tag.Value(n),
+					tag.Key("requested"), tag.Value(nCount),
 					tag.Key("current-used"), tag.Value(old),
 				)
 			}
 			return ErrOverflow
 		}
-		if old+n > capC {
-			m.emitHardCapExceeded("", budgetTypeCount, uint64(old+n), uint64(capC))
+		if old+nCount > capC {
+			m.emitHardCapExceeded("", budgetTypeCount, uint64(old+nCount), uint64(capC))
 			return ErrCountBudgetExceeded
 		}
-		if atomic.CompareAndSwapInt64(&m.usedCount, old, old+n) {
+		if atomic.CompareAndSwapInt64(&m.usedCount, old, old+nCount) {
 			return nil
 		}
 		// retry on contention
 	}
 }
 
-func (m *manager) reserveCountOptimistic(n int64) error {
+func (m *manager) reserveCountOptimistic(nCount int64) error {
 	capC := m.CapacityCount()
-	newVal := atomic.AddInt64(&m.usedCount, n)
+	newVal := atomic.AddInt64(&m.usedCount, nCount)
 	if newVal < 0 { // wrap-around
-		m.releaseCount(n)
+		m.releaseCount(nCount)
 		return ErrOverflow
 	}
 	if newVal <= capC {
 		return nil
 	}
-	m.releaseCount(n)
+	m.releaseCount(nCount)
 	m.emitHardCapExceeded("", budgetTypeCount, uint64(newVal), uint64(capC))
 	return ErrCountBudgetExceeded
 }
@@ -774,7 +780,7 @@ func (m *manager) ReleaseForCache(cacheID string, nBytes uint64, nCount int64) {
 		// Update cache-specific usage tracking with over-release protection
 		if nBytes > cacheUsage.usedBytes {
 			if m.logger != nil {
-				m.logger.Warn("Cache bytes over-release detected",
+				m.logger.Debug("Cache bytes over-release detected",
 					tag.CacheID(cacheID),
 					tag.Key("requested-release"), tag.Value(nBytes),
 					tag.Key("current-used"), tag.Value(cacheUsage.usedBytes),
@@ -802,7 +808,7 @@ func (m *manager) ReleaseForCache(cacheID string, nBytes uint64, nCount int64) {
 		// Update cache-specific usage tracking with over-release protection
 		if nCount > cacheUsage.usedCount {
 			if m.logger != nil {
-				m.logger.Warn("Cache count over-release detected",
+				m.logger.Debug("Cache count over-release detected",
 					tag.CacheID(cacheID),
 					tag.Key("requested-release"), tag.Value(nCount),
 					tag.Key("current-used"), tag.Value(cacheUsage.usedCount),
@@ -833,8 +839,8 @@ func (m *manager) ReleaseForCache(cacheID string, nBytes uint64, nCount int64) {
 	}
 }
 
-func (m *manager) ReleaseBytesForCache(cacheID string, n uint64) {
-	m.releaseBytes(n)
+func (m *manager) ReleaseBytesForCache(cacheID string, nBytes uint64) {
+	m.releaseBytes(nBytes)
 	// Update cache-specific usage tracking
 	cacheUsage := m.getCacheUsage(cacheID)
 
@@ -843,11 +849,11 @@ func (m *manager) ReleaseBytesForCache(cacheID string, n uint64) {
 
 	wasActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
 	// Update cache-specific usage tracking with over-release protection
-	if n > cacheUsage.usedBytes {
+	if nBytes > cacheUsage.usedBytes {
 		if m.logger != nil {
-			m.logger.Warn("Cache bytes over-release detected",
+			m.logger.Debug("Cache bytes over-release detected",
 				tag.CacheID(cacheID),
-				tag.Key("requested-release"), tag.Value(n),
+				tag.Key("requested-release"), tag.Value(nBytes),
 				tag.Key("current-used"), tag.Value(cacheUsage.usedBytes),
 			)
 		}
@@ -855,9 +861,9 @@ func (m *manager) ReleaseBytesForCache(cacheID string, n uint64) {
 		cacheUsage.fairShareCapacityBytes = 0
 		cacheUsage.freeCapacityBytes = 0
 	} else {
-		cacheUsage.usedBytes -= n
+		cacheUsage.usedBytes -= nBytes
 		// Update capacity type breakdown - subtract from fairShare first, then free
-		remainingBytes := n
+		remainingBytes := nBytes
 		fairShareToSubtract := min(remainingBytes, cacheUsage.fairShareCapacityBytes)
 		if fairShareToSubtract > 0 {
 			cacheUsage.fairShareCapacityBytes -= fairShareToSubtract
@@ -875,8 +881,8 @@ func (m *manager) ReleaseBytesForCache(cacheID string, n uint64) {
 	}
 }
 
-func (m *manager) ReleaseCountForCache(cacheID string, n int64) {
-	m.releaseCount(n)
+func (m *manager) ReleaseCountForCache(cacheID string, nCount int64) {
+	m.releaseCount(nCount)
 	// Update cache-specific usage tracking
 	cacheUsage := m.getCacheUsage(cacheID)
 
@@ -885,11 +891,11 @@ func (m *manager) ReleaseCountForCache(cacheID string, n int64) {
 
 	wasActive := cacheUsage.usedBytes > 0 || cacheUsage.usedCount > 0
 	// Update cache-specific usage tracking with over-release protection
-	if n > cacheUsage.usedCount {
+	if nCount > cacheUsage.usedCount {
 		if m.logger != nil {
-			m.logger.Warn("Cache count over-release detected",
+			m.logger.Debug("Cache count over-release detected",
 				tag.CacheID(cacheID),
-				tag.Key("requested-release"), tag.Value(n),
+				tag.Key("requested-release"), tag.Value(nCount),
 				tag.Key("current-used"), tag.Value(cacheUsage.usedCount),
 			)
 		}
@@ -897,9 +903,9 @@ func (m *manager) ReleaseCountForCache(cacheID string, n int64) {
 		cacheUsage.fairShareCapacityCount = 0
 		cacheUsage.freeCapacityCount = 0
 	} else {
-		cacheUsage.usedCount -= n
+		cacheUsage.usedCount -= nCount
 		// Update capacity type breakdown - subtract from fairShare first, then free
-		remainingCount := n
+		remainingCount := nCount
 		fairShareCountToSubtract := min(remainingCount, cacheUsage.fairShareCapacityCount)
 		if fairShareCountToSubtract > 0 {
 			cacheUsage.fairShareCapacityCount -= fairShareCountToSubtract
@@ -918,24 +924,24 @@ func (m *manager) ReleaseCountForCache(cacheID string, n int64) {
 
 }
 
-func (m *manager) releaseBytes(n uint64) {
+func (m *manager) releaseBytes(nBytes uint64) {
 	for {
 		old := atomic.LoadUint64(&m.usedBytes)
 		var newVal uint64
-		if n > old {
+		if nBytes > old {
 			// Over-release detected - clamp to 0 to prevent uint64 wraparound
 			newVal = 0
 			if atomic.CompareAndSwapUint64(&m.usedBytes, old, newVal) {
 				if m.logger != nil {
-					m.logger.Warn("Bytes over-release detected",
-						tag.Key("requested-release"), tag.Value(n),
+					m.logger.Debug("Bytes over-release detected",
+						tag.Key("requested-release"), tag.Value(nBytes),
 						tag.Key("current-used"), tag.Value(old),
 					)
 				}
 				return
 			}
 		} else {
-			newVal = old - n
+			newVal = old - nBytes
 			if atomic.CompareAndSwapUint64(&m.usedBytes, old, newVal) {
 				return
 			}
@@ -944,27 +950,27 @@ func (m *manager) releaseBytes(n uint64) {
 	}
 }
 
-func (m *manager) releaseCount(n int64) {
-	if n <= 0 {
+func (m *manager) releaseCount(nCount int64) {
+	if nCount <= 0 {
 		return
 	}
 	for {
 		old := atomic.LoadInt64(&m.usedCount)
 		var newVal int64
-		if n > old {
+		if nCount > old {
 			// Over-release detected - clamp to 0
 			newVal = 0
 			if atomic.CompareAndSwapInt64(&m.usedCount, old, newVal) {
 				if m.logger != nil {
-					m.logger.Warn("Count over-release detected",
-						tag.Key("requested-release"), tag.Value(n),
+					m.logger.Debug("Count over-release detected",
+						tag.Key("requested-release"), tag.Value(nCount),
 						tag.Key("current-used"), tag.Value(old),
 					)
 				}
 				return
 			}
 		} else {
-			newVal = old - n
+			newVal = old - nCount
 			if atomic.CompareAndSwapInt64(&m.usedCount, old, newVal) {
 				return
 			}
