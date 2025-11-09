@@ -157,19 +157,11 @@ func (c *BoundedAckCache[T]) Put(item T, size uint64) error {
 
 	if c.budgetManager != nil {
 		return c.budgetManager.ReserveWithCallback(c.cacheID, size, 1, func() error {
-			c.cache[sequenceID] = item
-			heap.Push(&c.order, heapItem[T]{sequenceID: sequenceID, size: size})
-			c.currSize += size
-			return nil
+			return c.putInternal(item, sequenceID, size)
 		})
 	}
 
-	// Add to both heap and map
-	c.cache[sequenceID] = item
-	heap.Push(&c.order, heapItem[T]{sequenceID: sequenceID, size: size})
-	c.currSize += size
-
-	return nil
+	return c.putInternal(item, sequenceID, size)
 }
 
 // Get retrieves an item by sequence ID.
@@ -189,14 +181,7 @@ func (c *BoundedAckCache[T]) Ack(level int64) (uint64, int) {
 		var freedSize uint64
 		var removedCount int64
 		err := c.budgetManager.ReleaseWithCallback(c.cacheID, func() (uint64, int64, error) {
-			for c.order.Len() > 0 && c.order.Peek().sequenceID <= level {
-				item := heap.Pop(&c.order).(heapItem[T])
-				delete(c.cache, item.sequenceID)
-				c.currSize -= item.size
-				freedSize += item.size
-				removedCount++
-			}
-			c.lastAck = level
+			freedSize, removedCount = c.ackInternal(level)
 			return freedSize, removedCount, nil
 		})
 		if err != nil {
@@ -205,20 +190,8 @@ func (c *BoundedAckCache[T]) Ack(level int64) (uint64, int) {
 		return freedSize, int(removedCount)
 	}
 
-	var freedSize uint64
-	var removedCount int
-
-	// Remove all items from heap with sequence ID <= level
-	for c.order.Len() > 0 && c.order.Peek().sequenceID <= level {
-		item := heap.Pop(&c.order).(heapItem[T])
-		delete(c.cache, item.sequenceID)
-		c.currSize -= item.size
-		freedSize += item.size
-		removedCount++
-	}
-
-	c.lastAck = level
-	return freedSize, removedCount
+	freedSize, removedCount := c.ackInternal(level)
+	return freedSize, int(removedCount)
 }
 
 // Size returns current total byte size.
@@ -235,6 +208,31 @@ func (c *BoundedAckCache[T]) Count() int {
 	defer c.mu.Unlock()
 
 	return len(c.order)
+}
+
+// putInternal adds an item to the cache. Caller must hold the lock.
+func (c *BoundedAckCache[T]) putInternal(item T, sequenceID int64, size uint64) error {
+	c.cache[sequenceID] = item
+	heap.Push(&c.order, heapItem[T]{sequenceID: sequenceID, size: size})
+	c.currSize += size
+	return nil
+}
+
+// ackInternal removes all items with sequence ID <= level. Caller must hold the lock.
+func (c *BoundedAckCache[T]) ackInternal(level int64) (uint64, int64) {
+	var freedSize uint64
+	var removedCount int64
+
+	for c.order.Len() > 0 && c.order.Peek().sequenceID <= level {
+		item := heap.Pop(&c.order).(heapItem[T])
+		delete(c.cache, item.sequenceID)
+		c.currSize -= item.size
+		freedSize += item.size
+		removedCount++
+	}
+
+	c.lastAck = level
+	return freedSize, removedCount
 }
 
 // heapItem represents an item in the sequence heap
