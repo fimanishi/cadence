@@ -1100,6 +1100,18 @@ const (
 	// Default value: 0
 	// Allowed filters: N/A
 	ReplicatorCacheMaxSize
+	// ReplicationCacheMaxSizeBytes is the max size of the replication budget cache in bytes
+	// KeyName: history.replicationCacheMaxSizeBytes
+	// Value type: Int
+	// Default value: 0
+	// Allowed filters: N/A
+	ReplicationCacheMaxSizeBytes
+	// ReplicationCacheMaxCount is the max count of the replication budget cache
+	// KeyName: history.replicationCacheMaxCount
+	// Value type: Int
+	// Default value: 0
+	// Allowed filters: N/A
+	ReplicationCacheMaxCount
 
 	// ExecutionMgrNumConns is persistence connections number for ExecutionManager
 	// KeyName: history.executionMgrNumConns
@@ -1810,6 +1822,12 @@ const (
 	// Default value: true
 	// Allowed filters: DomainID, WorkflowID
 	EnableReplicationTaskGeneration
+	// EnableReplicationBudgetManager enables the replication budget manager for cache capacity control
+	// KeyName: history.enableReplicationBudgetManager
+	// Value type: Bool
+	// Default value: false
+	// Allowed filters: N/A
+	EnableReplicationBudgetManager
 	// UseNewInitialFailoverVersion is a switch to issue a failover version based on the minFailoverVersion
 	// rather than the default initialFailoverVersion. USed as a per-domain migration switch
 	// KeyName: history.useNewInitialFailoverVersion
@@ -2265,6 +2283,12 @@ const (
 	// Default value: 0
 	// Allowed filters: N/A
 	HistoryErrorInjectionRate
+	// ReplicationCacheSoftCapThreshold is the soft cap threshold for the replication budget cache (0.0 to 1.0)
+	// KeyName: history.replicationCacheSoftCapThreshold
+	// Value type: Float64
+	// Default value: 1.0
+	// Allowed filters: N/A
+	ReplicationCacheSoftCapThreshold
 	// ReplicationTaskFetcherTimerJitterCoefficient is the jitter for fetcher timer
 	// KeyName: history.ReplicationTaskFetcherTimerJitterCoefficient
 	// Value type: Float64
@@ -3720,6 +3744,16 @@ var IntKeys = map[IntKey]DynamicInt{
 		Description:  "ReplicatorCacheMaxSize is the max size of the replication cache in bytes",
 		DefaultValue: 0,
 	},
+	ReplicationCacheMaxSizeBytes: {
+		KeyName:      "history.replicationCacheMaxSizeBytes",
+		Description:  "ReplicationCacheMaxSizeBytes is the max size of the replication budget cache in bytes",
+		DefaultValue: 0,
+	},
+	ReplicationCacheMaxCount: {
+		KeyName:      "history.replicationCacheMaxCount",
+		Description:  "ReplicationCacheMaxCount is the max count of the replication budget cache",
+		DefaultValue: 0,
+	},
 	ExecutionMgrNumConns: {
 		KeyName:      "history.executionMgrNumConns",
 		Description:  "Deprecated: not used. ExecutionMgrNumConns is persistence connections number for ExecutionManager",
@@ -4397,6 +4431,11 @@ var BoolKeys = map[BoolKey]DynamicBool{
 		Description:  "EnableReplicationTaskGeneration is the flag to control replication generation",
 		DefaultValue: true,
 	},
+	EnableReplicationBudgetManager: {
+		KeyName:      "history.enableReplicationBudgetManager",
+		Description:  "EnableReplicationBudgetManager enables the replication budget manager for cache capacity control",
+		DefaultValue: false,
+	},
 	UseNewInitialFailoverVersion: {
 		KeyName:      "history.useNewInitialFailoverVersion",
 		Description:  "use the minInitialFailover version",
@@ -4827,6 +4866,11 @@ var FloatKeys = map[FloatKey]DynamicFloat{
 		KeyName:      "history.errorInjectionRate",
 		Description:  "HistoryErrorInjectionRate is rate for injecting random error in history client",
 		DefaultValue: 0,
+	},
+	ReplicationCacheSoftCapThreshold: {
+		KeyName:      "history.replicationCacheSoftCapThreshold",
+		Description:  "ReplicationCacheSoftCapThreshold is the soft cap threshold for the replication budget cache (0.0 to 1.0)",
+		DefaultValue: 1.0,
 	},
 	ReplicationTaskFetcherTimerJitterCoefficient: {
 		KeyName:      "history.ReplicationTaskFetcherTimerJitterCoefficient",
