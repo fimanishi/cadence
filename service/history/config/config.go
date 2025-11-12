@@ -188,10 +188,10 @@ type Config struct {
 	ReplicatorUpperLatency                 dynamicproperties.DurationPropertyFn
 	ReplicatorCacheCapacity                dynamicproperties.IntPropertyFn
 	ReplicatorCacheMaxSize                 dynamicproperties.IntPropertyFn
-	ReplicationBudgetManagerMaxSizeBytes   dynamicproperties.IntPropertyFn
-	ReplicationBudgetManagerMaxSizeCount   dynamicproperties.IntPropertyFn
-	ReplicationCacheSoftCapThreshold       dynamicproperties.FloatPropertyFn
-	EnableReplicationBudgetManager         dynamicproperties.BoolPropertyFn
+	ReplicationBudgetManagerMaxSizeBytes     dynamicproperties.IntPropertyFn
+	ReplicationBudgetManagerMaxSizeCount     dynamicproperties.IntPropertyFn
+	ReplicationBudgetManagerSoftCapThreshold dynamicproperties.FloatPropertyFn
+	EnableReplicationBudgetManager           dynamicproperties.BoolPropertyFn
 
 	// System Limits
 	MaximumBufferedEventsBatch dynamicproperties.IntPropertyFn
@@ -488,10 +488,10 @@ func New(dc *dynamicconfig.Collection, numberOfShards int, maxMessageSize int, i
 		ReplicatorUpperLatency:                 dc.GetDurationProperty(dynamicproperties.ReplicatorUpperLatency),
 		ReplicatorCacheCapacity:                dc.GetIntProperty(dynamicproperties.ReplicatorCacheCapacity),
 		ReplicatorCacheMaxSize:                 dc.GetIntProperty(dynamicproperties.ReplicatorCacheMaxSize),
-		ReplicationBudgetManagerMaxSizeBytes:   dc.GetIntProperty(dynamicproperties.ReplicationBudgetManagerMaxSizeBytes),
-		ReplicationBudgetManagerMaxSizeCount:   dc.GetIntProperty(dynamicproperties.ReplicationBudgetManagerMaxSizeCount),
-		ReplicationCacheSoftCapThreshold:       dc.GetFloat64Property(dynamicproperties.ReplicationCacheSoftCapThreshold),
-		EnableReplicationBudgetManager:         dc.GetBoolProperty(dynamicproperties.EnableReplicationBudgetManager),
+		ReplicationBudgetManagerMaxSizeBytes:     dc.GetIntProperty(dynamicproperties.ReplicationBudgetManagerMaxSizeBytes),
+		ReplicationBudgetManagerMaxSizeCount:     dc.GetIntProperty(dynamicproperties.ReplicationBudgetManagerMaxSizeCount),
+		ReplicationBudgetManagerSoftCapThreshold: dc.GetFloat64Property(dynamicproperties.ReplicationBudgetManagerSoftCapThreshold),
+		EnableReplicationBudgetManager:           dc.GetBoolProperty(dynamicproperties.EnableReplicationBudgetManager),
 
 		MaximumBufferedEventsBatch:      dc.GetIntProperty(dynamicproperties.MaximumBufferedEventsBatch),
 		MaximumSignalsPerExecution:      dc.GetIntPropertyFilteredByDomain(dynamicproperties.MaximumSignalsPerExecution),

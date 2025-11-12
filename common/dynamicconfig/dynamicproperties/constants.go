@@ -2283,12 +2283,12 @@ const (
 	// Default value: 0
 	// Allowed filters: N/A
 	HistoryErrorInjectionRate
-	// ReplicationCacheSoftCapThreshold is the soft cap threshold for the replication budget cache (0.0 to 1.0)
-	// KeyName: history.replicationCacheSoftCapThreshold
+	// ReplicationBudgetManagerSoftCapThreshold is the soft cap threshold for the replication budget manager cache (0.0 to 1.0)
+	// KeyName: history.replicationBudgetManagerSoftCapThreshold
 	// Value type: Float64
 	// Default value: 1.0
 	// Allowed filters: N/A
-	ReplicationCacheSoftCapThreshold
+	ReplicationBudgetManagerSoftCapThreshold
 	// ReplicationTaskFetcherTimerJitterCoefficient is the jitter for fetcher timer
 	// KeyName: history.ReplicationTaskFetcherTimerJitterCoefficient
 	// Value type: Float64
@@ -4867,9 +4867,9 @@ var FloatKeys = map[FloatKey]DynamicFloat{
 		Description:  "HistoryErrorInjectionRate is rate for injecting random error in history client",
 		DefaultValue: 0,
 	},
-	ReplicationCacheSoftCapThreshold: {
-		KeyName:      "history.replicationCacheSoftCapThreshold",
-		Description:  "ReplicationCacheSoftCapThreshold is the soft cap threshold for the replication budget cache (0.0 to 1.0)",
+	ReplicationBudgetManagerSoftCapThreshold: {
+		KeyName:      "history.replicationBudgetManagerSoftCapThreshold",
+		Description:  "ReplicationBudgetManagerSoftCapThreshold is the soft cap threshold for the replication budget manager cache (0.0 to 1.0)",
 		DefaultValue: 1.0,
 	},
 	ReplicationTaskFetcherTimerJitterCoefficient: {

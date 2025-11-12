@@ -146,7 +146,7 @@ func (h *handlerImpl) Start() {
 			0,
 			h.GetMetricsClient().Scope(metrics.ReplicatorCacheManagerScope),
 			h.GetLogger(),
-			h.config.ReplicationCacheSoftCapThreshold,
+			h.config.ReplicationBudgetManagerSoftCapThreshold,
 		)
 	}
 

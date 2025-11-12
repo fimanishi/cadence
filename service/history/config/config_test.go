@@ -169,7 +169,7 @@ func TestNewConfig(t *testing.T) {
 		"ReplicatorCacheMaxSize":                               {dynamicproperties.ReplicatorCacheMaxSize, 2000},
 		"ReplicationBudgetManagerMaxSizeBytes":                 {dynamicproperties.ReplicationBudgetManagerMaxSizeBytes, 0},
 		"ReplicationBudgetManagerMaxSizeCount":                 {dynamicproperties.ReplicationBudgetManagerMaxSizeCount, 0},
-		"ReplicationCacheSoftCapThreshold":                     {dynamicproperties.ReplicationCacheSoftCapThreshold, 1.0},
+		"ReplicationBudgetManagerSoftCapThreshold":             {dynamicproperties.ReplicationBudgetManagerSoftCapThreshold, 1.0},
 		"EnableReplicationBudgetManager":                       {dynamicproperties.EnableReplicationBudgetManager, false},
 		"ExecutionMgrNumConns":                                 {dynamicproperties.ExecutionMgrNumConns, 57},
 		"HistoryMgrNumConns":                                   {dynamicproperties.HistoryMgrNumConns, 58},
