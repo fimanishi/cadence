@@ -140,8 +140,8 @@ func (h *handlerImpl) Start() {
 	if h.config.EnableReplicationBudgetManager() {
 		h.replicationBudgetManager = cache.NewBudgetManager(
 			"replication-cache",
-			h.config.ReplicationCacheMaxSizeBytes,
-			h.config.ReplicationCacheMaxCount,
+			h.config.ReplicationBudgetManagerMaxSizeBytes,
+			h.config.ReplicationBudgetManagerMaxSizeCount,
 			cache.AdmissionOptimistic,
 			0,
 			h.GetMetricsClient().Scope(metrics.ReplicatorCacheManagerScope),

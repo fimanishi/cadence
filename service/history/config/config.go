@@ -188,8 +188,8 @@ type Config struct {
 	ReplicatorUpperLatency                 dynamicproperties.DurationPropertyFn
 	ReplicatorCacheCapacity                dynamicproperties.IntPropertyFn
 	ReplicatorCacheMaxSize                 dynamicproperties.IntPropertyFn
-	ReplicationCacheMaxSizeBytes           dynamicproperties.IntPropertyFn
-	ReplicationCacheMaxCount               dynamicproperties.IntPropertyFn
+	ReplicationBudgetManagerMaxSizeBytes   dynamicproperties.IntPropertyFn
+	ReplicationBudgetManagerMaxSizeCount   dynamicproperties.IntPropertyFn
 	ReplicationCacheSoftCapThreshold       dynamicproperties.FloatPropertyFn
 	EnableReplicationBudgetManager         dynamicproperties.BoolPropertyFn
 
@@ -488,8 +488,8 @@ func New(dc *dynamicconfig.Collection, numberOfShards int, maxMessageSize int, i
 		ReplicatorUpperLatency:                 dc.GetDurationProperty(dynamicproperties.ReplicatorUpperLatency),
 		ReplicatorCacheCapacity:                dc.GetIntProperty(dynamicproperties.ReplicatorCacheCapacity),
 		ReplicatorCacheMaxSize:                 dc.GetIntProperty(dynamicproperties.ReplicatorCacheMaxSize),
-		ReplicationCacheMaxSizeBytes:           dc.GetIntProperty(dynamicproperties.ReplicationCacheMaxSizeBytes),
-		ReplicationCacheMaxCount:               dc.GetIntProperty(dynamicproperties.ReplicationCacheMaxCount),
+		ReplicationBudgetManagerMaxSizeBytes:   dc.GetIntProperty(dynamicproperties.ReplicationBudgetManagerMaxSizeBytes),
+		ReplicationBudgetManagerMaxSizeCount:   dc.GetIntProperty(dynamicproperties.ReplicationBudgetManagerMaxSizeCount),
 		ReplicationCacheSoftCapThreshold:       dc.GetFloat64Property(dynamicproperties.ReplicationCacheSoftCapThreshold),
 		EnableReplicationBudgetManager:         dc.GetBoolProperty(dynamicproperties.EnableReplicationBudgetManager),
 

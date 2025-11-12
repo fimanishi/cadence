@@ -1100,18 +1100,18 @@ const (
 	// Default value: 0
 	// Allowed filters: N/A
 	ReplicatorCacheMaxSize
-	// ReplicationCacheMaxSizeBytes is the max size of the replication budget cache in bytes
-	// KeyName: history.replicationCacheMaxSizeBytes
+	// ReplicationBudgetManagerMaxSizeBytes is the max size of the replication budget manager cache in bytes
+	// KeyName: history.replicationBudgetManagerMaxSizeBytes
 	// Value type: Int
 	// Default value: 0
 	// Allowed filters: N/A
-	ReplicationCacheMaxSizeBytes
-	// ReplicationCacheMaxCount is the max count of the replication budget cache
-	// KeyName: history.replicationCacheMaxCount
+	ReplicationBudgetManagerMaxSizeBytes
+	// ReplicationBudgetManagerMaxSizeCount is the max count of the replication budget manager cache
+	// KeyName: history.replicationBudgetManagerMaxSizeCount
 	// Value type: Int
 	// Default value: 0
 	// Allowed filters: N/A
-	ReplicationCacheMaxCount
+	ReplicationBudgetManagerMaxSizeCount
 
 	// ExecutionMgrNumConns is persistence connections number for ExecutionManager
 	// KeyName: history.executionMgrNumConns
@@ -3744,14 +3744,14 @@ var IntKeys = map[IntKey]DynamicInt{
 		Description:  "ReplicatorCacheMaxSize is the max size of the replication cache in bytes",
 		DefaultValue: 0,
 	},
-	ReplicationCacheMaxSizeBytes: {
-		KeyName:      "history.replicationCacheMaxSizeBytes",
-		Description:  "ReplicationCacheMaxSizeBytes is the max size of the replication budget cache in bytes",
+	ReplicationBudgetManagerMaxSizeBytes: {
+		KeyName:      "history.replicationBudgetManagerMaxSizeBytes",
+		Description:  "ReplicationBudgetManagerMaxSizeBytes is the max size of the replication budget manager cache in bytes",
 		DefaultValue: 0,
 	},
-	ReplicationCacheMaxCount: {
-		KeyName:      "history.replicationCacheMaxCount",
-		Description:  "ReplicationCacheMaxCount is the max count of the replication budget cache",
+	ReplicationBudgetManagerMaxSizeCount: {
+		KeyName:      "history.replicationBudgetManagerMaxSizeCount",
+		Description:  "ReplicationBudgetManagerMaxSizeCount is the max count of the replication budget manager cache",
 		DefaultValue: 0,
 	},
 	ExecutionMgrNumConns: {
