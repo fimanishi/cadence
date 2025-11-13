@@ -147,10 +147,12 @@ func TestTaskStoreWithBudgetManager(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Budget manager enforces capacity limits", func(t *testing.T) {
+		maxCount := 5
+
 		budgetManager := cache.NewBudgetManager(
 			"test-replication-cache",
 			dynamicproperties.GetIntPropertyFn(1000),
-			dynamicproperties.GetIntPropertyFn(5),
+			dynamicproperties.GetIntPropertyFn(maxCount),
 			cache.AdmissionOptimistic,
 			0,
 			metrics.NewNoopMetricsClient().Scope(metrics.ReplicatorCacheManagerScope),
@@ -173,7 +175,8 @@ func TestTaskStoreWithBudgetManager(t *testing.T) {
 		for _, cluster := range testDomain.GetReplicationConfig().Clusters {
 			totalCached += ts.clusters[cluster.ClusterName].Count()
 		}
-		assert.LessOrEqual(t, totalCached, 10)
+		assert.Equal(t, int64(totalCached), budgetManager.UsedCount())
+		assert.Equal(t, int64(maxCount), budgetManager.UsedCount())
 	})
 
 	t.Run("Nil budget manager works without errors", func(t *testing.T) {
@@ -217,10 +220,10 @@ func createTestTaskStore(t *testing.T, domains domainCache, hydrator taskHydrato
 
 func createTestTaskStoreWithBudgetManager(t *testing.T, domains domainCache, hydrator taskHydrator, budgetManager cache.Manager, shardID int) *TaskStore {
 	cfg := hconfig.Config{
-		ReplicatorCacheCapacity:         dynamicproperties.GetIntPropertyFn(2),
+		ReplicatorCacheCapacity:         dynamicproperties.GetIntPropertyFn(100),
 		ReplicationTaskGenerationQPS:    dynamicproperties.GetFloatPropertyFn(0),
 		ReplicatorReadTaskMaxRetryCount: dynamicproperties.GetIntPropertyFn(1),
-		ReplicatorCacheMaxSize:          dynamicproperties.GetIntPropertyFn(2000),
+		ReplicatorCacheMaxSize:          dynamicproperties.GetIntPropertyFn(20000),
 	}
 
 	clusterMetadata := cluster.NewMetadata(
