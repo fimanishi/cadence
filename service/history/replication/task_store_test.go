@@ -123,7 +123,7 @@ func TestTaskStore(t *testing.T) {
 		ts.Put(&testHydratedTask12)
 		ts.Put(&testHydratedTask14)
 		for _, cluster := range testDomain.GetReplicationConfig().Clusters {
-			assert.Equal(t, 2, ts.clusters[cluster.ClusterName].Count())
+			assert.Equal(t, 3, ts.clusters[cluster.ClusterName].Count())
 		}
 	})
 
