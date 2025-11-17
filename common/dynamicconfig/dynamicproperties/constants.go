@@ -1829,12 +1829,6 @@ const (
 	// Default value: true
 	// Allowed filters: DomainID, WorkflowID
 	EnableReplicationTaskGeneration
-	// EnableReplicationBudgetManager enables the replication budget manager for cache capacity control
-	// KeyName: history.enableReplicationBudgetManager
-	// Value type: Bool
-	// Default value: false
-	// Allowed filters: N/A
-	EnableReplicationBudgetManager
 	// UseNewInitialFailoverVersion is a switch to issue a failover version based on the minFailoverVersion
 	// rather than the default initialFailoverVersion. USed as a per-domain migration switch
 	// KeyName: history.useNewInitialFailoverVersion
@@ -4441,11 +4435,6 @@ var BoolKeys = map[BoolKey]DynamicBool{
 		KeyName:      "history.enableReplicationTaskGeneration",
 		Filters:      []Filter{DomainID, WorkflowID},
 		Description:  "EnableReplicationTaskGeneration is the flag to control replication generation",
-		DefaultValue: true,
-	},
-	EnableReplicationBudgetManager: {
-		KeyName:      "history.enableReplicationBudgetManager",
-		Description:  "EnableReplicationBudgetManager enables the replication budget manager for cache capacity control",
 		DefaultValue: true,
 	},
 	UseNewInitialFailoverVersion: {
