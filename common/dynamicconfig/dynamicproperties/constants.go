@@ -4446,7 +4446,7 @@ var BoolKeys = map[BoolKey]DynamicBool{
 	EnableReplicationBudgetManager: {
 		KeyName:      "history.enableReplicationBudgetManager",
 		Description:  "EnableReplicationBudgetManager enables the replication budget manager for cache capacity control",
-		DefaultValue: false,
+		DefaultValue: true,
 	},
 	UseNewInitialFailoverVersion: {
 		KeyName:      "history.useNewInitialFailoverVersion",
