@@ -91,6 +91,10 @@ func (s *jitterSuite) TestJitFloat64WithZeroCoefficient() {
 	}
 }
 
+func (s *jitterSuite) TestJitFloat64WithZeroInput() {
+	s.Equal(float64(0), JitFloat64(0, 0.5))
+}
+
 func (s *jitterSuite) TestJitDuration() {
 	input := time.Duration(1099511627776)
 	coefficient := float64(0.1)
