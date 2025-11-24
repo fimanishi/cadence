@@ -593,8 +593,8 @@ func TestDeleteShardStatsDeletesLargeBatches(t *testing.T) {
 		statsKey := etcdkeys.BuildShardKey(tc.EtcdPrefix, tc.Namespace, shardID, etcdkeys.ShardStatisticsKey)
 		stats := store.ShardStatistics{
 			SmoothedLoad:   float64(i),
-			LastUpdateTime: time.Unix(int64(i), 0),
-			LastMoveTime:   time.Unix(int64(i), 0),
+			LastUpdateTime: time.Unix(int64(i), 0).UTC(),
+			LastMoveTime:   time.Unix(int64(i), 0).UTC(),
 		}
 		payload, err := json.Marshal(stats)
 		require.NoError(t, err)
