@@ -3,6 +3,7 @@ package executorstore
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"testing"
 	"time"
 
@@ -589,12 +590,11 @@ func TestDeleteShardStatsDeletesLargeBatches(t *testing.T) {
 		shardID := "stale-stats-" + strconv.Itoa(i)
 		shardIDs = append(shardIDs, shardID)
 
-		statsKey, err := etcdkeys.BuildShardKey(tc.EtcdPrefix, tc.Namespace, shardID, etcdkeys.ShardStatisticsKey)
-		require.NoError(t, err)
+		statsKey := etcdkeys.BuildShardKey(tc.EtcdPrefix, tc.Namespace, shardID, etcdkeys.ShardStatisticsKey)
 		stats := store.ShardStatistics{
 			SmoothedLoad:   float64(i),
-			LastUpdateTime: int64(i),
-			LastMoveTime:   int64(i),
+			LastUpdateTime: time.Unix(int64(i), 0),
+			LastMoveTime:   time.Unix(int64(i), 0),
 		}
 		payload, err := json.Marshal(stats)
 		require.NoError(t, err)
