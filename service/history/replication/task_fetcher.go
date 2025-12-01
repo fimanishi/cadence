@@ -338,7 +338,7 @@ func (f *taskFetcherImpl) GetSourceCluster() string {
 
 // GetRequestChan returns the request chan for the fetcher
 func (f *taskFetcherImpl) GetRequestChan(shardID int) chan<- *request {
-	chanIdx := shardID % f.config.ReplicationTaskFetcherParallelism()
+	chanIdx := shardID % len(f.requestChan)
 
 	return f.requestChan[chanIdx]
 }
