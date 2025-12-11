@@ -25,6 +25,7 @@ func New{{.Interface.Name}}(
 	cfg          *config.Persistence,
     sampleLoggingRate dynamicproperties.IntPropertyFn,
     enableShardIDMetrics dynamicproperties.BoolPropertyFn,
+	hostname     string,
 ) persistence.{{.Interface.Name}} {
     return &{{$decorator}}{
         wrapped: wrapped,
@@ -34,6 +35,7 @@ func New{{.Interface.Name}}(
 			enableLatencyHistogramMetrics: cfg.EnablePersistenceLatencyHistogramMetrics,
 			sampleLoggingRate:             sampleLoggingRate,
 			enableShardIDMetrics:          enableShardIDMetrics,
+			hostname:                      hostname,
         },
     }
 }

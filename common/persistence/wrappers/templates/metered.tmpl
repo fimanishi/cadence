@@ -22,6 +22,7 @@ func New{{.Interface.Name}}(
 	metricClient metrics.Client,
 	logger       log.Logger,
 	cfg          *config.Persistence,
+	hostname     string,
 ) persistence.{{.Interface.Name}} {
     return &{{$decorator}}{
         wrapped: wrapped,
@@ -29,6 +30,7 @@ func New{{.Interface.Name}}(
 			metricClient:                  metricClient,
 			logger:                        logger,
 			enableLatencyHistogramMetrics: cfg.EnablePersistenceLatencyHistogramMetrics,
+			hostname:                      hostname,
         },
     }
 }

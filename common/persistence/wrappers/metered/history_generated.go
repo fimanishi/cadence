@@ -25,6 +25,7 @@ func NewHistoryManager(
 	metricClient metrics.Client,
 	logger log.Logger,
 	cfg *config.Persistence,
+	hostname string,
 ) persistence.HistoryManager {
 	return &meteredHistoryManager{
 		wrapped: wrapped,
@@ -32,6 +33,7 @@ func NewHistoryManager(
 			metricClient:                  metricClient,
 			logger:                        logger,
 			enableLatencyHistogramMetrics: cfg.EnablePersistenceLatencyHistogramMetrics,
+			hostname:                      hostname,
 		},
 	}
 }

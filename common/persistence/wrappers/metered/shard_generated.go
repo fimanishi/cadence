@@ -25,6 +25,7 @@ func NewShardManager(
 	metricClient metrics.Client,
 	logger log.Logger,
 	cfg *config.Persistence,
+	hostname string,
 ) persistence.ShardManager {
 	return &meteredShardManager{
 		wrapped: wrapped,
@@ -32,6 +33,7 @@ func NewShardManager(
 			metricClient:                  metricClient,
 			logger:                        logger,
 			enableLatencyHistogramMetrics: cfg.EnablePersistenceLatencyHistogramMetrics,
+			hostname:                      hostname,
 		},
 	}
 }
