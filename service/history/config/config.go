@@ -281,9 +281,10 @@ type Config struct {
 	ReplicationTaskProcessorHostQPS                    dynamicproperties.FloatPropertyFn
 	ReplicationTaskProcessorShardQPS                   dynamicproperties.FloatPropertyFn
 	ReplicationTaskGenerationQPS                       dynamicproperties.FloatPropertyFn
-	EnableReplicationTaskGeneration                    dynamicproperties.BoolPropertyFnWithDomainIDAndWorkflowIDFilter
-	EnableRecordWorkflowExecutionUninitialized         dynamicproperties.BoolPropertyFnWithDomainFilter
-	ReplicationTaskProcessorLatencyLogThreshold        dynamicproperties.DurationPropertyFn
+	EnableReplicationTaskGeneration                              dynamicproperties.BoolPropertyFnWithDomainIDAndWorkflowIDFilter
+	EnableRecordWorkflowExecutionUninitialized                   dynamicproperties.BoolPropertyFnWithDomainFilter
+	EnableCleanupOrphanedHistoryBranchOnWorkflowCreation         dynamicproperties.BoolPropertyFn
+	ReplicationTaskProcessorLatencyLogThreshold                  dynamicproperties.DurationPropertyFn
 
 	// The following are used by the history workflowID cache
 	WorkflowIDExternalRPS dynamicproperties.IntPropertyFnWithDomainFilter
@@ -558,9 +559,10 @@ func New(dc *dynamicconfig.Collection, numberOfShards int, maxMessageSize int, i
 		ReplicationTaskProcessorHostQPS:                    dc.GetFloat64Property(dynamicproperties.ReplicationTaskProcessorHostQPS),
 		ReplicationTaskProcessorShardQPS:                   dc.GetFloat64Property(dynamicproperties.ReplicationTaskProcessorShardQPS),
 		ReplicationTaskGenerationQPS:                       dc.GetFloat64Property(dynamicproperties.ReplicationTaskGenerationQPS),
-		EnableReplicationTaskGeneration:                    dc.GetBoolPropertyFilteredByDomainIDAndWorkflowID(dynamicproperties.EnableReplicationTaskGeneration),
-		EnableRecordWorkflowExecutionUninitialized:         dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableRecordWorkflowExecutionUninitialized),
-		ReplicationTaskProcessorLatencyLogThreshold:        dc.GetDurationProperty(dynamicproperties.ReplicationTaskProcessorLatencyLogThreshold),
+		EnableReplicationTaskGeneration:                              dc.GetBoolPropertyFilteredByDomainIDAndWorkflowID(dynamicproperties.EnableReplicationTaskGeneration),
+		EnableRecordWorkflowExecutionUninitialized:                   dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableRecordWorkflowExecutionUninitialized),
+		EnableCleanupOrphanedHistoryBranchOnWorkflowCreation:         dc.GetBoolProperty(dynamicproperties.EnableCleanupOrphanedHistoryBranchOnWorkflowCreation),
+		ReplicationTaskProcessorLatencyLogThreshold:                  dc.GetDurationProperty(dynamicproperties.ReplicationTaskProcessorLatencyLogThreshold),
 
 		WorkflowIDExternalRPS: dc.GetIntPropertyFilteredByDomain(dynamicproperties.WorkflowIDExternalRPS),
 		WorkflowIDInternalRPS: dc.GetIntPropertyFilteredByDomain(dynamicproperties.WorkflowIDInternalRPS),
