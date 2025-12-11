@@ -285,8 +285,13 @@ func TestStartWorkflowExecution_OrphanedHistoryCleanup(t *testing.T) {
 				eft.ShardCtx.Resource.DomainCache.EXPECT().GetDomainByID(constants.TestDomainID).Return(domainEntry, nil).AnyTimes()
 				eft.ShardCtx.Resource.ActiveClusterMgr.EXPECT().GetActiveClusterInfoByClusterAttribute(gomock.Any(), constants.TestDomainID, nil).Return(&types.ActiveClusterInfo{ActiveClusterName: cluster.TestCurrentClusterName}, nil)
 
+				var capturedBranchToken []byte
 				historyV2Mgr := eft.ShardCtx.Resource.HistoryMgr
 				historyV2Mgr.On("AppendHistoryNodes", mock.Anything, mock.AnythingOfType("*persistence.AppendHistoryNodesRequest")).
+					Run(func(args mock.Arguments) {
+						req := args.Get(1).(*persistence.AppendHistoryNodesRequest)
+						capturedBranchToken = req.BranchToken
+					}).
 					Return(&persistence.AppendHistoryNodesResponse{}, nil).Once()
 
 				eft.ShardCtx.Resource.ExecutionMgr.On("CreateWorkflowExecution", mock.Anything, mock.Anything).
@@ -296,7 +301,10 @@ func TestStartWorkflowExecution_OrphanedHistoryCleanup(t *testing.T) {
 						State:          persistence.WorkflowStateCompleted,
 					}).Once()
 
-				historyV2Mgr.On("DeleteHistoryBranch", mock.Anything, mock.AnythingOfType("*persistence.DeleteHistoryBranchRequest")).
+				historyV2Mgr.On("DeleteHistoryBranch", mock.Anything, mock.MatchedBy(func(req *persistence.DeleteHistoryBranchRequest) bool {
+					return assert.Equal(t, capturedBranchToken, req.BranchToken) &&
+						assert.Equal(t, constants.TestDomainName, req.DomainName)
+				})).
 					Return(nil).Once()
 			},
 			enableCleanupFlag:    true,
@@ -361,8 +369,13 @@ func TestStartWorkflowExecution_OrphanedHistoryCleanup(t *testing.T) {
 				eft.ShardCtx.Resource.ExecutionMgr.On("GetCurrentExecution", mock.Anything, mock.Anything).
 					Return(nil, &types.EntityNotExistsError{}).Once()
 
+				var capturedBranchToken []byte
 				historyV2Mgr := eft.ShardCtx.Resource.HistoryMgr
 				historyV2Mgr.On("AppendHistoryNodes", mock.Anything, mock.AnythingOfType("*persistence.AppendHistoryNodesRequest")).
+					Run(func(args mock.Arguments) {
+						req := args.Get(1).(*persistence.AppendHistoryNodesRequest)
+						capturedBranchToken = req.BranchToken
+					}).
 					Return(&persistence.AppendHistoryNodesResponse{}, nil).Once()
 
 				eft.ShardCtx.Resource.ExecutionMgr.On("CreateWorkflowExecution", mock.Anything, mock.Anything).
@@ -371,7 +384,10 @@ func TestStartWorkflowExecution_OrphanedHistoryCleanup(t *testing.T) {
 						RunID:       "existing-run-id",
 					}).Once()
 
-				historyV2Mgr.On("DeleteHistoryBranch", mock.Anything, mock.AnythingOfType("*persistence.DeleteHistoryBranchRequest")).
+				historyV2Mgr.On("DeleteHistoryBranch", mock.Anything, mock.MatchedBy(func(req *persistence.DeleteHistoryBranchRequest) bool {
+					return assert.Equal(t, capturedBranchToken, req.BranchToken) &&
+						assert.Equal(t, constants.TestDomainName, req.DomainName)
+				})).
 					Return(nil).Once()
 			},
 			enableCleanupFlag:    true,
@@ -394,12 +410,16 @@ func TestStartWorkflowExecution_OrphanedHistoryCleanup(t *testing.T) {
 			tc.setupMocks(t, eft)
 
 			_, err := eft.Engine.StartWorkflowExecution(context.Background(), tc.request)
-			if (err != nil) != tc.wantErr {
-				t.Fatalf("%s: StartWorkflowExecution() error = %v, wantErr %v", tc.name, err, tc.wantErr)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			if tc.expectHistoryCleanup {
-				eft.ShardCtx.Resource.HistoryMgr.AssertCalled(t, "DeleteHistoryBranch", mock.Anything, mock.AnythingOfType("*persistence.DeleteHistoryBranchRequest"))
+				eft.ShardCtx.Resource.HistoryMgr.AssertCalled(t, "DeleteHistoryBranch", mock.Anything, mock.MatchedBy(func(req *persistence.DeleteHistoryBranchRequest) bool {
+					return req.BranchToken != nil
+				}))
 			} else {
 				eft.ShardCtx.Resource.HistoryMgr.AssertNotCalled(t, "DeleteHistoryBranch", mock.Anything, mock.AnythingOfType("*persistence.DeleteHistoryBranchRequest"))
 			}
