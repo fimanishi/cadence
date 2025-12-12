@@ -7,28 +7,35 @@ package ratelimited
 import (
 	"context"
 
+	"github.com/uber/cadence/common/metrics"
 	"github.com/uber/cadence/common/persistence"
 	"github.com/uber/cadence/common/quotas"
 )
 
 // ratelimitedHistoryManager implements persistence.HistoryManager interface instrumented with rate limiter.
 type ratelimitedHistoryManager struct {
-	wrapped     persistence.HistoryManager
-	rateLimiter quotas.Limiter
+	wrapped       persistence.HistoryManager
+	rateLimiter   quotas.Limiter
+	metricsClient metrics.Client
 }
 
 // NewHistoryManager creates a new instance of HistoryManager with ratelimiter.
 func NewHistoryManager(
 	wrapped persistence.HistoryManager,
 	rateLimiter quotas.Limiter,
+	metricsClient metrics.Client,
 ) persistence.HistoryManager {
 	return &ratelimitedHistoryManager{
-		wrapped:     wrapped,
-		rateLimiter: rateLimiter,
+		wrapped:       wrapped,
+		rateLimiter:   rateLimiter,
+		metricsClient: metricsClient,
 	}
 }
 
 func (c *ratelimitedHistoryManager) AppendHistoryNodes(ctx context.Context, request *persistence.AppendHistoryNodesRequest) (ap1 *persistence.AppendHistoryNodesResponse, err error) {
+	if c.metricsClient != nil {
+		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
 		return
@@ -42,6 +49,9 @@ func (c *ratelimitedHistoryManager) Close() {
 }
 
 func (c *ratelimitedHistoryManager) DeleteHistoryBranch(ctx context.Context, request *persistence.DeleteHistoryBranchRequest) (err error) {
+	if c.metricsClient != nil {
+		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
 		return
@@ -50,6 +60,9 @@ func (c *ratelimitedHistoryManager) DeleteHistoryBranch(ctx context.Context, req
 }
 
 func (c *ratelimitedHistoryManager) ForkHistoryBranch(ctx context.Context, request *persistence.ForkHistoryBranchRequest) (fp1 *persistence.ForkHistoryBranchResponse, err error) {
+	if c.metricsClient != nil {
+		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
 		return
@@ -58,6 +71,9 @@ func (c *ratelimitedHistoryManager) ForkHistoryBranch(ctx context.Context, reque
 }
 
 func (c *ratelimitedHistoryManager) GetAllHistoryTreeBranches(ctx context.Context, request *persistence.GetAllHistoryTreeBranchesRequest) (gp1 *persistence.GetAllHistoryTreeBranchesResponse, err error) {
+	if c.metricsClient != nil {
+		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
 		return
@@ -66,6 +82,9 @@ func (c *ratelimitedHistoryManager) GetAllHistoryTreeBranches(ctx context.Contex
 }
 
 func (c *ratelimitedHistoryManager) GetHistoryTree(ctx context.Context, request *persistence.GetHistoryTreeRequest) (gp1 *persistence.GetHistoryTreeResponse, err error) {
+	if c.metricsClient != nil {
+		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
 		return
@@ -78,6 +97,9 @@ func (c *ratelimitedHistoryManager) GetName() (s1 string) {
 }
 
 func (c *ratelimitedHistoryManager) ReadHistoryBranch(ctx context.Context, request *persistence.ReadHistoryBranchRequest) (rp1 *persistence.ReadHistoryBranchResponse, err error) {
+	if c.metricsClient != nil {
+		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
 		return
@@ -86,6 +108,9 @@ func (c *ratelimitedHistoryManager) ReadHistoryBranch(ctx context.Context, reque
 }
 
 func (c *ratelimitedHistoryManager) ReadHistoryBranchByBatch(ctx context.Context, request *persistence.ReadHistoryBranchRequest) (rp1 *persistence.ReadHistoryBranchByBatchResponse, err error) {
+	if c.metricsClient != nil {
+		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
 		return
@@ -94,6 +119,9 @@ func (c *ratelimitedHistoryManager) ReadHistoryBranchByBatch(ctx context.Context
 }
 
 func (c *ratelimitedHistoryManager) ReadRawHistoryBranch(ctx context.Context, request *persistence.ReadHistoryBranchRequest) (rp1 *persistence.ReadRawHistoryBranchResponse, err error) {
+	if c.metricsClient != nil {
+		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
 		return

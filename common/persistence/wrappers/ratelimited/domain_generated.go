@@ -7,24 +7,28 @@ package ratelimited
 import (
 	"context"
 
+	"github.com/uber/cadence/common/metrics"
 	"github.com/uber/cadence/common/persistence"
 	"github.com/uber/cadence/common/quotas"
 )
 
 // ratelimitedDomainManager implements persistence.DomainManager interface instrumented with rate limiter.
 type ratelimitedDomainManager struct {
-	wrapped     persistence.DomainManager
-	rateLimiter quotas.Limiter
+	wrapped       persistence.DomainManager
+	rateLimiter   quotas.Limiter
+	metricsClient metrics.Client
 }
 
 // NewDomainManager creates a new instance of DomainManager with ratelimiter.
 func NewDomainManager(
 	wrapped persistence.DomainManager,
 	rateLimiter quotas.Limiter,
+	metricsClient metrics.Client,
 ) persistence.DomainManager {
 	return &ratelimitedDomainManager{
-		wrapped:     wrapped,
-		rateLimiter: rateLimiter,
+		wrapped:       wrapped,
+		rateLimiter:   rateLimiter,
+		metricsClient: metricsClient,
 	}
 }
 
@@ -34,6 +38,9 @@ func (c *ratelimitedDomainManager) Close() {
 }
 
 func (c *ratelimitedDomainManager) CreateDomain(ctx context.Context, request *persistence.CreateDomainRequest) (cp1 *persistence.CreateDomainResponse, err error) {
+	if c.metricsClient != nil {
+		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
 		return
@@ -42,6 +49,9 @@ func (c *ratelimitedDomainManager) CreateDomain(ctx context.Context, request *pe
 }
 
 func (c *ratelimitedDomainManager) DeleteDomain(ctx context.Context, request *persistence.DeleteDomainRequest) (err error) {
+	if c.metricsClient != nil {
+		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
 		return
@@ -50,6 +60,9 @@ func (c *ratelimitedDomainManager) DeleteDomain(ctx context.Context, request *pe
 }
 
 func (c *ratelimitedDomainManager) DeleteDomainByName(ctx context.Context, request *persistence.DeleteDomainByNameRequest) (err error) {
+	if c.metricsClient != nil {
+		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
 		return
@@ -58,6 +71,9 @@ func (c *ratelimitedDomainManager) DeleteDomainByName(ctx context.Context, reque
 }
 
 func (c *ratelimitedDomainManager) GetDomain(ctx context.Context, request *persistence.GetDomainRequest) (gp1 *persistence.GetDomainResponse, err error) {
+	if c.metricsClient != nil {
+		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
 		return
@@ -66,6 +82,9 @@ func (c *ratelimitedDomainManager) GetDomain(ctx context.Context, request *persi
 }
 
 func (c *ratelimitedDomainManager) GetMetadata(ctx context.Context) (gp1 *persistence.GetMetadataResponse, err error) {
+	if c.metricsClient != nil {
+		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
 		return
@@ -78,6 +97,9 @@ func (c *ratelimitedDomainManager) GetName() (s1 string) {
 }
 
 func (c *ratelimitedDomainManager) ListDomains(ctx context.Context, request *persistence.ListDomainsRequest) (lp1 *persistence.ListDomainsResponse, err error) {
+	if c.metricsClient != nil {
+		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
 		return
@@ -86,6 +108,9 @@ func (c *ratelimitedDomainManager) ListDomains(ctx context.Context, request *per
 }
 
 func (c *ratelimitedDomainManager) UpdateDomain(ctx context.Context, request *persistence.UpdateDomainRequest) (err error) {
+	if c.metricsClient != nil {
+		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
 		return
