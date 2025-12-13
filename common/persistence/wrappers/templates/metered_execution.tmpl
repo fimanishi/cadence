@@ -26,6 +26,7 @@ func New{{.Interface.Name}}(
     sampleLoggingRate dynamicproperties.IntPropertyFn,
     enableShardIDMetrics dynamicproperties.BoolPropertyFn,
 	hostname     string,
+	datastoreName string,
 ) persistence.{{.Interface.Name}} {
     return &{{$decorator}}{
         wrapped: wrapped,
@@ -36,6 +37,7 @@ func New{{.Interface.Name}}(
 			sampleLoggingRate:             sampleLoggingRate,
 			enableShardIDMetrics:          enableShardIDMetrics,
 			hostname:                      hostname,
+			datastoreName:                 datastoreName,
         },
     }
 }

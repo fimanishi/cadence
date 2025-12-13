@@ -17,6 +17,7 @@ type ratelimitedConfigStoreManager struct {
 	wrapped       persistence.ConfigStoreManager
 	rateLimiter   quotas.Limiter
 	metricsClient metrics.Client
+	datastoreName string
 }
 
 // NewConfigStoreManager creates a new instance of ConfigStoreManager with ratelimiter.
@@ -24,11 +25,13 @@ func NewConfigStoreManager(
 	wrapped persistence.ConfigStoreManager,
 	rateLimiter quotas.Limiter,
 	metricsClient metrics.Client,
+	datastoreName string,
 ) persistence.ConfigStoreManager {
 	return &ratelimitedConfigStoreManager{
 		wrapped:       wrapped,
 		rateLimiter:   rateLimiter,
 		metricsClient: metricsClient,
+		datastoreName: datastoreName,
 	}
 }
 
@@ -39,7 +42,8 @@ func (c *ratelimitedConfigStoreManager) Close() {
 
 func (c *ratelimitedConfigStoreManager) FetchDynamicConfig(ctx context.Context, cfgType persistence.ConfigType) (fp1 *persistence.FetchDynamicConfigResponse, err error) {
 	if c.metricsClient != nil {
-		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+		scope := c.metricsClient.Scope(metrics.PersistenceCreateShardScope, metrics.DatastoreTag(c.datastoreName))
+		scope.UpdateGauge(metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
 	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
@@ -50,7 +54,8 @@ func (c *ratelimitedConfigStoreManager) FetchDynamicConfig(ctx context.Context, 
 
 func (c *ratelimitedConfigStoreManager) UpdateDynamicConfig(ctx context.Context, request *persistence.UpdateDynamicConfigRequest, cfgType persistence.ConfigType) (err error) {
 	if c.metricsClient != nil {
-		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+		scope := c.metricsClient.Scope(metrics.PersistenceCreateShardScope, metrics.DatastoreTag(c.datastoreName))
+		scope.UpdateGauge(metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
 	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded

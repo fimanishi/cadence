@@ -17,6 +17,7 @@ type ratelimitedQueueManager struct {
 	wrapped       persistence.QueueManager
 	rateLimiter   quotas.Limiter
 	metricsClient metrics.Client
+	datastoreName string
 }
 
 // NewQueueManager creates a new instance of QueueManager with ratelimiter.
@@ -24,11 +25,13 @@ func NewQueueManager(
 	wrapped persistence.QueueManager,
 	rateLimiter quotas.Limiter,
 	metricsClient metrics.Client,
+	datastoreName string,
 ) persistence.QueueManager {
 	return &ratelimitedQueueManager{
 		wrapped:       wrapped,
 		rateLimiter:   rateLimiter,
 		metricsClient: metricsClient,
+		datastoreName: datastoreName,
 	}
 }
 
@@ -39,7 +42,8 @@ func (c *ratelimitedQueueManager) Close() {
 
 func (c *ratelimitedQueueManager) DeleteMessageFromDLQ(ctx context.Context, messageID int64) (err error) {
 	if c.metricsClient != nil {
-		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+		scope := c.metricsClient.Scope(metrics.PersistenceCreateShardScope, metrics.DatastoreTag(c.datastoreName))
+		scope.UpdateGauge(metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
 	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
@@ -50,7 +54,8 @@ func (c *ratelimitedQueueManager) DeleteMessageFromDLQ(ctx context.Context, mess
 
 func (c *ratelimitedQueueManager) DeleteMessagesBefore(ctx context.Context, messageID int64) (err error) {
 	if c.metricsClient != nil {
-		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+		scope := c.metricsClient.Scope(metrics.PersistenceCreateShardScope, metrics.DatastoreTag(c.datastoreName))
+		scope.UpdateGauge(metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
 	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
@@ -61,7 +66,8 @@ func (c *ratelimitedQueueManager) DeleteMessagesBefore(ctx context.Context, mess
 
 func (c *ratelimitedQueueManager) EnqueueMessage(ctx context.Context, messagePayload []byte) (err error) {
 	if c.metricsClient != nil {
-		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+		scope := c.metricsClient.Scope(metrics.PersistenceCreateShardScope, metrics.DatastoreTag(c.datastoreName))
+		scope.UpdateGauge(metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
 	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
@@ -72,7 +78,8 @@ func (c *ratelimitedQueueManager) EnqueueMessage(ctx context.Context, messagePay
 
 func (c *ratelimitedQueueManager) EnqueueMessageToDLQ(ctx context.Context, messagePayload []byte) (err error) {
 	if c.metricsClient != nil {
-		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+		scope := c.metricsClient.Scope(metrics.PersistenceCreateShardScope, metrics.DatastoreTag(c.datastoreName))
+		scope.UpdateGauge(metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
 	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
@@ -83,7 +90,8 @@ func (c *ratelimitedQueueManager) EnqueueMessageToDLQ(ctx context.Context, messa
 
 func (c *ratelimitedQueueManager) GetAckLevels(ctx context.Context) (m1 map[string]int64, err error) {
 	if c.metricsClient != nil {
-		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+		scope := c.metricsClient.Scope(metrics.PersistenceCreateShardScope, metrics.DatastoreTag(c.datastoreName))
+		scope.UpdateGauge(metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
 	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
@@ -94,7 +102,8 @@ func (c *ratelimitedQueueManager) GetAckLevels(ctx context.Context) (m1 map[stri
 
 func (c *ratelimitedQueueManager) GetDLQAckLevels(ctx context.Context) (m1 map[string]int64, err error) {
 	if c.metricsClient != nil {
-		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+		scope := c.metricsClient.Scope(metrics.PersistenceCreateShardScope, metrics.DatastoreTag(c.datastoreName))
+		scope.UpdateGauge(metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
 	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
@@ -105,7 +114,8 @@ func (c *ratelimitedQueueManager) GetDLQAckLevels(ctx context.Context) (m1 map[s
 
 func (c *ratelimitedQueueManager) GetDLQSize(ctx context.Context) (i1 int64, err error) {
 	if c.metricsClient != nil {
-		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+		scope := c.metricsClient.Scope(metrics.PersistenceCreateShardScope, metrics.DatastoreTag(c.datastoreName))
+		scope.UpdateGauge(metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
 	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
@@ -116,7 +126,8 @@ func (c *ratelimitedQueueManager) GetDLQSize(ctx context.Context) (i1 int64, err
 
 func (c *ratelimitedQueueManager) RangeDeleteMessagesFromDLQ(ctx context.Context, firstMessageID int64, lastMessageID int64) (err error) {
 	if c.metricsClient != nil {
-		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+		scope := c.metricsClient.Scope(metrics.PersistenceCreateShardScope, metrics.DatastoreTag(c.datastoreName))
+		scope.UpdateGauge(metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
 	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
@@ -127,7 +138,8 @@ func (c *ratelimitedQueueManager) RangeDeleteMessagesFromDLQ(ctx context.Context
 
 func (c *ratelimitedQueueManager) ReadMessages(ctx context.Context, lastMessageID int64, maxCount int) (q1 persistence.QueueMessageList, err error) {
 	if c.metricsClient != nil {
-		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+		scope := c.metricsClient.Scope(metrics.PersistenceCreateShardScope, metrics.DatastoreTag(c.datastoreName))
+		scope.UpdateGauge(metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
 	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
@@ -138,7 +150,8 @@ func (c *ratelimitedQueueManager) ReadMessages(ctx context.Context, lastMessageI
 
 func (c *ratelimitedQueueManager) ReadMessagesFromDLQ(ctx context.Context, firstMessageID int64, lastMessageID int64, pageSize int, pageToken []byte) (qpa1 []*persistence.QueueMessage, ba1 []byte, err error) {
 	if c.metricsClient != nil {
-		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+		scope := c.metricsClient.Scope(metrics.PersistenceCreateShardScope, metrics.DatastoreTag(c.datastoreName))
+		scope.UpdateGauge(metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
 	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
@@ -149,7 +162,8 @@ func (c *ratelimitedQueueManager) ReadMessagesFromDLQ(ctx context.Context, first
 
 func (c *ratelimitedQueueManager) UpdateAckLevel(ctx context.Context, messageID int64, clusterName string) (err error) {
 	if c.metricsClient != nil {
-		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+		scope := c.metricsClient.Scope(metrics.PersistenceCreateShardScope, metrics.DatastoreTag(c.datastoreName))
+		scope.UpdateGauge(metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
 	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded
@@ -160,7 +174,8 @@ func (c *ratelimitedQueueManager) UpdateAckLevel(ctx context.Context, messageID 
 
 func (c *ratelimitedQueueManager) UpdateDLQAckLevel(ctx context.Context, messageID int64, clusterName string) (err error) {
 	if c.metricsClient != nil {
-		c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+		scope := c.metricsClient.Scope(metrics.PersistenceCreateShardScope, metrics.DatastoreTag(c.datastoreName))
+		scope.UpdateGauge(metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
 	}
 	if ok := c.rateLimiter.Allow(); !ok {
 		err = ErrPersistenceLimitExceeded

@@ -26,6 +26,7 @@ func NewConfigStoreManager(
 	logger log.Logger,
 	cfg *config.Persistence,
 	hostname string,
+	datastoreName string,
 ) persistence.ConfigStoreManager {
 	return &meteredConfigStoreManager{
 		wrapped: wrapped,
@@ -34,6 +35,7 @@ func NewConfigStoreManager(
 			logger:                        logger,
 			enableLatencyHistogramMetrics: cfg.EnablePersistenceLatencyHistogramMetrics,
 			hostname:                      hostname,
+			datastoreName:                 datastoreName,
 		},
 	}
 }

@@ -26,6 +26,7 @@ func NewVisibilityManager(
 	logger log.Logger,
 	cfg *config.Persistence,
 	hostname string,
+	datastoreName string,
 ) persistence.VisibilityManager {
 	return &meteredVisibilityManager{
 		wrapped: wrapped,
@@ -34,6 +35,7 @@ func NewVisibilityManager(
 			logger:                        logger,
 			enableLatencyHistogramMetrics: cfg.EnablePersistenceLatencyHistogramMetrics,
 			hostname:                      hostname,
+			datastoreName:                 datastoreName,
 		},
 	}
 }

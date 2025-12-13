@@ -46,6 +46,7 @@ type base struct {
 	sampleLoggingRate             dynamicproperties.IntPropertyFn
 	enableShardIDMetrics          dynamicproperties.BoolPropertyFn
 	hostname                      string
+	datastoreName                 string
 }
 
 func (p *base) updateErrorMetricPerDomain(scope metrics.ScopeIdx, err error, scopeWithDomainTag metrics.Scope, logger log.Logger) {
@@ -128,6 +129,9 @@ func (p *base) call(scope metrics.ScopeIdx, op func() error, tags ...metrics.Tag
 	if p.hostname != "" {
 		tags = append(tags, metrics.HostTag(p.hostname))
 	}
+	if p.datastoreName != "" {
+		tags = append(tags, metrics.DatastoreTag(p.datastoreName))
+	}
 	metricsScope := p.metricClient.Scope(scope, tags...)
 	if len(tags) > 0 {
 		metricsScope.IncCounter(metrics.PersistenceRequestsPerDomain)
@@ -162,6 +166,9 @@ func (p *base) callWithoutDomainTag(scope metrics.ScopeIdx, op func() error, tag
 	if p.hostname != "" {
 		tags = append(tags, metrics.HostTag(p.hostname))
 	}
+	if p.datastoreName != "" {
+		tags = append(tags, metrics.DatastoreTag(p.datastoreName))
+	}
 	metricsScope := p.metricClient.Scope(scope, tags...)
 	metricsScope.IncCounter(metrics.PersistenceRequests)
 	before := time.Now()
@@ -181,6 +188,9 @@ func (p *base) callWithoutDomainTag(scope metrics.ScopeIdx, op func() error, tag
 func (p *base) callWithDomainAndShardScope(scope metrics.ScopeIdx, op func() error, domainTag metrics.Tag, shardIDTag metrics.Tag, additionalTags ...metrics.Tag) error {
 	if p.hostname != "" {
 		additionalTags = append(additionalTags, metrics.HostTag(p.hostname))
+	}
+	if p.datastoreName != "" {
+		additionalTags = append(additionalTags, metrics.DatastoreTag(p.datastoreName))
 	}
 	domainMetricsScope := p.metricClient.Scope(scope, append([]metrics.Tag{domainTag}, additionalTags...)...)
 	shardOperationsMetricsScope := p.metricClient.Scope(scope, append([]metrics.Tag{shardIDTag}, additionalTags...)...)

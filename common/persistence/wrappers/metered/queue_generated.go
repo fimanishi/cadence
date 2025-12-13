@@ -26,6 +26,7 @@ func NewQueueManager(
 	logger log.Logger,
 	cfg *config.Persistence,
 	hostname string,
+	datastoreName string,
 ) persistence.QueueManager {
 	return &meteredQueueManager{
 		wrapped: wrapped,
@@ -34,6 +35,7 @@ func NewQueueManager(
 			logger:                        logger,
 			enableLatencyHistogramMetrics: cfg.EnablePersistenceLatencyHistogramMetrics,
 			hostname:                      hostname,
+			datastoreName:                 datastoreName,
 		},
 	}
 }

@@ -13,6 +13,7 @@ type {{$decorator}} struct {
     wrapped      {{.Interface.Type}}
     rateLimiter  quotas.Limiter
     metricsClient metrics.Client
+    datastoreName string
 }
 
 // New{{.Interface.Name}} creates a new instance of {{.Interface.Name}} with ratelimiter.
@@ -20,11 +21,13 @@ func New{{.Interface.Name}}(
     wrapped persistence.{{.Interface.Name}},
     rateLimiter quotas.Limiter,
     metricsClient metrics.Client,
+    datastoreName string,
 ) persistence.{{.Interface.Name}} {
     return &{{$decorator}}{
         wrapped: wrapped,
         rateLimiter: rateLimiter,
         metricsClient: metricsClient,
+        datastoreName: datastoreName,
     }
 }
 
@@ -32,7 +35,8 @@ func New{{.Interface.Name}}(
     {{- if (and $method.AcceptsContext $method.ReturnsError)}}
         func (c *{{$decorator}}) {{$method.Declaration}} {
 	        if c.metricsClient != nil {
-		        c.metricsClient.UpdateGauge(metrics.PersistenceCreateShardScope, metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
+		        scope := c.metricsClient.Scope(metrics.PersistenceCreateShardScope, metrics.DatastoreTag(c.datastoreName))
+		        scope.UpdateGauge(metrics.PersistenceQuota, float64(c.rateLimiter.Limit()))
 	        }
 	        if ok := c.rateLimiter.Allow(); !ok {
 		        err = ErrPersistenceLimitExceeded
