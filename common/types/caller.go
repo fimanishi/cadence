@@ -31,7 +31,7 @@ const (
 	CallerTypeCLI
 	CallerTypeUI
 	CallerTypeSDK
-	CallerTypeService
+	CallerTypeInternal
 )
 
 type callerTypeContextKey string
@@ -46,8 +46,8 @@ func (c CallerType) String() string {
 		return "ui"
 	case CallerTypeSDK:
 		return "sdk"
-	case CallerTypeService:
-		return "service"
+	case CallerTypeInternal:
+		return "internal"
 	default:
 		return "unknown"
 	}
@@ -62,8 +62,8 @@ func ParseCallerType(s string) CallerType {
 		return CallerTypeUI
 	case "sdk":
 		return CallerTypeSDK
-	case "service":
-		return CallerTypeService
+	case "internal":
+		return CallerTypeInternal
 	default:
 		return CallerTypeUnknown
 	}

@@ -36,7 +36,7 @@ func TestCallerType_String(t *testing.T) {
 		{"CLI", CallerTypeCLI, "cli"},
 		{"UI", CallerTypeUI, "ui"},
 		{"SDK", CallerTypeSDK, "sdk"},
-		{"Service", CallerTypeService, "service"},
+		{"Internal", CallerTypeInternal, "internal"},
 		{"Unknown", CallerTypeUnknown, "unknown"},
 		{"Zero value", CallerType(0), "unknown"},
 		{"Invalid", CallerType(999), "unknown"},
@@ -58,7 +58,7 @@ func TestParseCallerType(t *testing.T) {
 		{"cli", "cli", CallerTypeCLI},
 		{"ui", "ui", CallerTypeUI},
 		{"sdk", "sdk", CallerTypeSDK},
-		{"service", "service", CallerTypeService},
+		{"internal", "internal", CallerTypeInternal},
 		{"unknown", "unknown", CallerTypeUnknown},
 		{"empty", "", CallerTypeUnknown},
 		{"invalid", "invalid", CallerTypeUnknown},
@@ -80,7 +80,7 @@ func TestWithCallerType(t *testing.T) {
 		{"CLI", CallerTypeCLI},
 		{"UI", CallerTypeUI},
 		{"SDK", CallerTypeSDK},
-		{"Service", CallerTypeService},
+		{"Internal", CallerTypeInternal},
 		{"Unknown", CallerTypeUnknown},
 	}
 
@@ -139,7 +139,7 @@ func TestCallerTypeRoundTrip(t *testing.T) {
 		CallerTypeCLI,
 		CallerTypeUI,
 		CallerTypeSDK,
-		CallerTypeService,
+		CallerTypeInternal,
 		CallerTypeUnknown,
 	}
 
