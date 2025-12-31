@@ -34,18 +34,30 @@ const (
 	CallerTypeInternal
 )
 
+// CallerInfo captures request source information for observability and resource management.
+//
+// Intent:
+//   - Track the source/origin/actor of API requests (CLI, UI, SDK, internal service calls)
+//   - Enable client-specific behavior and resource allocation decisions
+//   - Support future extensibility for additional caller metadata (e.g., identity, version)
+//
+// Consumers:
+//   - Logging and audit systems for request attribution
+//   - Metrics and monitoring for client-specific observability
+//   - Rate limiting and resource management based on caller information
+//
+// Lifecycle:
+//   - Should be set early in request processing, typically after authentication
+//   - Expected for external API calls (CLI, UI, SDK)
+//   - May be absent for internal service-to-service calls or unauthenticated endpoints
+//   - Set by authentication/authorization middleware or API gateway components
 type CallerInfo struct {
-	CallerType CallerType
+	callerType CallerType
 }
 
-// WithCallerType creates a new CallerInfo with the given CallerType
-func (c *CallerInfo) WithCallerType(callerType CallerType) *CallerInfo {
-	if c == nil {
-		return &CallerInfo{CallerType: callerType}
-	}
-	newInfo := *c
-	newInfo.CallerType = callerType
-	return &newInfo
+// NewCallerInfo creates a new CallerInfo
+func NewCallerInfo(callerType CallerType) *CallerInfo {
+	return &CallerInfo{callerType: callerType}
 }
 
 // GetCallerType returns the CallerType, or CallerTypeUnknown if CallerInfo is nil
@@ -53,7 +65,7 @@ func (c *CallerInfo) GetCallerType() CallerType {
 	if c == nil {
 		return CallerTypeUnknown
 	}
-	return c.CallerType
+	return c.callerType
 }
 
 type callerInfoContextKey string
@@ -91,16 +103,16 @@ func ParseCallerType(s string) CallerType {
 	}
 }
 
-// WithCallerInfo adds CallerInfo to context
-func WithCallerInfo(ctx context.Context, callerInfo *CallerInfo) context.Context {
+// ContextWithCallerInfo adds CallerInfo to context
+func ContextWithCallerInfo(ctx context.Context, callerInfo *CallerInfo) context.Context {
 	if callerInfo == nil {
 		return ctx
 	}
 	return context.WithValue(ctx, callerInfoKey, callerInfo)
 }
 
-// GetCallerInfo retrieves CallerInfo from context, returns nil if not set
-func GetCallerInfo(ctx context.Context) *CallerInfo {
+// CallerInfoFromContext retrieves CallerInfo from context, returns nil if not set
+func CallerInfoFromContext(ctx context.Context) *CallerInfo {
 	if ctx == nil {
 		return nil
 	}
