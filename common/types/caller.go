@@ -34,9 +34,31 @@ const (
 	CallerTypeInternal
 )
 
-type callerTypeContextKey string
+type CallerInfo struct {
+	CallerType CallerType
+}
 
-const callerTypeKey = callerTypeContextKey("caller-type")
+// WithCallerType creates a new CallerInfo with the given CallerType
+func (c *CallerInfo) WithCallerType(callerType CallerType) *CallerInfo {
+	if c == nil {
+		return &CallerInfo{CallerType: callerType}
+	}
+	newInfo := *c
+	newInfo.CallerType = callerType
+	return &newInfo
+}
+
+// GetCallerType returns the CallerType, or CallerTypeUnknown if CallerInfo is nil
+func (c *CallerInfo) GetCallerType() CallerType {
+	if c == nil {
+		return CallerTypeUnknown
+	}
+	return c.CallerType
+}
+
+type callerInfoContextKey string
+
+const callerInfoKey = callerInfoContextKey("caller-info")
 
 func (c CallerType) String() string {
 	switch c {
@@ -69,19 +91,19 @@ func ParseCallerType(s string) CallerType {
 	}
 }
 
-// WithCallerType adds CallerType to context
-func WithCallerType(ctx context.Context, callerType CallerType) context.Context {
-	return context.WithValue(ctx, callerTypeKey, callerType)
+// WithCallerInfo adds CallerInfo to context
+func WithCallerInfo(ctx context.Context, callerInfo *CallerInfo) context.Context {
+	if callerInfo == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, callerInfoKey, callerInfo)
 }
 
-// GetCallerType retrieves CallerType from context, returns CallerTypeUnknown if not set
-func GetCallerType(ctx context.Context) CallerType {
+// GetCallerInfo retrieves CallerInfo from context, returns nil if not set
+func GetCallerInfo(ctx context.Context) *CallerInfo {
 	if ctx == nil {
-		return CallerTypeUnknown
+		return nil
 	}
-	callerType, ok := ctx.Value(callerTypeKey).(CallerType)
-	if !ok {
-		return CallerTypeUnknown
-	}
-	return callerType
+	callerInfo, _ := ctx.Value(callerInfoKey).(*CallerInfo)
+	return callerInfo
 }

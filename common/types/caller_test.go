@@ -72,68 +72,6 @@ func TestParseCallerType(t *testing.T) {
 	}
 }
 
-func TestWithCallerType(t *testing.T) {
-	tests := []struct {
-		name       string
-		callerType CallerType
-	}{
-		{"CLI", CallerTypeCLI},
-		{"UI", CallerTypeUI},
-		{"SDK", CallerTypeSDK},
-		{"Internal", CallerTypeInternal},
-		{"Unknown", CallerTypeUnknown},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			ctx = WithCallerType(ctx, tt.callerType)
-
-			assert.Equal(t, tt.callerType, GetCallerType(ctx))
-		})
-	}
-}
-
-func TestGetCallerType(t *testing.T) {
-	tests := []struct {
-		name string
-		ctx  context.Context
-		want CallerType
-	}{
-		{
-			name: "nil context",
-			ctx:  nil,
-			want: CallerTypeUnknown,
-		},
-		{
-			name: "context without caller type",
-			ctx:  context.Background(),
-			want: CallerTypeUnknown,
-		},
-		{
-			name: "context with zero value caller type",
-			ctx:  WithCallerType(context.Background(), CallerType(0)),
-			want: CallerType(0),
-		},
-		{
-			name: "context with CLI caller type",
-			ctx:  WithCallerType(context.Background(), CallerTypeCLI),
-			want: CallerTypeCLI,
-		},
-		{
-			name: "context with SDK caller type",
-			ctx:  WithCallerType(context.Background(), CallerTypeSDK),
-			want: CallerTypeSDK,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, GetCallerType(tt.ctx))
-		})
-	}
-}
-
 func TestCallerTypeRoundTrip(t *testing.T) {
 	tests := []CallerType{
 		CallerTypeCLI,
@@ -148,6 +86,130 @@ func TestCallerTypeRoundTrip(t *testing.T) {
 			str := ct.String()
 			parsed := ParseCallerType(str)
 			assert.Equal(t, ct, parsed)
+		})
+	}
+}
+
+func TestCallerInfo_WithCallerType(t *testing.T) {
+	tests := []struct {
+		name       string
+		initial    *CallerInfo
+		callerType CallerType
+		want       *CallerInfo
+	}{
+		{
+			name:       "nil CallerInfo",
+			initial:    nil,
+			callerType: CallerTypeCLI,
+			want:       &CallerInfo{CallerType: CallerTypeCLI},
+		},
+		{
+			name:       "existing CallerInfo",
+			initial:    &CallerInfo{CallerType: CallerTypeSDK},
+			callerType: CallerTypeCLI,
+			want:       &CallerInfo{CallerType: CallerTypeCLI},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.initial.WithCallerType(tt.callerType)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCallerInfo_GetCallerType(t *testing.T) {
+	tests := []struct {
+		name string
+		info *CallerInfo
+		want CallerType
+	}{
+		{
+			name: "nil CallerInfo",
+			info: nil,
+			want: CallerTypeUnknown,
+		},
+		{
+			name: "CLI CallerInfo",
+			info: &CallerInfo{CallerType: CallerTypeCLI},
+			want: CallerTypeCLI,
+		},
+		{
+			name: "SDK CallerInfo",
+			info: &CallerInfo{CallerType: CallerTypeSDK},
+			want: CallerTypeSDK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.info.GetCallerType())
+		})
+	}
+}
+
+func TestWithCallerInfo(t *testing.T) {
+	tests := []struct {
+		name       string
+		callerInfo *CallerInfo
+		want       *CallerInfo
+	}{
+		{
+			name:       "CLI caller info",
+			callerInfo: &CallerInfo{CallerType: CallerTypeCLI},
+			want:       &CallerInfo{CallerType: CallerTypeCLI},
+		},
+		{
+			name:       "SDK caller info",
+			callerInfo: &CallerInfo{CallerType: CallerTypeSDK},
+			want:       &CallerInfo{CallerType: CallerTypeSDK},
+		},
+		{
+			name:       "nil caller info",
+			callerInfo: nil,
+			want:       nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			ctx = WithCallerInfo(ctx, tt.callerInfo)
+
+			got := GetCallerInfo(ctx)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestGetCallerInfo(t *testing.T) {
+	tests := []struct {
+		name string
+		ctx  context.Context
+		want *CallerInfo
+	}{
+		{
+			name: "nil context",
+			ctx:  nil,
+			want: nil,
+		},
+		{
+			name: "context without caller info",
+			ctx:  context.Background(),
+			want: nil,
+		},
+		{
+			name: "context with caller info",
+			ctx:  WithCallerInfo(context.Background(), &CallerInfo{CallerType: CallerTypeCLI}),
+			want: &CallerInfo{CallerType: CallerTypeCLI},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GetCallerInfo(tt.ctx)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
