@@ -24,20 +24,20 @@ import (
 	"context"
 )
 
-type CallerType int
+type CallerType string
 
 const (
-	CallerTypeUnknown CallerType = iota
-	CallerTypeCLI
-	CallerTypeUI
-	CallerTypeSDK
-	CallerTypeInternal
+	CallerTypeUnknown  CallerType = "unknown"
+	CallerTypeCLI      CallerType = "cli"
+	CallerTypeUI       CallerType = "ui"
+	CallerTypeSDK      CallerType = "sdk"
+	CallerTypeInternal CallerType = "internal"
 )
 
 // CallerInfo captures request source information for observability and resource management.
 //
 // Intent:
-//   - Track the source/origin/actor of API requests (CLI, UI, SDK, internal service calls)
+//   - Track the source/origin/actor of API requests (CLI, UI, SDK, internal service calls, etc.)
 //   - Enable client-specific behavior and resource allocation decisions
 //   - Support future extensibility for additional caller metadata (e.g., identity, version)
 //
@@ -73,31 +73,14 @@ type callerInfoContextKey string
 const callerInfoKey = callerInfoContextKey("caller-info")
 
 func (c CallerType) String() string {
-	switch c {
-	case CallerTypeCLI:
-		return "cli"
-	case CallerTypeUI:
-		return "ui"
-	case CallerTypeSDK:
-		return "sdk"
-	case CallerTypeInternal:
-		return "internal"
-	default:
-		return "unknown"
-	}
+	return string(c)
 }
 
 // ParseCallerType converts a string to CallerType
 func ParseCallerType(s string) CallerType {
-	switch s {
-	case "cli":
-		return CallerTypeCLI
-	case "ui":
-		return CallerTypeUI
-	case "sdk":
-		return CallerTypeSDK
-	case "internal":
-		return CallerTypeInternal
+	switch CallerType(s) {
+	case CallerTypeCLI, CallerTypeUI, CallerTypeSDK, CallerTypeInternal:
+		return CallerType(s)
 	default:
 		return CallerTypeUnknown
 	}

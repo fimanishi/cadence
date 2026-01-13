@@ -38,8 +38,8 @@ func TestCallerType_String(t *testing.T) {
 		{"SDK", CallerTypeSDK, "sdk"},
 		{"Internal", CallerTypeInternal, "internal"},
 		{"Unknown", CallerTypeUnknown, "unknown"},
-		{"Zero value", CallerType(0), "unknown"},
-		{"Invalid", CallerType(999), "unknown"},
+		{"Empty string", CallerType(""), ""},
+		{"Invalid", CallerType("invalid"), "invalid"},
 	}
 
 	for _, tt := range tests {
