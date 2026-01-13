@@ -78,12 +78,7 @@ func (c CallerType) String() string {
 
 // ParseCallerType converts a string to CallerType
 func ParseCallerType(s string) CallerType {
-	switch CallerType(s) {
-	case CallerTypeCLI, CallerTypeUI, CallerTypeSDK, CallerTypeInternal:
-		return CallerType(s)
-	default:
-		return CallerTypeUnknown
-	}
+	return CallerType(s)
 }
 
 // ContextWithCallerInfo adds CallerInfo to context

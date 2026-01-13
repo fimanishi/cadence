@@ -60,9 +60,9 @@ func TestParseCallerType(t *testing.T) {
 		{"sdk", "sdk", CallerTypeSDK},
 		{"internal", "internal", CallerTypeInternal},
 		{"unknown", "unknown", CallerTypeUnknown},
-		{"empty", "", CallerTypeUnknown},
-		{"invalid", "invalid", CallerTypeUnknown},
-		{"uppercase", "CLI", CallerTypeUnknown},
+		{"empty", "", CallerType("")},
+		{"custom value", "my-custom-tool", CallerType("my-custom-tool")},
+		{"uppercase", "CLI", CallerType("CLI")},
 	}
 
 	for _, tt := range tests {
