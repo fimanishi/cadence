@@ -679,13 +679,6 @@ const (
 	// Default value: 0
 	// Allowed filters: DomainName
 	FrontendDecisionResultCountLimit
-	// FrontendHistoryMgrNumConns is for persistence cluster.NumConns
-	// KeyName: frontend.historyMgrNumConns
-	// Value type: Int
-	// Default value: 10
-	// Allowed filters: N/A
-	// Deprecated: not used
-	FrontendHistoryMgrNumConns
 	// FrontendThrottledLogRPS is the rate limit on number of log messages emitted per second for throttled logger
 	// KeyName: frontend.throttledLogRPS
 	// Value type: Int
@@ -962,16 +955,12 @@ const (
 	// Default value: 200
 	// Allowed filters: N/A
 	TaskSchedulerWorkerCount
-	// TaskSchedulerShardWorkerCount is deprecated
-	TaskSchedulerShardWorkerCount
 	// TaskSchedulerQueueSize is the size of task channel for host level task scheduler
 	// KeyName: history.taskSchedulerQueueSize
 	// Value type: Int
 	// Default value: 10000
 	// Allowed filters: N/A
 	TaskSchedulerQueueSize
-	// TaskSchedulerShardQueueSize is deprecated
-	TaskSchedulerShardQueueSize
 	// TaskSchedulerDispatcherCount is the number of task dispatcher in task scheduler (only applies to host level task scheduler)
 	// KeyName: history.taskSchedulerDispatcherCount
 	// Value type: Int
@@ -1165,20 +1154,6 @@ const (
 	// Allowed filters: N/A
 	ReplicationBudgetManagerMaxSizeCount
 
-	// ExecutionMgrNumConns is persistence connections number for ExecutionManager
-	// KeyName: history.executionMgrNumConns
-	// Value type: Int
-	// Default value: 50
-	// Allowed filters: N/A
-	// Deprecated: not used
-	ExecutionMgrNumConns
-	// HistoryMgrNumConns is persistence connections number for HistoryManager
-	// KeyName: history.historyMgrNumConns
-	// Value type: Int
-	// Default value: 50
-	// Allowed filters: N/A
-	// Deprecated: not used
-	HistoryMgrNumConns
 	// MaximumBufferedEventsBatch is max number of buffer event in mutable state
 	// KeyName: history.maximumBufferedEventsBatch
 	// Value type: Int
@@ -1233,7 +1208,7 @@ const (
 	// Default value: DefaultHistoryMaxAutoResetPoints
 	// Allowed filters: DomainName
 	HistoryMaxAutoResetPoints
-	// ParentClosePolicyThreshold is decides that parent close policy will be processed by sys workers(if enabled) ifthe number of children greater than or equal to this threshold
+	// ParentClosePolicyThreshold decides that parent close policy will be processed by sys workers(if enabled) if the number of children is greater than or equal to this threshold
 	// KeyName: history.parentClosePolicyThreshold
 	// Value type: Int
 	// Default value: 10
@@ -2180,13 +2155,6 @@ const (
 	// Allowed filters: DomainID
 	EnableTimerDebugLogByDomainID
 
-	// EnableTaskVal is which allows the taskvalidation to be enabled.
-	// KeyName: system.enableTaskVal
-	// Value type: Bool
-	// Default value: false
-	// Allowed filters: DomainID
-	EnableTaskVal
-
 	// EnableRetryForChecksumFailure enables retry if mutable state checksum verification fails
 	// KeyName: history.enableMutableStateChecksumFailureRetry
 	// Value type: Bool
@@ -2349,7 +2317,6 @@ const (
 
 	// key for history
 
-	TaskRedispatchIntervalJitterCoefficient
 	// QueueProcessorRandomSplitProbability is the probability for a domain to be split to a new processing queue
 	// KeyName: history.queueProcessorRandomSplitProbability
 	// Value type: Float64
@@ -3576,11 +3543,6 @@ var IntKeys = map[IntKey]DynamicInt{
 		Description:  "FrontendDecisionResultCountLimit is max number of decisions per RespondDecisionTaskCompleted request",
 		DefaultValue: 0,
 	},
-	FrontendHistoryMgrNumConns: {
-		KeyName:      "frontend.historyMgrNumConns",
-		Description:  "Deprecated: not used. FrontendHistoryMgrNumConns is for persistence cluster.NumConns",
-		DefaultValue: 10,
-	},
 	FrontendThrottledLogRPS: {
 		KeyName:      "frontend.throttledLogRPS",
 		Description:  "FrontendThrottledLogRPS is the rate limit on number of log messages emitted per second for throttled logger",
@@ -3827,20 +3789,10 @@ var IntKeys = map[IntKey]DynamicInt{
 		Description:  "TaskSchedulerWorkerCount is the number of workers per host in task scheduler",
 		DefaultValue: 200,
 	},
-	TaskSchedulerShardWorkerCount: {
-		KeyName:      "history.taskSchedulerShardWorkerCount",
-		Description:  "Deprecated",
-		DefaultValue: 0,
-	},
 	TaskSchedulerQueueSize: {
 		KeyName:      "history.taskSchedulerQueueSize",
 		Description:  "TaskSchedulerQueueSize is the size of task channel for host level task scheduler",
 		DefaultValue: 10000,
-	},
-	TaskSchedulerShardQueueSize: {
-		KeyName:      "history.taskSchedulerShardQueueSize",
-		Description:  "Deprecated",
-		DefaultValue: 200,
 	},
 	TaskSchedulerDispatcherCount: {
 		KeyName:      "history.taskSchedulerDispatcherCount",
@@ -4001,16 +3953,6 @@ var IntKeys = map[IntKey]DynamicInt{
 		Description:  "ReplicationBudgetManagerMaxSizeCount is the max count of the replication budget manager cache",
 		DefaultValue: 0,
 	},
-	ExecutionMgrNumConns: {
-		KeyName:      "history.executionMgrNumConns",
-		Description:  "Deprecated: not used. ExecutionMgrNumConns is persistence connections number for ExecutionManager",
-		DefaultValue: 50,
-	},
-	HistoryMgrNumConns: {
-		KeyName:      "history.historyMgrNumConns",
-		Description:  "Deprecated: not used. HistoryMgrNumConns is persistence connections number for HistoryManager",
-		DefaultValue: 50,
-	},
 	MaximumBufferedEventsBatch: {
 		KeyName:      "history.maximumBufferedEventsBatch",
 		Description:  "MaximumBufferedEventsBatch is max number of buffer event in mutable state",
@@ -4061,7 +4003,7 @@ var IntKeys = map[IntKey]DynamicInt{
 	ParentClosePolicyThreshold: {
 		KeyName:      "history.parentClosePolicyThreshold",
 		Filters:      []Filter{DomainName},
-		Description:  "ParentClosePolicyThreshold is decides that parent close policy will be processed by sys workers(if enabled) ifthe number of children greater than or equal to this threshold",
+		Description:  "ParentClosePolicyThreshold decides that parent close policy will be processed by sys workers(if enabled) if the number of children is greater than or equal to this threshold",
 		DefaultValue: 10,
 	},
 	ParentClosePolicyBatchSize: {
@@ -4879,24 +4821,19 @@ var BoolKeys = map[BoolKey]DynamicBool{
 		Description:  "Enable log for debugging timer task issue by domain",
 		DefaultValue: false,
 	},
-	EnableTaskVal: {
-		KeyName:      "system.enableTaskVal",
-		Description:  "Enable TaskValidation",
-		DefaultValue: false,
-	},
 	EnableRetryForChecksumFailure: {
 		KeyName:      "history.enableMutableStateChecksumFailureRetry",
 		Filters:      []Filter{DomainName},
 		Description:  "EnableRetryForChecksumFailure enables retry if mutable state checksum verification fails",
 		DefaultValue: false,
 	},
-	EnableStrongIdempotency: DynamicBool{
+	EnableStrongIdempotency: {
 		KeyName:      "history.enableStrongIdempotency",
 		Filters:      []Filter{DomainName},
 		Description:  "EnableStrongIdempotency enables strong idempotency for APIs",
 		DefaultValue: false,
 	},
-	EnableStrongIdempotencySanityCheck: DynamicBool{
+	EnableStrongIdempotencySanityCheck: {
 		KeyName:      "history.enableStrongIdempotencySanityCheck",
 		Filters:      []Filter{DomainName},
 		Description:  "EnableStrongIdempotencySanityCheck enables sanity check for strong idempotency",
@@ -5023,11 +4960,6 @@ var FloatKeys = map[FloatKey]DynamicFloat{
 		KeyName:      "matching.errorInjectionRate",
 		Description:  "MatchingErrorInjectionRate is rate for injecting random error in matching client",
 		DefaultValue: 0,
-	},
-	TaskRedispatchIntervalJitterCoefficient: {
-		KeyName:      "history.taskRedispatchIntervalJitterCoefficient",
-		Description:  "Deprecated",
-		DefaultValue: 0.15,
 	},
 	QueueProcessorRandomSplitProbability: {
 		KeyName:      "history.queueProcessorRandomSplitProbability",
