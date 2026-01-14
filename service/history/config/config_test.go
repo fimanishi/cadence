@@ -170,7 +170,6 @@ func TestNewConfig(t *testing.T) {
 		"ReplicationBudgetManagerMaxSizeBytes":                 {dynamicproperties.ReplicationBudgetManagerMaxSizeBytes, 0},
 		"ReplicationBudgetManagerMaxSizeCount":                 {dynamicproperties.ReplicationBudgetManagerMaxSizeCount, 0},
 		"ReplicationBudgetManagerSoftCapThreshold":             {dynamicproperties.ReplicationBudgetManagerSoftCapThreshold, 1.0},
-		"HistoryMgrNumConns":                                   {dynamicproperties.HistoryMgrNumConns, 58},
 		"MaximumBufferedEventsBatch":                           {dynamicproperties.MaximumBufferedEventsBatch, 59},
 		"MaximumSignalsPerExecution":                           {dynamicproperties.MaximumSignalsPerExecution, 60},
 		"ShardUpdateMinInterval":                               {dynamicproperties.ShardUpdateMinInterval, time.Second},
