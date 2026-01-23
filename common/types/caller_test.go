@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/yarpc/yarpctest"
 )
 
 func TestCallerType_String(t *testing.T) {
@@ -60,7 +61,7 @@ func TestParseCallerType(t *testing.T) {
 		{"sdk", "sdk", CallerTypeSDK},
 		{"internal", "internal", CallerTypeInternal},
 		{"unknown", "unknown", CallerTypeUnknown},
-		{"empty", "", CallerType("")},
+		{"empty", "", CallerTypeUnknown},
 		{"custom value", "my-custom-tool", CallerType("my-custom-tool")},
 		{"uppercase", "CLI", CallerType("CLI")},
 	}
@@ -175,7 +176,7 @@ func TestContextWithCallerInfo(t *testing.T) {
 			ctx := context.Background()
 			ctx = ContextWithCallerInfo(ctx, NewCallerInfo(tt.callerType))
 
-			got := CallerInfoFromContext(ctx)
+			got := GetCallerInfoFromContext(ctx)
 			assert.NotNil(t, got)
 			assert.Equal(t, tt.want, got.GetCallerType())
 		})
@@ -186,11 +187,11 @@ func TestContextWithCallerInfo_Nil(t *testing.T) {
 	ctx := context.Background()
 	ctx = ContextWithCallerInfo(ctx, nil)
 
-	got := CallerInfoFromContext(ctx)
+	got := GetCallerInfoFromContext(ctx)
 	assert.Nil(t, got)
 }
 
-func TestCallerInfoFromContext(t *testing.T) {
+func TestGetCallerInfoFromContext(t *testing.T) {
 	tests := []struct {
 		name       string
 		ctx        context.Context
@@ -223,12 +224,160 @@ func TestCallerInfoFromContext(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := CallerInfoFromContext(tt.ctx)
+			got := GetCallerInfoFromContext(tt.ctx)
 			if tt.wantNil {
 				assert.Nil(t, got)
 			} else {
 				assert.NotNil(t, got)
 				assert.Equal(t, tt.wantCaller, got.GetCallerType())
+			}
+		})
+	}
+}
+
+func TestGetCallerInfoFromHeaders(t *testing.T) {
+	tests := []struct {
+		name       string
+		ctx        context.Context
+		wantNil    bool
+		wantCaller CallerType
+	}{
+		{
+			name:    "nil context",
+			ctx:     nil,
+			wantNil: true,
+		},
+		{
+			name:    "context without YARPC call",
+			ctx:     context.Background(),
+			wantNil: true,
+		},
+		{
+			name:       "YARPC call without caller-type header",
+			ctx:        yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{}),
+			wantNil:    false,
+			wantCaller: CallerTypeUnknown,
+		},
+		{
+			name: "YARPC call with CLI caller-type header",
+			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
+				Headers: map[string]string{CallerTypeHeaderName: "cli"},
+			}),
+			wantNil:    false,
+			wantCaller: CallerTypeCLI,
+		},
+		{
+			name: "YARPC call with UI caller-type header",
+			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
+				Headers: map[string]string{CallerTypeHeaderName: "ui"},
+			}),
+			wantNil:    false,
+			wantCaller: CallerTypeUI,
+		},
+		{
+			name: "YARPC call with SDK caller-type header",
+			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
+				Headers: map[string]string{CallerTypeHeaderName: "sdk"},
+			}),
+			wantNil:    false,
+			wantCaller: CallerTypeSDK,
+		},
+		{
+			name: "YARPC call with internal caller-type header",
+			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
+				Headers: map[string]string{CallerTypeHeaderName: "internal"},
+			}),
+			wantNil:    false,
+			wantCaller: CallerTypeInternal,
+		},
+		{
+			name: "YARPC call with empty caller-type header",
+			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
+				Headers: map[string]string{CallerTypeHeaderName: ""},
+			}),
+			wantNil:    false,
+			wantCaller: CallerTypeUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GetCallerInfoFromHeaders(tt.ctx)
+			if tt.wantNil {
+				assert.Nil(t, got)
+			} else {
+				assert.NotNil(t, got)
+				assert.Equal(t, tt.wantCaller, got.GetCallerType())
+			}
+		})
+	}
+}
+
+func TestGetContextWithCallerInfoFromHeaders(t *testing.T) {
+	tests := []struct {
+		name           string
+		ctx            context.Context
+		wantCallerInfo bool
+		wantCallerType CallerType
+	}{
+		{
+			name:           "nil context",
+			ctx:            nil,
+			wantCallerInfo: false,
+		},
+		{
+			name:           "context without YARPC call",
+			ctx:            context.Background(),
+			wantCallerInfo: false,
+		},
+		{
+			name:           "YARPC call without caller-type header",
+			ctx:            yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{}),
+			wantCallerInfo: true,
+			wantCallerType: CallerTypeUnknown,
+		},
+		{
+			name: "YARPC call with CLI caller-type header",
+			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
+				Headers: map[string]string{CallerTypeHeaderName: "cli"},
+			}),
+			wantCallerInfo: true,
+			wantCallerType: CallerTypeCLI,
+		},
+		{
+			name: "YARPC call with SDK caller-type header",
+			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
+				Headers: map[string]string{CallerTypeHeaderName: "sdk"},
+			}),
+			wantCallerInfo: true,
+			wantCallerType: CallerTypeSDK,
+		},
+		{
+			name: "YARPC call with empty caller-type header",
+			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
+				Headers: map[string]string{CallerTypeHeaderName: ""},
+			}),
+			wantCallerInfo: true,
+			wantCallerType: CallerTypeUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.ctx == nil {
+				assert.Nil(t, GetContextWithCallerInfoFromHeaders(tt.ctx))
+				return
+			}
+
+			resultCtx := GetContextWithCallerInfoFromHeaders(tt.ctx)
+			assert.NotNil(t, resultCtx)
+
+			callerInfo := GetCallerInfoFromContext(resultCtx)
+			if tt.wantCallerInfo {
+				assert.NotNil(t, callerInfo)
+				assert.Equal(t, tt.wantCallerType, callerInfo.GetCallerType())
+			} else {
+				assert.Nil(t, callerInfo)
 			}
 		})
 	}
