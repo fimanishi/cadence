@@ -120,7 +120,7 @@ func (m *InboundMetricsMiddleware) Handle(ctx context.Context, req *transport.Re
 type CallerInfoMiddleware struct{}
 
 func (m *CallerInfoMiddleware) Handle(ctx context.Context, req *transport.Request, resw transport.ResponseWriter, h transport.UnaryHandler) error {
-	ctx = types.GetContextWithCallerInfoFromHeaders(ctx)
+	ctx = types.GetContextWithCallerInfoFromHeaders(ctx, req.Headers)
 	return h.Handle(ctx, req, resw)
 }
 

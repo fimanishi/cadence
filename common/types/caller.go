@@ -22,8 +22,6 @@ package types
 
 import (
 	"context"
-
-	"go.uber.org/yarpc"
 )
 
 const (
@@ -108,27 +106,21 @@ func GetCallerInfoFromContext(ctx context.Context) *CallerInfo {
 	return callerInfo
 }
 
-// GetCallerInfoFromHeaders extracts CallerInfo from YARPC headers in the context
-func GetCallerInfoFromHeaders(ctx context.Context) *CallerInfo {
-	if ctx == nil {
-		return nil
-	}
+// NewCallerInfoFromTransportHeaders extracts CallerInfo from transport headers
+// This is used by middleware to extract caller information from incoming requests
+// Always returns a CallerInfo (never nil) even if headers are missing
+func NewCallerInfoFromTransportHeaders(headers interface{ Get(string) (string, bool) }) *CallerInfo {
+	callerTypeStr, _ := headers.Get(CallerTypeHeaderName)
 
-	call := yarpc.CallFromContext(ctx)
-	if call == nil {
-		return nil
-	}
+	// Future: add more header extractions here
+	// version, _ := headers.Get("cadence-client-version")
+	// identity, _ := headers.Get("cadence-client-identity")
 
-	callerTypeStr := call.Header(CallerTypeHeaderName)
 	return NewCallerInfo(ParseCallerType(callerTypeStr))
 }
 
-// GetContextWithCallerInfoFromHeaders extracts CallerInfo from YARPC headers and adds it to the context
-// Returns the original context if no caller info is found in headers
-func GetContextWithCallerInfoFromHeaders(ctx context.Context) context.Context {
-	callerInfo := GetCallerInfoFromHeaders(ctx)
-	if callerInfo == nil {
-		return ctx
-	}
+// GetContextWithCallerInfoFromHeaders extracts CallerInfo from transport headers and adds it to the context
+func GetContextWithCallerInfoFromHeaders(ctx context.Context, headers interface{ Get(string) (string, bool) }) context.Context {
+	callerInfo := NewCallerInfoFromTransportHeaders(headers)
 	return ContextWithCallerInfo(ctx, callerInfo)
 }

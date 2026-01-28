@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/yarpc/yarpctest"
 )
 
 func TestCallerType_String(t *testing.T) {
@@ -235,150 +234,96 @@ func TestGetCallerInfoFromContext(t *testing.T) {
 	}
 }
 
-func TestGetCallerInfoFromHeaders(t *testing.T) {
+type mockHeaders map[string]string
+
+func (m mockHeaders) Get(key string) (string, bool) {
+	val, ok := m[key]
+	return val, ok
+}
+
+func TestNewCallerInfoFromTransportHeaders(t *testing.T) {
 	tests := []struct {
 		name       string
-		ctx        context.Context
-		wantNil    bool
+		headers    mockHeaders
 		wantCaller CallerType
 	}{
 		{
-			name:    "nil context",
-			ctx:     nil,
-			wantNil: true,
-		},
-		{
-			name:    "context without YARPC call",
-			ctx:     context.Background(),
-			wantNil: true,
-		},
-		{
-			name:       "YARPC call without caller-type header",
-			ctx:        yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{}),
-			wantNil:    false,
-			wantCaller: CallerTypeUnknown,
-		},
-		{
-			name: "YARPC call with CLI caller-type header",
-			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
-				Headers: map[string]string{CallerTypeHeaderName: "cli"},
-			}),
-			wantNil:    false,
+			name:       "CLI caller-type header",
+			headers:    mockHeaders{CallerTypeHeaderName: "cli"},
 			wantCaller: CallerTypeCLI,
 		},
 		{
-			name: "YARPC call with UI caller-type header",
-			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
-				Headers: map[string]string{CallerTypeHeaderName: "ui"},
-			}),
-			wantNil:    false,
+			name:       "UI caller-type header",
+			headers:    mockHeaders{CallerTypeHeaderName: "ui"},
 			wantCaller: CallerTypeUI,
 		},
 		{
-			name: "YARPC call with SDK caller-type header",
-			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
-				Headers: map[string]string{CallerTypeHeaderName: "sdk"},
-			}),
-			wantNil:    false,
+			name:       "SDK caller-type header",
+			headers:    mockHeaders{CallerTypeHeaderName: "sdk"},
 			wantCaller: CallerTypeSDK,
 		},
 		{
-			name: "YARPC call with internal caller-type header",
-			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
-				Headers: map[string]string{CallerTypeHeaderName: "internal"},
-			}),
-			wantNil:    false,
+			name:       "Internal caller-type header",
+			headers:    mockHeaders{CallerTypeHeaderName: "internal"},
 			wantCaller: CallerTypeInternal,
 		},
 		{
-			name: "YARPC call with empty caller-type header",
-			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
-				Headers: map[string]string{CallerTypeHeaderName: ""},
-			}),
-			wantNil:    false,
+			name:       "empty caller-type header",
+			headers:    mockHeaders{CallerTypeHeaderName: ""},
+			wantCaller: CallerTypeUnknown,
+		},
+		{
+			name:       "missing caller-type header",
+			headers:    mockHeaders{},
 			wantCaller: CallerTypeUnknown,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GetCallerInfoFromHeaders(tt.ctx)
-			if tt.wantNil {
-				assert.Nil(t, got)
-			} else {
-				assert.NotNil(t, got)
-				assert.Equal(t, tt.wantCaller, got.GetCallerType())
-			}
+			got := NewCallerInfoFromTransportHeaders(tt.headers)
+			assert.NotNil(t, got)
+			assert.Equal(t, tt.wantCaller, got.GetCallerType())
 		})
 	}
 }
 
 func TestGetContextWithCallerInfoFromHeaders(t *testing.T) {
 	tests := []struct {
-		name           string
-		ctx            context.Context
-		wantCallerInfo bool
-		wantCallerType CallerType
+		name       string
+		headers    mockHeaders
+		wantCaller CallerType
 	}{
 		{
-			name:           "nil context",
-			ctx:            nil,
-			wantCallerInfo: false,
+			name:       "CLI caller-type header",
+			headers:    mockHeaders{CallerTypeHeaderName: "cli"},
+			wantCaller: CallerTypeCLI,
 		},
 		{
-			name:           "context without YARPC call",
-			ctx:            context.Background(),
-			wantCallerInfo: false,
+			name:       "SDK caller-type header",
+			headers:    mockHeaders{CallerTypeHeaderName: "sdk"},
+			wantCaller: CallerTypeSDK,
 		},
 		{
-			name:           "YARPC call without caller-type header",
-			ctx:            yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{}),
-			wantCallerInfo: true,
-			wantCallerType: CallerTypeUnknown,
+			name:       "empty caller-type header",
+			headers:    mockHeaders{CallerTypeHeaderName: ""},
+			wantCaller: CallerTypeUnknown,
 		},
 		{
-			name: "YARPC call with CLI caller-type header",
-			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
-				Headers: map[string]string{CallerTypeHeaderName: "cli"},
-			}),
-			wantCallerInfo: true,
-			wantCallerType: CallerTypeCLI,
-		},
-		{
-			name: "YARPC call with SDK caller-type header",
-			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
-				Headers: map[string]string{CallerTypeHeaderName: "sdk"},
-			}),
-			wantCallerInfo: true,
-			wantCallerType: CallerTypeSDK,
-		},
-		{
-			name: "YARPC call with empty caller-type header",
-			ctx: yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
-				Headers: map[string]string{CallerTypeHeaderName: ""},
-			}),
-			wantCallerInfo: true,
-			wantCallerType: CallerTypeUnknown,
+			name:       "missing caller-type header",
+			headers:    mockHeaders{},
+			wantCaller: CallerTypeUnknown,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.ctx == nil {
-				assert.Nil(t, GetContextWithCallerInfoFromHeaders(tt.ctx))
-				return
-			}
-
-			resultCtx := GetContextWithCallerInfoFromHeaders(tt.ctx)
+			resultCtx := GetContextWithCallerInfoFromHeaders(context.Background(), tt.headers)
 			assert.NotNil(t, resultCtx)
 
 			callerInfo := GetCallerInfoFromContext(resultCtx)
-			if tt.wantCallerInfo {
-				assert.NotNil(t, callerInfo)
-				assert.Equal(t, tt.wantCallerType, callerInfo.GetCallerType())
-			} else {
-				assert.Nil(t, callerInfo)
-			}
+			assert.NotNil(t, callerInfo)
+			assert.Equal(t, tt.wantCaller, callerInfo.GetCallerType())
 		})
 	}
 }

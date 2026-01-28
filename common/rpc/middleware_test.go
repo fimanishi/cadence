@@ -334,10 +334,8 @@ func TestCallerInfoMiddleware(t *testing.T) {
 	t.Run("extracts caller type from header", func(t *testing.T) {
 		m := &CallerInfoMiddleware{}
 		h := &fakeHandler{}
-		ctx := yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
-			Headers: map[string]string{types.CallerTypeHeaderName: "cli"},
-		})
-		err := m.Handle(ctx, &transport.Request{}, nil, h)
+		headers := transport.NewHeaders().With(types.CallerTypeHeaderName, "cli")
+		err := m.Handle(context.Background(), &transport.Request{Headers: headers}, nil, h)
 		assert.NoError(t, err)
 
 		callerInfo := types.GetCallerInfoFromContext(h.ctx)
@@ -348,10 +346,8 @@ func TestCallerInfoMiddleware(t *testing.T) {
 	t.Run("sets unknown caller type when header is missing", func(t *testing.T) {
 		m := &CallerInfoMiddleware{}
 		h := &fakeHandler{}
-		ctx := yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
-			Headers: map[string]string{},
-		})
-		err := m.Handle(ctx, &transport.Request{}, nil, h)
+		headers := transport.NewHeaders()
+		err := m.Handle(context.Background(), &transport.Request{Headers: headers}, nil, h)
 		assert.NoError(t, err)
 
 		callerInfo := types.GetCallerInfoFromContext(h.ctx)
@@ -359,14 +355,32 @@ func TestCallerInfoMiddleware(t *testing.T) {
 		assert.Equal(t, types.CallerTypeUnknown, callerInfo.GetCallerType())
 	})
 
-	t.Run("handles context without yarpc call", func(t *testing.T) {
-		m := &CallerInfoMiddleware{}
-		h := &fakeHandler{}
-		err := m.Handle(context.Background(), &transport.Request{}, nil, h)
-		assert.NoError(t, err)
+	t.Run("extracts different caller types", func(t *testing.T) {
+		tests := []struct {
+			name           string
+			headerValue    string
+			expectedCaller types.CallerType
+		}{
+			{"CLI", "cli", types.CallerTypeCLI},
+			{"UI", "ui", types.CallerTypeUI},
+			{"SDK", "sdk", types.CallerTypeSDK},
+			{"Internal", "internal", types.CallerTypeInternal},
+			{"Empty", "", types.CallerTypeUnknown},
+		}
 
-		callerInfo := types.GetCallerInfoFromContext(h.ctx)
-		assert.Nil(t, callerInfo)
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				m := &CallerInfoMiddleware{}
+				h := &fakeHandler{}
+				headers := transport.NewHeaders().With(types.CallerTypeHeaderName, tt.headerValue)
+				err := m.Handle(context.Background(), &transport.Request{Headers: headers}, nil, h)
+				assert.NoError(t, err)
+
+				callerInfo := types.GetCallerInfoFromContext(h.ctx)
+				require.NotNil(t, callerInfo)
+				assert.Equal(t, tt.expectedCaller, callerInfo.GetCallerType())
+			})
+		}
 	})
 }
 
