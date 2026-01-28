@@ -38,6 +38,7 @@ import (
 	"github.com/uber/cadence/common/config"
 	"github.com/uber/cadence/common/isolationgroup"
 	"github.com/uber/cadence/common/metrics"
+	"github.com/uber/cadence/common/types"
 )
 
 func TestAuthOubboundMiddleware(t *testing.T) {
@@ -326,6 +327,46 @@ func TestClientPartitionConfigMiddleware(t *testing.T) {
 		assert.Nil(t, isolationgroup.ConfigFromContext(h.ctx))
 		assert.Equal(t, "", isolationgroup.IsolationGroupFromContext(h.ctx))
 		assert.Equal(t, ctx, h.ctx)
+	})
+}
+
+func TestCallerInfoMiddleware(t *testing.T) {
+	t.Run("extracts caller type from header", func(t *testing.T) {
+		m := &CallerInfoMiddleware{}
+		h := &fakeHandler{}
+		ctx := yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
+			Headers: map[string]string{types.CallerTypeHeaderName: "cli"},
+		})
+		err := m.Handle(ctx, &transport.Request{}, nil, h)
+		assert.NoError(t, err)
+
+		callerInfo := types.GetCallerInfoFromContext(h.ctx)
+		require.NotNil(t, callerInfo)
+		assert.Equal(t, types.CallerTypeCLI, callerInfo.GetCallerType())
+	})
+
+	t.Run("sets unknown caller type when header is missing", func(t *testing.T) {
+		m := &CallerInfoMiddleware{}
+		h := &fakeHandler{}
+		ctx := yarpctest.ContextWithCall(context.Background(), &yarpctest.Call{
+			Headers: map[string]string{},
+		})
+		err := m.Handle(ctx, &transport.Request{}, nil, h)
+		assert.NoError(t, err)
+
+		callerInfo := types.GetCallerInfoFromContext(h.ctx)
+		require.NotNil(t, callerInfo)
+		assert.Equal(t, types.CallerTypeUnknown, callerInfo.GetCallerType())
+	})
+
+	t.Run("handles context without yarpc call", func(t *testing.T) {
+		m := &CallerInfoMiddleware{}
+		h := &fakeHandler{}
+		err := m.Handle(context.Background(), &transport.Request{}, nil, h)
+		assert.NoError(t, err)
+
+		callerInfo := types.GetCallerInfoFromContext(h.ctx)
+		assert.Nil(t, callerInfo)
 	})
 }
 
