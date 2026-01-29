@@ -339,7 +339,6 @@ func TestCallerInfoMiddleware(t *testing.T) {
 		assert.NoError(t, err)
 
 		callerInfo := types.GetCallerInfoFromContext(h.ctx)
-		require.NotNil(t, callerInfo)
 		assert.Equal(t, types.CallerTypeCLI, callerInfo.GetCallerType())
 	})
 
@@ -351,7 +350,6 @@ func TestCallerInfoMiddleware(t *testing.T) {
 		assert.NoError(t, err)
 
 		callerInfo := types.GetCallerInfoFromContext(h.ctx)
-		require.NotNil(t, callerInfo)
 		assert.Equal(t, types.CallerTypeUnknown, callerInfo.GetCallerType())
 	})
 
@@ -377,7 +375,6 @@ func TestCallerInfoMiddleware(t *testing.T) {
 				assert.NoError(t, err)
 
 				callerInfo := types.GetCallerInfoFromContext(h.ctx)
-				require.NotNil(t, callerInfo)
 				assert.Equal(t, tt.expectedCaller, callerInfo.GetCallerType())
 			})
 		}

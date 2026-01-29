@@ -60,15 +60,12 @@ type CallerInfo struct {
 }
 
 // NewCallerInfo creates a new CallerInfo
-func NewCallerInfo(callerType CallerType) *CallerInfo {
-	return &CallerInfo{callerType: callerType}
+func NewCallerInfo(callerType CallerType) CallerInfo {
+	return CallerInfo{callerType: callerType}
 }
 
-// GetCallerType returns the CallerType, or CallerTypeUnknown if CallerInfo is nil
-func (c *CallerInfo) GetCallerType() CallerType {
-	if c == nil {
-		return CallerTypeUnknown
-	}
+// GetCallerType returns the CallerType
+func (c CallerInfo) GetCallerType() CallerType {
 	return c.callerType
 }
 
@@ -90,26 +87,25 @@ func ParseCallerType(s string) CallerType {
 }
 
 // ContextWithCallerInfo adds CallerInfo to context
-func ContextWithCallerInfo(ctx context.Context, callerInfo *CallerInfo) context.Context {
-	if callerInfo == nil {
-		return ctx
-	}
+func ContextWithCallerInfo(ctx context.Context, callerInfo CallerInfo) context.Context {
 	return context.WithValue(ctx, callerInfoKey, callerInfo)
 }
 
-// GetCallerInfoFromContext retrieves CallerInfo from context, returns nil if not set
-func GetCallerInfoFromContext(ctx context.Context) *CallerInfo {
+// GetCallerInfoFromContext retrieves CallerInfo from context
+// Returns CallerInfo with CallerTypeUnknown if not set in context
+func GetCallerInfoFromContext(ctx context.Context) CallerInfo {
 	if ctx == nil {
-		return nil
+		return NewCallerInfo(CallerTypeUnknown)
 	}
-	callerInfo, _ := ctx.Value(callerInfoKey).(*CallerInfo)
-	return callerInfo
+	if callerInfo, ok := ctx.Value(callerInfoKey).(CallerInfo); ok {
+		return callerInfo
+	}
+	return NewCallerInfo(CallerTypeUnknown)
 }
 
 // NewCallerInfoFromTransportHeaders extracts CallerInfo from transport headers
 // This is used by middleware to extract caller information from incoming requests
-// Always returns a CallerInfo (never nil) even if headers are missing
-func NewCallerInfoFromTransportHeaders(headers interface{ Get(string) (string, bool) }) *CallerInfo {
+func NewCallerInfoFromTransportHeaders(headers interface{ Get(string) (string, bool) }) CallerInfo {
 	callerTypeStr, _ := headers.Get(CallerTypeHeaderName)
 
 	// Future: add more header extractions here
@@ -121,6 +117,5 @@ func NewCallerInfoFromTransportHeaders(headers interface{ Get(string) (string, b
 
 // GetContextWithCallerInfoFromHeaders extracts CallerInfo from transport headers and adds it to the context
 func GetContextWithCallerInfoFromHeaders(ctx context.Context, headers interface{ Get(string) (string, bool) }) context.Context {
-	callerInfo := NewCallerInfoFromTransportHeaders(headers)
-	return ContextWithCallerInfo(ctx, callerInfo)
+	return ContextWithCallerInfo(ctx, NewCallerInfoFromTransportHeaders(headers))
 }
