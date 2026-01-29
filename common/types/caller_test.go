@@ -175,7 +175,6 @@ func TestContextWithCallerInfo(t *testing.T) {
 	}
 }
 
-
 func TestGetCallerInfoFromContext(t *testing.T) {
 	tests := []struct {
 		name       string
