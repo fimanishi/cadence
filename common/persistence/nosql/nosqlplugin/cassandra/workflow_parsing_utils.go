@@ -38,6 +38,7 @@ import (
 var _emptyUUID = cql.UUID{}
 
 func parseWorkflowExecutionInfo(result map[string]interface{}) *persistence.InternalWorkflowExecutionInfo {
+	executionBlob := result["execution"].(map[string]interface{})
 	info := &persistence.InternalWorkflowExecutionInfo{}
 	var completionEventData []byte
 	var completionEventEncoding constants.EncodingType
@@ -46,7 +47,7 @@ func parseWorkflowExecutionInfo(result map[string]interface{}) *persistence.Inte
 	var activeClusterSelectionPolicy []byte
 	var activeClusterSelectionPolicyEncoding constants.EncodingType
 
-	for k, v := range result {
+	for k, v := range executionBlob {
 		switch k {
 		case "domain_id":
 			info.DomainID = v.(gocql.UUID).String()
@@ -98,16 +99,12 @@ func parseWorkflowExecutionInfo(result map[string]interface{}) *persistence.Inte
 			info.DecisionStartToCloseTimeout = common.SecondsToDuration(int64(v.(int)))
 		case "execution_context":
 			info.ExecutionContext = v.([]byte)
-		case "state":
-			info.State = v.(int)
 		case "close_status":
 			info.CloseStatus = v.(int)
 		case "last_first_event_id":
 			info.LastFirstEventID = v.(int64)
 		case "last_event_task_id":
 			info.LastEventTaskID = v.(int64)
-		case "next_event_id":
-			info.NextEventID = v.(int64)
 		case "last_processed_event":
 			info.LastProcessedEvent = v.(int64)
 		case "start_time":
@@ -191,6 +188,14 @@ func parseWorkflowExecutionInfo(result map[string]interface{}) *persistence.Inte
 	info.CompletionEvent = persistence.NewDataBlob(completionEventData, completionEventEncoding)
 	info.AutoResetPoints = persistence.NewDataBlob(autoResetPoints, autoResetPointsEncoding)
 	info.ActiveClusterSelectionPolicy = persistence.NewDataBlob(activeClusterSelectionPolicy, activeClusterSelectionPolicyEncoding)
+
+	if nextEventID, ok := result["next_event_id"].(int64); ok {
+		info.NextEventID = nextEventID
+	}
+	if workflowState, ok := result["workflow_state"].(int); ok {
+		info.State = workflowState
+	}
+
 	return info
 }
 

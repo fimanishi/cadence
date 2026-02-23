@@ -310,7 +310,8 @@ const (
 	// TODO: remove replication_state after all 2DC workflows complete
 	templateGetWorkflowExecutionQuery = `SELECT execution, replication_state, activity_map, timer_map, ` +
 		`child_executions_map, request_cancel_map, signal_map, signal_requested, buffered_events_list, ` +
-		`buffered_replication_tasks_map, version_histories, version_histories_encoding, checksum ` +
+		`buffered_replication_tasks_map, version_histories, version_histories_encoding, checksum, ` +
+		`next_event_id, workflow_state ` +
 		`FROM executions ` +
 		`WHERE shard_id = ? ` +
 		`and type = ? ` +
