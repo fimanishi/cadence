@@ -126,8 +126,7 @@ func Test_parseWorkflowExecutionInfo(t *testing.T) {
 					"active_cluster_selection_policy":          activeClusterSelectionPolicyData,
 					"active_cluster_selection_policy_encoding": "Proto3",
 				},
-				"next_event_id":  int64(5),
-				"workflow_state": 1,
+				"next_event_id": int64(5),
 			},
 
 			want: &persistence.InternalWorkflowExecutionInfo{
