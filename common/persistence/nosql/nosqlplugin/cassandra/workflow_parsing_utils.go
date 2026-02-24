@@ -196,9 +196,6 @@ func parseWorkflowExecutionInfo(result map[string]interface{}) *persistence.Inte
 	if nextEventID, ok := result["next_event_id"].(int64); ok {
 		info.NextEventID = nextEventID
 	}
-	if workflowState, ok := result["workflow_state"].(int); ok {
-		info.State = workflowState
-	}
 
 	return info
 }

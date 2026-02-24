@@ -233,33 +233,6 @@ func Test_parseWorkflowExecutionInfo(t *testing.T) {
 			},
 		},
 		{
-			name: "denormalized columns override blob - workflow_state",
-			args: map[string]interface{}{
-				"execution": map[string]interface{}{
-					"state": 2,
-				},
-				"workflow_state": 1,
-			},
-			want: &persistence.InternalWorkflowExecutionInfo{
-				State: 1,
-			},
-		},
-		{
-			name: "denormalized columns override blob - both fields",
-			args: map[string]interface{}{
-				"execution": map[string]interface{}{
-					"next_event_id": int64(10),
-					"state":         2,
-				},
-				"next_event_id":  int64(5),
-				"workflow_state": 1,
-			},
-			want: &persistence.InternalWorkflowExecutionInfo{
-				NextEventID: int64(5),
-				State:       1,
-			},
-		},
-		{
 			name: "no denormalized columns - use execution field values",
 			args: map[string]interface{}{
 				"execution": map[string]interface{}{
