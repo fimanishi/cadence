@@ -99,12 +99,16 @@ func parseWorkflowExecutionInfo(result map[string]interface{}) *persistence.Inte
 			info.DecisionStartToCloseTimeout = common.SecondsToDuration(int64(v.(int)))
 		case "execution_context":
 			info.ExecutionContext = v.([]byte)
+		case "state":
+			info.State = v.(int)
 		case "close_status":
 			info.CloseStatus = v.(int)
 		case "last_first_event_id":
 			info.LastFirstEventID = v.(int64)
 		case "last_event_task_id":
 			info.LastEventTaskID = v.(int64)
+		case "next_event_id":
+			info.NextEventID = v.(int64)
 		case "last_processed_event":
 			info.LastProcessedEvent = v.(int64)
 		case "start_time":
