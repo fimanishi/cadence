@@ -111,8 +111,6 @@ func parseWorkflowExecutionInfo(result map[string]interface{}) (*persistence.Int
 			info.LastFirstEventID = v.(int64)
 		case "last_event_task_id":
 			info.LastEventTaskID = v.(int64)
-		case "next_event_id":
-			info.NextEventID = v.(int64)
 		case "last_processed_event":
 			info.LastProcessedEvent = v.(int64)
 		case "start_time":

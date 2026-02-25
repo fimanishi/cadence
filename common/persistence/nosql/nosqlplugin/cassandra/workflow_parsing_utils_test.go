@@ -232,15 +232,15 @@ func Test_parseWorkflowExecutionInfo(t *testing.T) {
 			},
 		},
 		{
-			name: "no denormalized columns - use execution field values",
+			name: "no denormalized columns - execution blob values ignored for next_event_id",
 			args: map[string]interface{}{
 				"execution": map[string]interface{}{
-					"next_event_id": int64(10),
+					"next_event_id": int64(10), // This is ignored, only denormalized column is used
 					"state":         2,
 				},
 			},
 			want: &persistence.InternalWorkflowExecutionInfo{
-				NextEventID: int64(10),
+				NextEventID: int64(0), // Zero value since denormalized column not present
 				State:       2,
 			},
 		},
