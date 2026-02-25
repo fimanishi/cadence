@@ -247,7 +247,8 @@ func Test_parseWorkflowExecutionInfo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := parseWorkflowExecutionInfo(tt.args)
+			result, err := parseWorkflowExecutionInfo(tt.args)
+			assert.NoError(t, err)
 			assert.Equal(t, result.FirstExecutionRunID, tt.want.FirstExecutionRunID)
 			assert.Equal(t, result.DomainID, tt.want.DomainID)
 			assert.Equal(t, result.WorkflowID, tt.want.WorkflowID)
@@ -283,6 +284,53 @@ func Test_parseWorkflowExecutionInfo(t *testing.T) {
 			assert.Equal(t, result.DecisionAttempt, tt.want.DecisionAttempt)
 			assert.Equal(t, result.ParentDomainID, tt.want.ParentDomainID)
 			assert.Equal(t, result.ActiveClusterSelectionPolicy, tt.want.ActiveClusterSelectionPolicy)
+		})
+	}
+}
+
+func Test_parseWorkflowExecutionInfo_ErrorCases(t *testing.T) {
+	tests := []struct {
+		name        string
+		args        map[string]interface{}
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "missing execution field",
+			args: map[string]interface{}{
+				"next_event_id": int64(5),
+			},
+			wantErr:     true,
+			errContains: "missing or invalid 'execution' field",
+		},
+		{
+			name: "invalid execution field type",
+			args: map[string]interface{}{
+				"execution": "not a map",
+			},
+			wantErr:     true,
+			errContains: "missing or invalid 'execution' field",
+		},
+		{
+			name: "execution field is nil",
+			args: map[string]interface{}{
+				"execution": nil,
+			},
+			wantErr:     true,
+			errContains: "missing or invalid 'execution' field",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseWorkflowExecutionInfo(tt.args)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+				assert.Contains(t, err.Error(), tt.errContains)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+			}
 		})
 	}
 }

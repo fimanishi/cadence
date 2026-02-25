@@ -179,7 +179,10 @@ func executeCreateWorkflowBatchTransaction(
 	// CreateWorkflowExecution failed because there is already a current execution record for this workflow
 	if currentExecutionAlreadyExists {
 		if actualExecution != nil {
-			executionInfo := parseWorkflowExecutionInfo(actualExecutionFullRecord)
+			executionInfo, err := parseWorkflowExecutionInfo(actualExecutionFullRecord)
+			if err != nil {
+				return err
+			}
 			msg := fmt.Sprintf("Workflow execution already running. WorkflowId: %v, RunId: %v", currentWorkflowRequest.Row.WorkflowID, executionInfo.RunID)
 			return &nosqlplugin.WorkflowOperationConditionFailure{
 				WorkflowExecutionAlreadyExists: &nosqlplugin.WorkflowExecutionAlreadyExists{

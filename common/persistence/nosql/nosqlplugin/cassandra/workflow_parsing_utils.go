@@ -22,6 +22,7 @@
 package cassandra
 
 import (
+	"fmt"
 	"time"
 
 	cql "github.com/gocql/gocql"
@@ -37,8 +38,11 @@ import (
 
 var _emptyUUID = cql.UUID{}
 
-func parseWorkflowExecutionInfo(result map[string]interface{}) *persistence.InternalWorkflowExecutionInfo {
-	executionBlob := result["execution"].(map[string]interface{})
+func parseWorkflowExecutionInfo(result map[string]interface{}) (*persistence.InternalWorkflowExecutionInfo, error) {
+	executionBlob, ok := result["execution"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid execution blob format: missing or invalid 'execution' field")
+	}
 	info := &persistence.InternalWorkflowExecutionInfo{}
 	var completionEventData []byte
 	var completionEventEncoding constants.EncodingType
@@ -197,7 +201,7 @@ func parseWorkflowExecutionInfo(result map[string]interface{}) *persistence.Inte
 		info.NextEventID = nextEventID
 	}
 
-	return info
+	return info, nil
 }
 
 // TODO: remove this after all 2DC workflows complete
