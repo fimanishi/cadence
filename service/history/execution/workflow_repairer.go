@@ -5,10 +5,8 @@ package execution
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
-	"github.com/uber/cadence/common"
 	"github.com/uber/cadence/common/checksum"
 	"github.com/uber/cadence/common/definition"
 	"github.com/uber/cadence/common/log"
@@ -31,12 +29,10 @@ type (
 	// WorkflowRepairer attempts to detect and repair corrupted workflow executions
 	WorkflowRepairer interface {
 		// DetectAndRepairIfNeeded verifies checksum and attempts repair if corruption detected
-		// If detectHistoryCorruption is true, also validates history even if checksum OK
 		DetectAndRepairIfNeeded(
 			ctx context.Context,
 			mutableState MutableState,
 			persistedChecksum checksum.Checksum,
-			detectHistoryCorruption bool,
 		) error
 
 		// RepairWorkflow attempts to repair a corrupted workflow execution
@@ -54,7 +50,6 @@ type (
 	workflowRepairerImpl struct {
 		shard          shard.Context
 		stateRebuilder StateRebuilder
-		historyV2Mgr   persistence.HistoryManager
 		logger         log.Logger
 		metricsClient  metrics.Client
 		scope          metrics.Scope
@@ -64,11 +59,6 @@ type (
 const (
 	CorruptionTypeNone CorruptionType = iota
 	CorruptionTypeChecksumMismatch
-	CorruptionTypeHistoryMissing
-	CorruptionTypeHistoryEventCorrupted
-	CorruptionTypeHistoryDeserializationError
-	CorruptionTypeHistoryEventGap
-	CorruptionTypeHistoryBranchTokenInvalid
 )
 
 var _ WorkflowRepairer = (*workflowRepairerImpl)(nil)
@@ -82,7 +72,6 @@ func NewWorkflowRepairer(
 	return &workflowRepairerImpl{
 		shard:          shard,
 		stateRebuilder: NewStateRebuilder(shard, logger),
-		historyV2Mgr:   shard.GetHistoryManager(),
 		logger:         logger,
 		metricsClient:  metricsClient,
 		scope:          metricsClient.Scope(metrics.WorkflowCorruptionRepairScope),
@@ -96,16 +85,6 @@ func (c CorruptionType) String() string {
 		return "None"
 	case CorruptionTypeChecksumMismatch:
 		return "ChecksumMismatch"
-	case CorruptionTypeHistoryMissing:
-		return "HistoryMissing"
-	case CorruptionTypeHistoryEventCorrupted:
-		return "HistoryEventCorrupted"
-	case CorruptionTypeHistoryDeserializationError:
-		return "HistoryDeserializationError"
-	case CorruptionTypeHistoryEventGap:
-		return "HistoryEventGap"
-	case CorruptionTypeHistoryBranchTokenInvalid:
-		return "HistoryBranchTokenInvalid"
 	default:
 		return "Unknown"
 	}
@@ -116,22 +95,16 @@ func (r *workflowRepairerImpl) DetectAndRepairIfNeeded(
 	ctx context.Context,
 	mutableState MutableState,
 	persistedChecksum checksum.Checksum,
-	detectHistoryCorruption bool,
 ) error {
-	// Step 1: Always verify checksum first
+	// Verify checksum
 	corruptionType, checksumValue, err := r.verifyChecksumAndAnalyze(mutableState, persistedChecksum)
 
-	// Step 2: If checksum OK but caller wants history validation
-	if corruptionType == CorruptionTypeNone && detectHistoryCorruption {
-		corruptionType, err = r.detectHistoryCorruption(ctx, mutableState)
-	}
-
-	// Step 3: If no corruption detected, return
+	// If no corruption detected, return
 	if corruptionType == CorruptionTypeNone {
 		return nil
 	}
 
-	// Step 4: Corruption detected - attempt auto-repair if enabled
+	// Corruption detected - attempt auto-repair if enabled
 	if r.shard.GetConfig().EnableCorruptionAutoRepair() {
 		repairErr := r.RepairWorkflow(mutableState, corruptionType, checksumValue)
 		if repairErr == nil {
@@ -423,182 +396,4 @@ func (r *workflowRepairerImpl) verifyChecksumAndAnalyze(
 	)
 
 	return CorruptionTypeChecksumMismatch, persistedChecksum, checksum.ErrMismatch
-}
-
-// detectHistoryCorruption proactively checks if history can be read and is valid
-// Returns (corruptionType, error). If no corruption, returns (CorruptionTypeNone, nil)
-func (r *workflowRepairerImpl) detectHistoryCorruption(
-	ctx context.Context,
-	mutableState MutableState,
-) (CorruptionType, error) {
-
-	// Extract workflow identifiers
-	executionInfo := mutableState.GetExecutionInfo()
-	domainID := executionInfo.DomainID
-	workflowID := executionInfo.WorkflowID
-	runID := executionInfo.RunID
-	expectedLastEventID := executionInfo.NextEventID - 1
-
-	// Get branch token
-	branchToken, err := mutableState.GetCurrentBranchToken()
-	if err != nil || len(branchToken) == 0 {
-		clusterName := r.shard.GetClusterMetadata().GetCurrentClusterName()
-
-		r.scope.IncCounter(metrics.HistoryCorruptionDetected)
-		r.scope.Tagged(metrics.CorruptionTypeTag(CorruptionTypeHistoryBranchTokenInvalid.String())).
-			Tagged(metrics.SourceClusterTag(clusterName)).
-			IncCounter(metrics.HistoryCorruptionDetected)
-
-		r.logger.Error("History corruption detected: cannot get branch token",
-			tag.Error(err),
-			tag.WorkflowDomainID(domainID),
-			tag.WorkflowID(workflowID),
-			tag.WorkflowRunID(runID),
-			tag.ClusterName(clusterName),
-		)
-
-		return CorruptionTypeHistoryBranchTokenInvalid, ErrHistoryCorruption
-	}
-
-	// Read all history events and verify contiguity
-	var nextPageToken []byte
-	var lastEventID int64
-	const pageSize = 100
-
-	for {
-		resp, err := r.historyV2Mgr.ReadHistoryBranch(ctx, &persistence.ReadHistoryBranchRequest{
-			BranchToken:   branchToken,
-			MinEventID:    lastEventID + 1,
-			MaxEventID:    expectedLastEventID + 1,
-			PageSize:      pageSize,
-			NextPageToken: nextPageToken,
-			ShardID:       common.IntPtr(r.shard.GetShardID()),
-		})
-
-		if err != nil {
-			// Classify the error type
-			corruptionType := r.classifyHistoryError(err)
-			clusterName := r.shard.GetClusterMetadata().GetCurrentClusterName()
-
-			r.scope.IncCounter(metrics.HistoryCorruptionDetected)
-			r.scope.Tagged(metrics.CorruptionTypeTag(corruptionType.String())).
-				Tagged(metrics.SourceClusterTag(clusterName)).
-				IncCounter(metrics.HistoryCorruptionDetected)
-
-			r.logger.Error("History corruption detected: cannot read history",
-				tag.Error(err),
-				tag.WorkflowDomainID(domainID),
-				tag.WorkflowID(workflowID),
-				tag.WorkflowRunID(runID),
-				tag.ClusterName(clusterName),
-				tag.Dynamic("corruptionType", corruptionType.String()),
-			)
-
-			return corruptionType, ErrHistoryCorruption
-		}
-
-		// Verify contiguity of events in this batch
-		for _, event := range resp.HistoryEvents {
-			expectedEventID := lastEventID + 1
-			if event.ID != expectedEventID {
-				corruptionType := CorruptionTypeHistoryEventGap
-				clusterName := r.shard.GetClusterMetadata().GetCurrentClusterName()
-
-				r.scope.IncCounter(metrics.HistoryCorruptionDetected)
-				r.scope.Tagged(metrics.CorruptionTypeTag(corruptionType.String())).
-					Tagged(metrics.SourceClusterTag(clusterName)).
-					IncCounter(metrics.HistoryCorruptionDetected)
-
-				r.logger.Error("History corruption detected: event ID gap",
-					tag.WorkflowDomainID(domainID),
-					tag.WorkflowID(workflowID),
-					tag.WorkflowRunID(runID),
-					tag.ClusterName(clusterName),
-					tag.Dynamic("expectedEventID", expectedEventID),
-					tag.Dynamic("actualEventID", event.ID),
-				)
-
-				return corruptionType, ErrHistoryCorruption
-			}
-			lastEventID = event.ID
-		}
-
-		// Check if we have more pages
-		if len(resp.NextPageToken) == 0 {
-			break
-		}
-		nextPageToken = resp.NextPageToken
-	}
-
-	// Verify we read all events up to expectedLastEventID
-	if lastEventID != expectedLastEventID {
-		corruptionType := CorruptionTypeHistoryEventGap
-		clusterName := r.shard.GetClusterMetadata().GetCurrentClusterName()
-
-		r.scope.IncCounter(metrics.HistoryCorruptionDetected)
-		r.scope.Tagged(metrics.CorruptionTypeTag(corruptionType.String())).
-			Tagged(metrics.SourceClusterTag(clusterName)).
-			IncCounter(metrics.HistoryCorruptionDetected)
-
-		r.logger.Error("History corruption detected: incomplete history",
-			tag.WorkflowDomainID(domainID),
-			tag.WorkflowID(workflowID),
-			tag.WorkflowRunID(runID),
-			tag.ClusterName(clusterName),
-			tag.Dynamic("expectedLastEventID", expectedLastEventID),
-			tag.Dynamic("actualLastEventID", lastEventID),
-		)
-
-		return corruptionType, ErrHistoryCorruption
-	}
-
-	// History is valid and contiguous
-	return CorruptionTypeNone, nil
-}
-
-// classifyHistoryError determines the corruption type based on the error
-func (r *workflowRepairerImpl) classifyHistoryError(err error) CorruptionType {
-	if err == nil {
-		return CorruptionTypeNone
-	}
-
-	// Check for transient errors that aren't corruption
-	var timeoutErr *persistence.TimeoutError
-	var busyErr *types.ServiceBusyError
-	var dbUnavailableErr *persistence.DBUnavailableError
-	if errors.As(err, &timeoutErr) || errors.As(err, &busyErr) || errors.As(err, &dbUnavailableErr) {
-		// Transient errors - not corruption, caller should retry
-		return CorruptionTypeNone
-	}
-
-	// Check for actual corruption - specific error types
-	var entityNotExists *types.EntityNotExistsError
-	if errors.As(err, &entityNotExists) {
-		return CorruptionTypeHistoryMissing
-	}
-
-	var dataInconsistency *types.InternalDataInconsistencyError
-	if errors.As(err, &dataInconsistency) {
-		// InternalDataInconsistencyError can represent various corruption types
-		// Check the message for more specific classification
-		errMsg := strings.ToLower(dataInconsistency.Message)
-		if strings.Contains(errMsg, "gap") || strings.Contains(errMsg, "continuous") {
-			return CorruptionTypeHistoryEventGap
-		}
-		return CorruptionTypeHistoryEventCorrupted
-	}
-
-	// Check error message for deserialization and other patterns
-	errStr := strings.ToLower(err.Error())
-
-	if strings.Contains(errStr, "deserialize") || strings.Contains(errStr, "unmarshal") {
-		return CorruptionTypeHistoryDeserializationError
-	}
-
-	if strings.Contains(errStr, "decode") && strings.Contains(errStr, "branch") {
-		return CorruptionTypeHistoryBranchTokenInvalid
-	}
-
-	// InternalServiceError and other unknown errors - default to generic corruption
-	return CorruptionTypeHistoryEventCorrupted
 }
