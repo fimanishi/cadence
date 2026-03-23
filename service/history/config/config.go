@@ -308,10 +308,10 @@ type Config struct {
 	EnableRetryForChecksumFailure         dynamicproperties.BoolPropertyFnWithDomainFilter
 
 	// Corruption detection and repair config knobs
-	EnableCorruptionAutoRepair            dynamicproperties.BoolPropertyFn
-	EnableCorruptionAutoClose             dynamicproperties.BoolPropertyFn
-	EnableCorruptionRecoveryWorkflow      dynamicproperties.BoolPropertyFn
-	CorruptionRepairTimeout               dynamicproperties.DurationPropertyFn
+	EnableCorruptionAutoRepair             dynamicproperties.BoolPropertyFn
+	EnableCorruptionAutoClose              dynamicproperties.BoolPropertyFn
+	EnableCorruptionRecoveryWorkflow       dynamicproperties.BoolPropertyFn
+	CorruptionRepairTimeout                dynamicproperties.DurationPropertyFn
 	RequireChecksumMatchAfterRebuildRepair dynamicproperties.BoolPropertyFn
 
 	// History check for corruptions
