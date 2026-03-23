@@ -365,7 +365,7 @@ func (e *mutableStateBuilder) Load(
 			e.metricsClient.IncCounter(metrics.WorkflowContextScope, metrics.MutableStateChecksumInvalidated)
 		case e.shouldVerifyChecksum():
 			repairer := NewWorkflowRepairer(e.shard, e.logger, e.metricsClient)
-			err := repairer.DetectAndRepairIfNeeded(ctx, e, state.Checksum, false)
+			err := repairer.DetectAndRepairIfNeeded(ctx, e, state.Checksum)
 			if err != nil && e.enableChecksumFailureRetry() {
 				return err
 			}
