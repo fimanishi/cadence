@@ -2183,6 +2183,34 @@ const (
 	// Allowed filters: DomainName
 	EnableRetryForChecksumFailure
 
+	// EnableCorruptionAutoRepair enables automatic repair of corrupted workflows via StateRebuilder
+	// KeyName: history.enableCorruptionAutoRepair
+	// Value type: Bool
+	// Default value: false
+	// Allowed filters: N/A
+	EnableCorruptionAutoRepair
+
+	// EnableCorruptionAutoClose enables automatic closure of corrupted workflows
+	// KeyName: history.enableCorruptionAutoClose
+	// Value type: Bool
+	// Default value: false
+	// Allowed filters: N/A
+	EnableCorruptionAutoClose
+
+	// EnableCorruptionRecoveryWorkflow enables cross-cluster recovery workflow for corrupted workflows
+	// KeyName: history.enableCorruptionRecoveryWorkflow
+	// Value type: Bool
+	// Default value: false
+	// Allowed filters: N/A
+	EnableCorruptionRecoveryWorkflow
+
+	// RequireChecksumMatchAfterRebuildRepair requires that rebuilt state produces same checksum as original
+	// KeyName: history.requireChecksumMatchAfterRebuildRepair
+	// Value type: Bool
+	// Default value: false
+	// Allowed filters: N/A
+	RequireChecksumMatchAfterRebuildRepair
+
 	// EnableStrongIdempotency enables strong idempotency for APIs
 	// KeyName: history.enableStrongIdempotency
 	// Value type: Bool
@@ -2688,6 +2716,13 @@ const (
 	TestGetDurationPropertyFilteredByWorkflowTypeKey
 	TestGetDurationPropertyFilteredByDomainIDKey
 	TestGetDurationPropertyFilteredByShardID
+
+	// CorruptionRepairTimeout is the timeout for corruption repair operations
+	// KeyName: history.corruptionRepairTimeout
+	// Value type: Duration
+	// Default value: 30s
+	// Allowed filters: N/A
+	CorruptionRepairTimeout
 
 	// FrontendShutdownDrainDuration is the duration of traffic drain during shutdown
 	// KeyName: frontend.shutdownDrainDuration
@@ -4899,6 +4934,26 @@ var BoolKeys = map[BoolKey]DynamicBool{
 		Description:  "EnableRetryForChecksumFailure enables retry if mutable state checksum verification fails",
 		DefaultValue: false,
 	},
+	EnableCorruptionAutoRepair: {
+		KeyName:      "history.enableCorruptionAutoRepair",
+		Description:  "EnableCorruptionAutoRepair enables automatic repair of corrupted workflows via StateRebuilder",
+		DefaultValue: false,
+	},
+	EnableCorruptionAutoClose: {
+		KeyName:      "history.enableCorruptionAutoClose",
+		Description:  "EnableCorruptionAutoClose enables automatic closure of corrupted workflows",
+		DefaultValue: false,
+	},
+	EnableCorruptionRecoveryWorkflow: {
+		KeyName:      "history.enableCorruptionRecoveryWorkflow",
+		Description:  "EnableCorruptionRecoveryWorkflow enables cross-cluster recovery workflow for corrupted workflows",
+		DefaultValue: false,
+	},
+	RequireChecksumMatchAfterRebuildRepair: {
+		KeyName:      "history.requireChecksumMatchAfterRebuildRepair",
+		Description:  "RequireChecksumMatchAfterRebuildRepair requires that rebuilt state produces same checksum as original",
+		DefaultValue: false,
+	},
 	EnableStrongIdempotency: {
 		KeyName:      "history.enableStrongIdempotency",
 		Filters:      []Filter{DomainName},
@@ -5790,6 +5845,11 @@ var DurationKeys = map[DurationKey]DynamicDuration{
 		Filters:      []Filter{DomainID},
 		Description:  "DomainAuditLogTTL is the TTL for domain audit log entries",
 		DefaultValue: time.Hour * 24 * 365, // 1 year
+	},
+	CorruptionRepairTimeout: {
+		KeyName:      "history.corruptionRepairTimeout",
+		Description:  "CorruptionRepairTimeout is the timeout for corruption repair operations",
+		DefaultValue: time.Second * 30,
 	},
 }
 
