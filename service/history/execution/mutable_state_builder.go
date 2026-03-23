@@ -364,24 +364,10 @@ func (e *mutableStateBuilder) Load(
 			e.checksum = checksum.Checksum{}
 			e.metricsClient.IncCounter(metrics.WorkflowContextScope, metrics.MutableStateChecksumInvalidated)
 		case e.shouldVerifyChecksum():
-			if err := verifyMutableStateChecksum(e, state.Checksum); err != nil {
-				// we ignore checksum verification errors for now until this
-				// feature is tested and/or we have mechanisms in place to deal
-				// with these types of errors
-				e.metricsClient.IncCounter(metrics.WorkflowContextScope, metrics.MutableStateChecksumMismatch)
-				e.logError("mutable state checksum mismatch",
-					tag.WorkflowNextEventID(e.executionInfo.NextEventID),
-					tag.WorkflowScheduleID(e.executionInfo.DecisionScheduleID),
-					tag.WorkflowStartedID(e.executionInfo.DecisionStartedID),
-					tag.Dynamic("timerIDs", maps.Keys(e.pendingTimerInfoIDs)),
-					tag.Dynamic("activityIDs", maps.Keys(e.pendingActivityInfoIDs)),
-					tag.Dynamic("childIDs", maps.Keys(e.pendingChildExecutionInfoIDs)),
-					tag.Dynamic("signalIDs", maps.Keys(e.pendingSignalInfoIDs)),
-					tag.Dynamic("cancelIDs", maps.Keys(e.pendingRequestCancelInfoIDs)),
-					tag.Error(err))
-				if e.enableChecksumFailureRetry() {
-					return err
-				}
+			repairer := NewWorkflowRepairer(e.shard, e.logger, e.metricsClient)
+			err := repairer.DetectAndRepairIfNeeded(ctx, e, state.Checksum, false)
+			if err != nil && e.enableChecksumFailureRetry() {
+				return err
 			}
 		}
 	}

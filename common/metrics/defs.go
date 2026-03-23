@@ -1383,6 +1383,8 @@ const (
 	HistoryFlushBufferedEventsScope
 	// HistoryTaskSchedulerMigrationScope is the scope used by history task scheduler migration
 	HistoryTaskSchedulerMigrationScope
+	// WorkflowCorruptionRepairScope is the scope used for workflow corruption detection and repair operations
+	WorkflowCorruptionRepairScope
 
 	NumHistoryScopes
 )
@@ -2126,6 +2128,7 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 		HistoryWorkflowCacheScope:                                       {operation: "HistoryWorkflowCache"},
 		HistoryFlushBufferedEventsScope:                                 {operation: "HistoryFlushBufferedEvents"},
 		HistoryTaskSchedulerMigrationScope:                              {operation: "HistoryTaskSchedulerMigration"},
+		WorkflowCorruptionRepairScope:                                   {operation: "WorkflowCorruptionRepair"},
 	},
 	// Matching Scope Names
 	Matching: {
@@ -2790,6 +2793,16 @@ const (
 	ReplicationTasksFetchedSize
 	MutableStateChecksumMismatch
 	MutableStateChecksumInvalidated
+	MutableStateCorruptionDetected
+	MutableStateCorruptionAutoRecovered
+	MutableStateRebuildChecksumMatch
+	MutableStateRebuildChecksumMismatch
+	HistoryCorruptionDetected
+	WorkflowRepairAttempted
+	WorkflowRepairSuccess
+	WorkflowRepairFailure
+	WorkflowRepairTimeout
+	WorkflowRepairDuration
 	FailoverMarkerCount
 	FailoverMarkerReplicationLatency
 	FailoverMarkerInsertFailure
@@ -3639,6 +3652,16 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		ReplicationTasksFetchedSize:                                  {metricName: "replication_tasks_fetched_size", metricType: Histogram, buckets: ResponseRowSizeBuckets},
 		MutableStateChecksumMismatch:                                 {metricName: "mutable_state_checksum_mismatch", metricType: Counter},
 		MutableStateChecksumInvalidated:                              {metricName: "mutable_state_checksum_invalidated", metricType: Counter},
+		MutableStateCorruptionDetected:                               {metricName: "mutable_state_corruption_detected", metricType: Counter},
+		MutableStateCorruptionAutoRecovered:                          {metricName: "mutable_state_corruption_auto_recovered", metricType: Counter},
+		MutableStateRebuildChecksumMatch:                             {metricName: "mutable_state_rebuild_checksum_match", metricType: Counter},
+		MutableStateRebuildChecksumMismatch:                          {metricName: "mutable_state_rebuild_checksum_mismatch", metricType: Counter},
+		HistoryCorruptionDetected:                                    {metricName: "history_corruption_detected", metricType: Counter},
+		WorkflowRepairAttempted:                                      {metricName: "workflow_repair_attempted", metricType: Counter},
+		WorkflowRepairSuccess:                                        {metricName: "workflow_repair_success", metricType: Counter},
+		WorkflowRepairFailure:                                        {metricName: "workflow_repair_failure", metricType: Counter},
+		WorkflowRepairTimeout:                                        {metricName: "workflow_repair_timeout", metricType: Counter},
+		WorkflowRepairDuration:                                       {metricName: "workflow_repair_duration_ns", metricType: Histogram, exponentialBuckets: Low1ms100s},
 		FailoverMarkerCount:                                          {metricName: "failover_marker_count", metricType: Counter},
 		FailoverMarkerReplicationLatency:                             {metricName: "failover_marker_replication_latency", metricType: Timer},
 		FailoverMarkerInsertFailure:                                  {metricName: "failover_marker_insert_failures", metricType: Counter},
