@@ -23,6 +23,7 @@ package execution
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"runtime/debug"
@@ -371,7 +372,9 @@ func (e *mutableStateBuilder) Load(
 				// since the mismatch case is rare and repair is expensive compared to verification
 				repairer := NewWorkflowRepairer(e.shard, e.logger, e.metricsClient)
 				repairErr := repairer.DetectAndRepairIfNeeded(ctx, e, state.Checksum)
-				if repairErr != nil && e.enableChecksumFailureRetry() {
+				// Always propagate ErrWorkflowRepairedRetryOperation (auto-repair forces retry),
+				// otherwise only propagate if enableChecksumFailureRetry is true
+				if repairErr != nil && (errors.Is(repairErr, ErrWorkflowRepairedRetryOperation) || e.enableChecksumFailureRetry()) {
 					return repairErr
 				}
 			}

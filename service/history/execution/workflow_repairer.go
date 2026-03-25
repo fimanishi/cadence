@@ -24,13 +24,16 @@ var (
 	// ErrChecksumMismatchAfterRebuild indicates the rebuilt state has a different checksum than the original
 	ErrChecksumMismatchAfterRebuild = errors.New("rebuilt mutable state checksum does not match original - StateRebuilder may be buggy or history tampered")
 
-	// ErrWorkflowRepairedRetryOperation indicates repair succeeded and caller should retry the operation.
-	// This error is returned after the repaired state has been successfully persisted to the database.
-	// The caller should NOT proceed with the current operation context, as:
+	// ErrWorkflowRepairedRetryOperation indicates repair succeeded and caller must retry.
+	// This error is ALWAYS returned after successful repair, regardless of enableChecksumFailureRetry config.
+	// The repaired state has been successfully persisted to the database.
+	//
+	// The caller MUST NOT proceed with the current operation context because:
 	// 1. The operation may be based on stale/corrupted state that is no longer valid
 	// 2. Concurrent repairs could race if the caller proceeds to update
-	// 3. The in-memory mutableState, while updated, may not reflect the full context needed
-	// Instead, the caller should retry the entire operation, which will reload fresh state from DB.
+	// 3. The operation context may not reflect the full state after repair
+	//
+	// The caller should retry the entire operation, which will reload fresh state from DB.
 	ErrWorkflowRepairedRetryOperation = errors.New("workflow corruption was repaired and persisted - retry operation to load fresh state")
 )
 
@@ -143,8 +146,8 @@ func (r *workflowRepairerImpl) RepairWorkflow(
 	defer func() {
 		taggedScope.RecordHistogramDuration(metrics.WorkflowRepairDuration, time.Since(startTime))
 
-		// ErrWorkflowRepairedRetryOperation is a success case (repair succeeded, caller should retry)
-		isSuccess := retErr == nil || errors.Is(retErr, ErrWorkflowRepairedRetryOperation)
+		// ErrWorkflowRepairedRetryOperation means repair succeeded
+		isSuccess := errors.Is(retErr, ErrWorkflowRepairedRetryOperation)
 
 		if !isSuccess {
 			isTimeout := errors.Is(retErr, context.DeadlineExceeded) || errors.Is(retErr, context.Canceled)

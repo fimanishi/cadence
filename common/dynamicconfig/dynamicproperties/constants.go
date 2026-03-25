@@ -2177,6 +2177,8 @@ const (
 	EnableTimerDebugLogByDomainID
 
 	// EnableRetryForChecksumFailure enables retry if mutable state checksum verification fails
+	// Note: When EnableCorruptionAutoRepair is true, repair errors always force retry regardless
+	// of this setting. This flag only controls non-repair checksum mismatch errors.
 	// KeyName: history.enableMutableStateChecksumFailureRetry
 	// Value type: Bool
 	// Default value: false
@@ -2184,6 +2186,8 @@ const (
 	EnableRetryForChecksumFailure
 
 	// EnableCorruptionAutoRepair enables automatic repair of corrupted workflows via StateRebuilder
+	// When enabled, detected corruption triggers automatic repair and ALWAYS forces operation retry
+	// (regardless of EnableRetryForChecksumFailure setting) to prevent race conditions.
 	// KeyName: history.enableCorruptionAutoRepair
 	// Value type: Bool
 	// Default value: false
