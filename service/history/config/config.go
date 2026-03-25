@@ -309,8 +309,6 @@ type Config struct {
 
 	// Corruption detection and repair config knobs
 	EnableCorruptionAutoRepair             dynamicproperties.BoolPropertyFn
-	EnableCorruptionAutoClose              dynamicproperties.BoolPropertyFn
-	EnableCorruptionRecoveryWorkflow       dynamicproperties.BoolPropertyFn
 	CorruptionRepairTimeout                dynamicproperties.DurationPropertyFn
 	RequireChecksumMatchAfterRebuildRepair dynamicproperties.BoolPropertyFn
 
@@ -587,8 +585,6 @@ func New(dc *dynamicconfig.Collection, numberOfShards int, maxMessageSize int, i
 		EnableRetryForChecksumFailure:         dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableRetryForChecksumFailure),
 
 		EnableCorruptionAutoRepair:             dc.GetBoolProperty(dynamicproperties.EnableCorruptionAutoRepair),
-		EnableCorruptionAutoClose:              dc.GetBoolProperty(dynamicproperties.EnableCorruptionAutoClose),
-		EnableCorruptionRecoveryWorkflow:       dc.GetBoolProperty(dynamicproperties.EnableCorruptionRecoveryWorkflow),
 		CorruptionRepairTimeout:                dc.GetDurationProperty(dynamicproperties.CorruptionRepairTimeout),
 		RequireChecksumMatchAfterRebuildRepair: dc.GetBoolProperty(dynamicproperties.RequireChecksumMatchAfterRebuildRepair),
 
