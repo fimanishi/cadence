@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/uber/cadence/common/checksum"
@@ -22,6 +23,15 @@ import (
 var (
 	// ErrChecksumMismatchAfterRebuild indicates the rebuilt state has a different checksum than the original
 	ErrChecksumMismatchAfterRebuild = errors.New("rebuilt mutable state checksum does not match original - StateRebuilder may be buggy or history tampered")
+
+	// ErrWorkflowRepairedRetryOperation indicates repair succeeded and caller should retry the operation.
+	// This error is returned after the repaired state has been successfully persisted to the database.
+	// The caller should NOT proceed with the current operation context, as:
+	// 1. The operation may be based on stale/corrupted state that is no longer valid
+	// 2. Concurrent repairs could race if the caller proceeds to update
+	// 3. The in-memory mutableState, while updated, may not reflect the full context needed
+	// Instead, the caller should retry the entire operation, which will reload fresh state from DB.
+	ErrWorkflowRepairedRetryOperation = errors.New("workflow corruption was repaired and persisted - retry operation to load fresh state")
 )
 
 type (
@@ -37,6 +47,7 @@ type (
 		// RepairWorkflow attempts to repair a corrupted workflow execution
 		// If successful, the passed-in mutableState will be updated with repaired state
 		RepairWorkflow(
+			ctx context.Context,
 			mutableState MutableState,
 			corruptionType CorruptionType,
 			persistedChecksum checksum.Checksum,
@@ -102,7 +113,7 @@ func (r *workflowRepairerImpl) DetectAndRepairIfNeeded(
 
 	// Corruption detected - attempt auto-repair if enabled
 	if r.shard.GetConfig().EnableCorruptionAutoRepair() {
-		return r.RepairWorkflow(mutableState, corruptionType, checksumValue)
+		return r.RepairWorkflow(ctx, mutableState, corruptionType, checksumValue)
 	}
 
 	// Auto-repair disabled - return the error associated with this corruption type
@@ -111,13 +122,15 @@ func (r *workflowRepairerImpl) DetectAndRepairIfNeeded(
 
 // RepairWorkflow attempts to repair a corrupted workflow execution
 func (r *workflowRepairerImpl) RepairWorkflow(
+	callerCtx context.Context,
 	mutableState MutableState,
 	corruptionType CorruptionType,
 	persistedChecksum checksum.Checksum,
 ) (retErr error) {
-	// Use dedicated timeout independent of caller's context to give repair sufficient time.
+	// Create repair context that inherits cancellation from caller but has its own timeout.
+	// This ensures repair stops on shard shutdown while giving sufficient time to complete.
 	repairTimeout := r.shard.GetConfig().CorruptionRepairTimeout()
-	repairCtx, cancel := context.WithTimeout(context.Background(), repairTimeout)
+	repairCtx, cancel := context.WithTimeout(callerCtx, repairTimeout)
 	defer cancel()
 
 	executionInfo := mutableState.GetExecutionInfo()
@@ -130,7 +143,10 @@ func (r *workflowRepairerImpl) RepairWorkflow(
 	defer func() {
 		taggedScope.RecordHistogramDuration(metrics.WorkflowRepairDuration, time.Since(startTime))
 
-		if retErr != nil {
+		// ErrWorkflowRepairedRetryOperation is a success case (repair succeeded, caller should retry)
+		isSuccess := retErr == nil || errors.Is(retErr, ErrWorkflowRepairedRetryOperation)
+
+		if !isSuccess {
 			isTimeout := errors.Is(retErr, context.DeadlineExceeded) || errors.Is(retErr, context.Canceled)
 
 			if isTimeout {
@@ -298,7 +314,16 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 	// Persist the repaired state immediately to DB
 	// Without this, if the caller's context times out or fails before persisting,
 	// we'll detect the same corruption on the next Load() without actually fixing the issue.
-	return r.persistRepairedState(ctx, mutableState)
+	if err := r.persistRepairedState(ctx, mutableState); err != nil {
+		return err
+	}
+
+	// Return special error to signal caller that repair succeeded and they should retry.
+	// This prevents the caller from proceeding with potentially stale operation context:
+	// - The operation may have been initiated based on corrupted state
+	// - Concurrent repairs could race if caller proceeds to update
+	// - Forcing retry ensures caller loads fresh, repaired state from DB
+	return ErrWorkflowRepairedRetryOperation
 }
 
 func (r *workflowRepairerImpl) persistRepairedState(
@@ -368,13 +393,31 @@ func (r *workflowRepairerImpl) verifyChecksumAndAnalyze(
 		Tagged(metrics.SourceClusterTag(clusterName)).
 		IncCounter(metrics.MutableStateCorruptionDetected)
 
-	r.logger.Warn("Mutable state corruption detected: checksum mismatch",
+	// Build detailed diagnostic tags for logging
+	logTags := []tag.Tag{
 		tag.WorkflowDomainID(executionInfo.DomainID),
 		tag.WorkflowID(executionInfo.WorkflowID),
 		tag.WorkflowRunID(executionInfo.RunID),
+		tag.WorkflowNextEventID(executionInfo.NextEventID),
+		tag.WorkflowScheduleID(executionInfo.DecisionScheduleID),
+		tag.WorkflowStartedID(executionInfo.DecisionStartedID),
 		tag.ClusterName(clusterName),
 		tag.Dynamic("corruptionType", CorruptionTypeChecksumMismatch.String()),
-	)
+		tag.Error(err),
+	}
+
+	// Add pending item counts for additional diagnostics (type-assert to access internal fields)
+	if msb, ok := mutableState.(*mutableStateBuilder); ok {
+		logTags = append(logTags,
+			tag.Dynamic("timerIDs", maps.Keys(msb.pendingTimerInfoIDs)),
+			tag.Dynamic("activityIDs", maps.Keys(msb.pendingActivityInfoIDs)),
+			tag.Dynamic("childIDs", maps.Keys(msb.pendingChildExecutionInfoIDs)),
+			tag.Dynamic("signalIDs", maps.Keys(msb.pendingSignalInfoIDs)),
+			tag.Dynamic("cancelIDs", maps.Keys(msb.pendingRequestCancelInfoIDs)),
+		)
+	}
+
+	r.logger.Warn("Mutable state corruption detected: checksum mismatch", logTags...)
 
 	return CorruptionTypeChecksumMismatch, persistedChecksum, checksum.ErrMismatch
 }

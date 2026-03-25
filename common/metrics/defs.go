@@ -2794,10 +2794,8 @@ const (
 	MutableStateChecksumMismatch
 	MutableStateChecksumInvalidated
 	MutableStateCorruptionDetected
-	MutableStateCorruptionAutoRecovered
 	MutableStateRebuildChecksumMatch
 	MutableStateRebuildChecksumMismatch
-	HistoryCorruptionDetected
 	WorkflowRepairAttempted
 	WorkflowRepairSuccess
 	WorkflowRepairFailure
@@ -3660,10 +3658,8 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		MutableStateChecksumMismatch:                                 {metricName: "mutable_state_checksum_mismatch", metricType: Counter},
 		MutableStateChecksumInvalidated:                              {metricName: "mutable_state_checksum_invalidated", metricType: Counter},
 		MutableStateCorruptionDetected:                               {metricName: "mutable_state_corruption_detected", metricType: Counter},
-		MutableStateCorruptionAutoRecovered:                          {metricName: "mutable_state_corruption_auto_recovered", metricType: Counter},
 		MutableStateRebuildChecksumMatch:                             {metricName: "mutable_state_rebuild_checksum_match", metricType: Counter},
 		MutableStateRebuildChecksumMismatch:                          {metricName: "mutable_state_rebuild_checksum_mismatch", metricType: Counter},
-		HistoryCorruptionDetected:                                    {metricName: "history_corruption_detected", metricType: Counter},
 		WorkflowRepairAttempted:                                      {metricName: "workflow_repair_attempted", metricType: Counter},
 		WorkflowRepairSuccess:                                        {metricName: "workflow_repair_success", metricType: Counter},
 		WorkflowRepairFailure:                                        {metricName: "workflow_repair_failure", metricType: Counter},

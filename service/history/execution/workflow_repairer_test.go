@@ -240,7 +240,8 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 				setupVersionHistories(mockMutableState)
 				setupSuccessfulRebuild(ctrl, mockMutableState, mockStateRebuilder, testShard, true)
 			},
-			wantErr: false,
+			wantErr:   true,
+			wantErrIs: ErrWorkflowRepairedRetryOperation,
 		},
 		{
 			name:              "Checksum mismatch after rebuild with RequireChecksumMatchAfterRebuildRepair disabled - repair succeeds",
@@ -254,7 +255,8 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 				setupVersionHistories(mockMutableState)
 				setupSuccessfulRebuild(ctrl, mockMutableState, mockStateRebuilder, testShard, false)
 			},
-			wantErr: false,
+			wantErr:   true,
+			wantErrIs: ErrWorkflowRepairedRetryOperation,
 		},
 		{
 			name:              "rebuild fails",
@@ -581,7 +583,7 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 				scope:          mockMetricsClient.Scope(metrics.WorkflowCorruptionRepairScope),
 			}
 
-			err := repairer.RepairWorkflow(mockMutableState, tt.corruptionType, tt.persistedChecksum)
+			err := repairer.RepairWorkflow(context.Background(), mockMutableState, tt.corruptionType, tt.persistedChecksum)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -684,7 +686,8 @@ func TestWorkflowRepairer_DetectAndRepairIfNeeded(t *testing.T) {
 				setupDomainCacheMocks(testShard)
 				testShard.Resource.ExecutionMgr.On("UpdateWorkflowExecution", mock.Anything, mock.Anything).Return(&persistence.UpdateWorkflowExecutionResponse{}, nil).Once()
 			},
-			wantErr: false,
+			wantErr:   true,
+			wantErrIs: ErrWorkflowRepairedRetryOperation,
 		},
 	}
 
