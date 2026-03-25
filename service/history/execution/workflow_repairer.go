@@ -298,11 +298,7 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 	// Persist the repaired state immediately to DB
 	// Without this, if the caller's context times out or fails before persisting,
 	// we'll detect the same corruption on the next Load() without actually fixing the issue.
-	if err := r.persistRepairedState(ctx, mutableState); err != nil {
-		return err
-	}
-
-	return nil
+	return r.persistRepairedState(ctx, mutableState)
 }
 
 func (r *workflowRepairerImpl) persistRepairedState(
