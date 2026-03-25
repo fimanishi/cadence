@@ -3,8 +3,10 @@
 package execution
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/uber/cadence/common/checksum"
@@ -18,9 +20,6 @@ import (
 )
 
 var (
-	// ErrHistoryCorruption indicates history corruption that cannot be repaired via rebuild
-	ErrHistoryCorruption = errors.New("history corruption detected - cannot rebuild from local history")
-
 	// ErrChecksumMismatchAfterRebuild indicates the rebuilt state has a different checksum than the original
 	ErrChecksumMismatchAfterRebuild = errors.New("rebuilt mutable state checksum does not match original - StateRebuilder may be buggy or history tampered")
 )
@@ -78,7 +77,6 @@ func NewWorkflowRepairer(
 	}
 }
 
-// String returns the string representation of CorruptionType
 func (c CorruptionType) String() string {
 	switch c {
 	case CorruptionTypeNone:
@@ -96,23 +94,15 @@ func (r *workflowRepairerImpl) DetectAndRepairIfNeeded(
 	mutableState MutableState,
 	persistedChecksum checksum.Checksum,
 ) error {
-	// Verify checksum
 	corruptionType, checksumValue, err := r.verifyChecksumAndAnalyze(mutableState, persistedChecksum)
 
-	// If no corruption detected, return
 	if corruptionType == CorruptionTypeNone {
 		return nil
 	}
 
 	// Corruption detected - attempt auto-repair if enabled
 	if r.shard.GetConfig().EnableCorruptionAutoRepair() {
-		repairErr := r.RepairWorkflow(mutableState, corruptionType, checksumValue)
-		if repairErr == nil {
-			// Repair succeeded - mutableState has been updated in place
-			return nil
-		}
-		// Repair failed - return the repair error
-		return repairErr
+		return r.RepairWorkflow(mutableState, corruptionType, checksumValue)
 	}
 
 	// Auto-repair disabled - return the error associated with this corruption type
@@ -120,8 +110,6 @@ func (r *workflowRepairerImpl) DetectAndRepairIfNeeded(
 }
 
 // RepairWorkflow attempts to repair a corrupted workflow execution
-//
-//goland:noinspection DuplicatedCode
 func (r *workflowRepairerImpl) RepairWorkflow(
 	mutableState MutableState,
 	corruptionType CorruptionType,
@@ -138,11 +126,19 @@ func (r *workflowRepairerImpl) RepairWorkflow(
 	runID := executionInfo.RunID
 
 	startTime := time.Now()
+	taggedScope := r.scope.Tagged(metrics.CorruptionTypeTag(corruptionType.String()))
 	defer func() {
-		r.scope.Tagged(metrics.CorruptionTypeTag(corruptionType.String())).
-			RecordHistogramDuration(metrics.WorkflowRepairDuration, time.Since(startTime))
+		taggedScope.RecordHistogramDuration(metrics.WorkflowRepairDuration, time.Since(startTime))
 
 		if retErr != nil {
+			isTimeout := errors.Is(retErr, context.DeadlineExceeded) || errors.Is(retErr, context.Canceled)
+
+			if isTimeout {
+				taggedScope.IncCounter(metrics.WorkflowRepairTimeout)
+			}
+
+			taggedScope.IncCounter(metrics.WorkflowRepairFailure)
+
 			r.logger.Error("Workflow repair failed",
 				tag.Error(retErr),
 				tag.WorkflowDomainID(domainID),
@@ -151,6 +147,8 @@ func (r *workflowRepairerImpl) RepairWorkflow(
 				tag.Dynamic("corruptionType", corruptionType.String()),
 			)
 		} else {
+			taggedScope.IncCounter(metrics.WorkflowRepairSuccess)
+
 			r.logger.Info("Workflow repair succeeded",
 				tag.WorkflowDomainID(domainID),
 				tag.WorkflowID(workflowID),
@@ -161,8 +159,7 @@ func (r *workflowRepairerImpl) RepairWorkflow(
 	}()
 
 	clusterName := r.shard.GetClusterMetadata().GetCurrentClusterName()
-	r.scope.Tagged(metrics.CorruptionTypeTag(corruptionType.String())).
-		Tagged(metrics.SourceClusterTag(clusterName)).
+	taggedScope.Tagged(metrics.SourceClusterTag(clusterName)).
 		IncCounter(metrics.WorkflowRepairAttempted)
 
 	r.logger.Info("Attempting to repair corrupted workflow",
@@ -173,18 +170,15 @@ func (r *workflowRepairerImpl) RepairWorkflow(
 		tag.Dynamic("corruptionType", corruptionType.String()),
 	)
 
-	// Determine repair strategy based on corruption type
 	if corruptionType == CorruptionTypeChecksumMismatch {
 		// Checksum mismatch - try to rebuild from local history
 		return r.repairViaRebuild(repairCtx, mutableState, persistedChecksum)
 	}
 
-	// History corruption detected - would need cross-cluster recovery
-	// For now, return failure (cross-cluster not implemented yet)
-	r.scope.Tagged(metrics.CorruptionTypeTag(corruptionType.String())).
-		IncCounter(metrics.WorkflowRepairFailure)
-
-	return ErrHistoryCorruption
+	// Unknown corruption type - should not happen
+	return &types.InternalServiceError{
+		Message: fmt.Sprintf("unknown corruption type: %v", corruptionType),
+	}
 }
 
 // repairViaRebuild attempts to repair by rebuilding mutable state from history
@@ -194,13 +188,11 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 	mutableState MutableState,
 	persistedChecksum checksum.Checksum,
 ) error {
-
 	executionInfo := mutableState.GetExecutionInfo()
 	domainID := executionInfo.DomainID
 	workflowID := executionInfo.WorkflowID
 	runID := executionInfo.RunID
 
-	// Get branch token
 	branchToken, err := mutableState.GetCurrentBranchToken()
 	if err != nil {
 		return err
@@ -222,44 +214,36 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 	}
 
 	// Use StateRebuilder to rebuild mutable state from history
+	// For local repair, source and target workflow are the same (we're rebuilding the same workflow from its own history)
 	workflowIdentifier := definition.NewWorkflowIdentifier(domainID, workflowID, runID)
 
 	rebuiltMutableState, _, err := r.stateRebuilder.Rebuild(
 		ctx,
 		time.Now(),
-		workflowIdentifier,
+		workflowIdentifier, // source workflow
 		branchToken,
 		lastItem.EventID,
 		lastItem.Version,
-		workflowIdentifier,
+		workflowIdentifier, // target workflow (same as source for local repair)
 		func() ([]byte, error) { return branchToken, nil },
 		"", // requestID - empty for corruption repair
 	)
 	if err != nil {
-		// Check if the error is due to context timeout
-		isTimeout := errors.Is(ctx.Err(), context.DeadlineExceeded)
-
-		if isTimeout {
-			r.scope.Tagged(metrics.CorruptionTypeTag(CorruptionTypeChecksumMismatch.String())).
-				IncCounter(metrics.WorkflowRepairTimeout)
-		}
-
-		r.scope.Tagged(metrics.CorruptionTypeTag(CorruptionTypeChecksumMismatch.String())).
-			IncCounter(metrics.WorkflowRepairFailure)
-
 		return err
 	}
 
-	// Generate checksum from rebuilt state
+	// Try preserving original sticky tasklist before generating checksum
+	// Sticky tasklist is a performance hint (not correctness) and isn't stored in history,
+	// so rebuilt state won't have it. Try preserving it to see if checksum matches.
+	rebuiltInfo := rebuiltMutableState.GetExecutionInfo()
+	rebuiltInfo.StickyTaskList = executionInfo.StickyTaskList
+
 	rebuiltChecksum, err := generateMutableStateChecksum(rebuiltMutableState)
 	if err != nil {
 		return err
 	}
 
-	checksumMatch := len(rebuiltChecksum.Value) > 0 && len(persistedChecksum.Value) > 0 &&
-		string(rebuiltChecksum.Value) == string(persistedChecksum.Value)
-
-	if checksumMatch {
+	if checksumMatches(rebuiltChecksum, persistedChecksum) {
 		r.scope.IncCounter(metrics.MutableStateRebuildChecksumMatch)
 	} else {
 		r.scope.IncCounter(metrics.MutableStateRebuildChecksumMismatch)
@@ -268,9 +252,11 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 		if r.shard.GetConfig().RequireChecksumMatchAfterRebuildRepair() {
 			return ErrChecksumMismatchAfterRebuild
 		}
+
+		// Checksum didn't match - can't trust original sticky tasklist, clear it
+		rebuiltInfo.StickyTaskList = ""
 	}
 
-	// Load the rebuilt state into the passed-in mutableState
 	rebuiltPersistence := rebuiltMutableState.CopyToPersistence()
 
 	// CRITICAL: Preserve values for conditional write to succeed
@@ -294,9 +280,15 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 	// Temporarily use original value so Load() sets nextEventIDInDB correctly
 	rebuiltPersistence.ExecutionInfo.NextEventID = originalNextEventIDInDB
 
+	// CRITICAL: Clear checksum to prevent recursive repair during Load()
+	//
+	// Load() verifies the checksum (line 366-372 in mutable_state_builder.go) and would call
+	// DetectAndRepairIfNeeded() again, creating infinite recursion. By clearing the checksum,
+	// we skip verification during Load(). A fresh checksum will be automatically generated
+	// when we call CloseTransactionAsMutation() in persistRepairedState().
+	rebuiltPersistence.Checksum = checksum.Checksum{}
+
 	if err := mutableState.Load(ctx, rebuiltPersistence); err != nil {
-		r.scope.Tagged(metrics.CorruptionTypeTag(CorruptionTypeChecksumMismatch.String())).
-			IncCounter(metrics.WorkflowRepairFailure)
 		return err
 	}
 
@@ -307,20 +299,12 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 	// Without this, if the caller's context times out or fails before persisting,
 	// we'll detect the same corruption on the next Load() without actually fixing the issue.
 	if err := r.persistRepairedState(ctx, mutableState); err != nil {
-		r.scope.Tagged(metrics.CorruptionTypeTag(CorruptionTypeChecksumMismatch.String())).
-			IncCounter(metrics.WorkflowRepairFailure)
 		return err
 	}
-
-	// Repair succeeded
-	r.scope.IncCounter(metrics.MutableStateCorruptionAutoRecovered)
-	r.scope.Tagged(metrics.CorruptionTypeTag(CorruptionTypeChecksumMismatch.String())).
-		IncCounter(metrics.WorkflowRepairSuccess)
 
 	return nil
 }
 
-// persistRepairedState persists the repaired mutable state to the database
 func (r *workflowRepairerImpl) persistRepairedState(
 	ctx context.Context,
 	mutableState MutableState,
@@ -328,7 +312,6 @@ func (r *workflowRepairerImpl) persistRepairedState(
 	executionInfo := mutableState.GetExecutionInfo()
 	domainID := executionInfo.DomainID
 
-	// Get domain name for persistence request
 	domainName, err := r.shard.GetDomainCache().GetDomainName(domainID)
 	if err != nil {
 		return err
@@ -344,6 +327,11 @@ func (r *workflowRepairerImpl) persistRepairedState(
 		return err
 	}
 
+	// CloseTransactionAsMutation doesn't populate ExecutionStats - set it manually from mutableState
+	workflowMutation.ExecutionStats = &persistence.ExecutionStats{
+		HistorySize: mutableState.GetHistorySize(),
+	}
+
 	// Should not have any new events when just persisting repaired state
 	if len(workflowEventsSeq) != 0 {
 		return &types.InternalServiceError{
@@ -353,16 +341,13 @@ func (r *workflowRepairerImpl) persistRepairedState(
 
 	// Persist to database using UpdateWorkflowModeIgnoreCurrent
 	// We just want to fix the corrupted row, not update current execution pointers
-	_, err = r.shard.GetExecutionManager().UpdateWorkflowExecution(ctx, &persistence.UpdateWorkflowExecutionRequest{
+	// Use shard.UpdateWorkflowExecution() because it automatically sets RangeID and Encoding
+	_, err = r.shard.UpdateWorkflowExecution(ctx, &persistence.UpdateWorkflowExecutionRequest{
 		Mode:                   persistence.UpdateWorkflowModeIgnoreCurrent,
 		UpdateWorkflowMutation: *workflowMutation,
 		DomainName:             domainName,
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // verifyChecksumAndAnalyze verifies the checksum and analyzes any mismatch
@@ -371,18 +356,14 @@ func (r *workflowRepairerImpl) verifyChecksumAndAnalyze(
 	mutableState MutableState,
 	persistedChecksum checksum.Checksum,
 ) (CorruptionType, checksum.Checksum, error) {
-
 	err := verifyMutableStateChecksum(mutableState, persistedChecksum)
 	if err == nil {
-		// Checksum is valid - no corruption
 		return CorruptionTypeNone, persistedChecksum, nil
 	}
 
 	clusterName := r.shard.GetClusterMetadata().GetCurrentClusterName()
 	executionInfo := mutableState.GetExecutionInfo()
 
-	r.metricsClient.IncCounter(metrics.WorkflowContextScope, metrics.MutableStateChecksumMismatch)
-	r.scope.IncCounter(metrics.MutableStateCorruptionDetected)
 	r.scope.Tagged(metrics.CorruptionTypeTag(CorruptionTypeChecksumMismatch.String())).
 		Tagged(metrics.SourceClusterTag(clusterName)).
 		IncCounter(metrics.MutableStateCorruptionDetected)
@@ -396,4 +377,9 @@ func (r *workflowRepairerImpl) verifyChecksumAndAnalyze(
 	)
 
 	return CorruptionTypeChecksumMismatch, persistedChecksum, checksum.ErrMismatch
+}
+
+// checksumMatches returns true if both checksums are non-empty and equal
+func checksumMatches(a, b checksum.Checksum) bool {
+	return len(a.Value) > 0 && len(b.Value) > 0 && bytes.Equal(a.Value, b.Value)
 }

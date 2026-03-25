@@ -2190,24 +2190,10 @@ const (
 	// Allowed filters: N/A
 	EnableCorruptionAutoRepair
 
-	// EnableCorruptionAutoClose enables automatic closure of corrupted workflows
-	// KeyName: history.enableCorruptionAutoClose
-	// Value type: Bool
-	// Default value: false
-	// Allowed filters: N/A
-	EnableCorruptionAutoClose
-
-	// EnableCorruptionRecoveryWorkflow enables cross-cluster recovery workflow for corrupted workflows
-	// KeyName: history.enableCorruptionRecoveryWorkflow
-	// Value type: Bool
-	// Default value: false
-	// Allowed filters: N/A
-	EnableCorruptionRecoveryWorkflow
-
 	// RequireChecksumMatchAfterRebuildRepair requires that rebuilt state produces same checksum as original
 	// KeyName: history.requireChecksumMatchAfterRebuildRepair
 	// Value type: Bool
-	// Default value: false
+	// Default value: true
 	// Allowed filters: N/A
 	RequireChecksumMatchAfterRebuildRepair
 
@@ -4145,13 +4131,13 @@ var IntKeys = map[IntKey]DynamicInt{
 		KeyName:      "history.mutableStateChecksumGenProbability",
 		Filters:      []Filter{DomainName},
 		Description:  "MutableStateChecksumGenProbability is the probability [0-100] that checksum will be generated for mutable state",
-		DefaultValue: 0,
+		DefaultValue: 100,
 	},
 	MutableStateChecksumVerifyProbability: {
 		KeyName:      "history.mutableStateChecksumVerifyProbability",
 		Filters:      []Filter{DomainName},
 		Description:  "MutableStateChecksumVerifyProbability is the probability [0-100] that checksum will be verified for mutable state",
-		DefaultValue: 0,
+		DefaultValue: 100,
 	},
 	TaskSchedulerMigrationRatio: {
 		KeyName:      "history.taskSchedulerMigrationRatio",
@@ -4937,17 +4923,7 @@ var BoolKeys = map[BoolKey]DynamicBool{
 	EnableCorruptionAutoRepair: {
 		KeyName:      "history.enableCorruptionAutoRepair",
 		Description:  "EnableCorruptionAutoRepair enables automatic repair of corrupted workflows via StateRebuilder",
-		DefaultValue: false,
-	},
-	EnableCorruptionAutoClose: {
-		KeyName:      "history.enableCorruptionAutoClose",
-		Description:  "EnableCorruptionAutoClose enables automatic closure of corrupted workflows",
-		DefaultValue: false,
-	},
-	EnableCorruptionRecoveryWorkflow: {
-		KeyName:      "history.enableCorruptionRecoveryWorkflow",
-		Description:  "EnableCorruptionRecoveryWorkflow enables cross-cluster recovery workflow for corrupted workflows",
-		DefaultValue: false,
+		DefaultValue: true,
 	},
 	RequireChecksumMatchAfterRebuildRepair: {
 		KeyName:      "history.requireChecksumMatchAfterRebuildRepair",
