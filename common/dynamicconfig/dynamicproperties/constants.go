@@ -4131,13 +4131,13 @@ var IntKeys = map[IntKey]DynamicInt{
 		KeyName:      "history.mutableStateChecksumGenProbability",
 		Filters:      []Filter{DomainName},
 		Description:  "MutableStateChecksumGenProbability is the probability [0-100] that checksum will be generated for mutable state",
-		DefaultValue: 100,
+		DefaultValue: 0,
 	},
 	MutableStateChecksumVerifyProbability: {
 		KeyName:      "history.mutableStateChecksumVerifyProbability",
 		Filters:      []Filter{DomainName},
 		Description:  "MutableStateChecksumVerifyProbability is the probability [0-100] that checksum will be verified for mutable state",
-		DefaultValue: 100,
+		DefaultValue: 0,
 	},
 	TaskSchedulerMigrationRatio: {
 		KeyName:      "history.taskSchedulerMigrationRatio",
@@ -4923,12 +4923,12 @@ var BoolKeys = map[BoolKey]DynamicBool{
 	EnableCorruptionAutoRepair: {
 		KeyName:      "history.enableCorruptionAutoRepair",
 		Description:  "EnableCorruptionAutoRepair enables automatic repair of corrupted workflows via StateRebuilder",
-		DefaultValue: true,
+		DefaultValue: false,
 	},
 	RequireChecksumMatchAfterRebuildRepair: {
 		KeyName:      "history.requireChecksumMatchAfterRebuildRepair",
 		Description:  "RequireChecksumMatchAfterRebuildRepair requires that rebuilt state produces same checksum as original",
-		DefaultValue: false,
+		DefaultValue: true,
 	},
 	EnableStrongIdempotency: {
 		KeyName:      "history.enableStrongIdempotency",

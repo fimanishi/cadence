@@ -360,6 +360,10 @@ func (r *workflowRepairerImpl) verifyChecksumAndAnalyze(
 	clusterName := r.shard.GetClusterMetadata().GetCurrentClusterName()
 	executionInfo := mutableState.GetExecutionInfo()
 
+	// Increment the legacy checksum-mismatch metric on WorkflowContextScope for backwards compatibility
+	r.metricsClient.IncCounter(metrics.WorkflowContextScope, metrics.MutableStateChecksumMismatch)
+
+	// Also increment the new corruption-detection metric with tags
 	r.scope.Tagged(metrics.CorruptionTypeTag(CorruptionTypeChecksumMismatch.String())).
 		Tagged(metrics.SourceClusterTag(clusterName)).
 		IncCounter(metrics.MutableStateCorruptionDetected)
