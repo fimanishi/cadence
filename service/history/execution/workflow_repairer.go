@@ -45,6 +45,7 @@ type (
 			ctx context.Context,
 			mutableState MutableState,
 			persistedChecksum checksum.Checksum,
+			checksumCorrupted bool,
 		) error
 
 		// RepairWorkflow attempts to repair a corrupted workflow execution
@@ -107,8 +108,23 @@ func (r *workflowRepairerImpl) DetectAndRepairIfNeeded(
 	ctx context.Context,
 	mutableState MutableState,
 	persistedChecksum checksum.Checksum,
+	checksumCorrupted bool,
 ) error {
-	corruptionType, checksumValue, err := r.verifyChecksumAndAnalyze(mutableState, persistedChecksum)
+	var corruptionType CorruptionType
+	var checksumValue checksum.Checksum
+	var err error
+
+	if checksumCorrupted {
+		// Caller already verified checksum - skip redundant verification
+		// Assume checksum mismatch corruption and log/metric it
+		corruptionType = CorruptionTypeChecksumMismatch
+		checksumValue = persistedChecksum
+		err = checksum.ErrMismatch
+		r.logChecksumMismatchDetected(mutableState, err)
+	} else {
+		// Verify checksum and analyze corruption type
+		corruptionType, checksumValue, err = r.verifyChecksumAndAnalyze(mutableState, persistedChecksum)
+	}
 
 	if corruptionType == CorruptionTypeNone {
 		return nil
@@ -130,6 +146,13 @@ func (r *workflowRepairerImpl) RepairWorkflow(
 	corruptionType CorruptionType,
 	persistedChecksum checksum.Checksum,
 ) (retErr error) {
+	// Guard against programmer error - should never be called with CorruptionTypeNone
+	if corruptionType == CorruptionTypeNone {
+		return &types.InternalServiceError{
+			Message: "RepairWorkflow called with CorruptionTypeNone - this is a bug",
+		}
+	}
+
 	// Create repair context that inherits cancellation from caller but has its own timeout.
 	// This ensures repair stops on shard shutdown while giving sufficient time to complete.
 	repairTimeout := r.shard.GetConfig().CorruptionRepairTimeout()
@@ -251,6 +274,11 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 	// Try preserving original sticky tasklist before generating checksum
 	// Sticky tasklist is a performance hint (not correctness) and isn't stored in history,
 	// so rebuilt state won't have it. Try preserving it to see if checksum matches.
+	//
+	// NOTE: We directly mutate rebuiltInfo.StickyTaskList here (bypassing write tracking)
+	// because StickyTaskList is currently included in the checksum (checksum.go:70).
+	// If we change the checksum to exclude StickyTaskList (which would make sense since
+	// it's ephemeral), we can remove this preservation code entirely.
 	rebuiltInfo := rebuiltMutableState.GetExecutionInfo()
 	rebuiltInfo.StickyTaskList = executionInfo.StickyTaskList
 
@@ -283,6 +311,18 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 	// We just need to set the update condition to the original (possibly corrupted) value
 	// that's currently in the database, so the conditional write passes.
 	originalNextEventIDInDB := executionInfo.NextEventID
+	rebuiltNextEventID := rebuiltMutableState.GetExecutionInfo().NextEventID
+
+	if originalNextEventIDInDB != rebuiltNextEventID {
+		r.logger.Warn("NextEventID corruption detected - original DB value differs from rebuilt value",
+			tag.WorkflowDomainID(domainID),
+			tag.WorkflowID(workflowID),
+			tag.WorkflowRunID(runID),
+			tag.WorkflowNextEventID(originalNextEventIDInDB),
+			tag.Dynamic("rebuiltNextEventID", rebuiltNextEventID),
+		)
+	}
+
 	rebuiltMutableState.SetUpdateCondition(originalNextEventIDInDB)
 
 	// Persist the repaired state immediately to DB
@@ -358,6 +398,15 @@ func (r *workflowRepairerImpl) verifyChecksumAndAnalyze(
 		return CorruptionTypeNone, persistedChecksum, nil
 	}
 
+	r.logChecksumMismatchDetected(mutableState, err)
+	return CorruptionTypeChecksumMismatch, persistedChecksum, checksum.ErrMismatch
+}
+
+// logChecksumMismatchDetected logs and metrics checksum mismatch detection
+func (r *workflowRepairerImpl) logChecksumMismatchDetected(
+	mutableState MutableState,
+	err error,
+) {
 	clusterName := r.shard.GetClusterMetadata().GetCurrentClusterName()
 	executionInfo := mutableState.GetExecutionInfo()
 
@@ -382,20 +431,16 @@ func (r *workflowRepairerImpl) verifyChecksumAndAnalyze(
 		tag.Error(err),
 	}
 
-	// Add pending item counts for additional diagnostics (type-assert to access internal fields)
-	if msb, ok := mutableState.(*mutableStateBuilder); ok {
-		logTags = append(logTags,
-			tag.Dynamic("timerIDs", maps.Keys(msb.pendingTimerInfoIDs)),
-			tag.Dynamic("activityIDs", maps.Keys(msb.pendingActivityInfoIDs)),
-			tag.Dynamic("childIDs", maps.Keys(msb.pendingChildExecutionInfoIDs)),
-			tag.Dynamic("signalIDs", maps.Keys(msb.pendingSignalInfoIDs)),
-			tag.Dynamic("cancelIDs", maps.Keys(msb.pendingRequestCancelInfoIDs)),
-		)
-	}
+	// Add pending item counts for additional diagnostics
+	logTags = append(logTags,
+		tag.Dynamic("timerIDs", maps.Keys(mutableState.GetPendingTimerInfos())),
+		tag.Dynamic("activityIDs", maps.Keys(mutableState.GetPendingActivityInfos())),
+		tag.Dynamic("childIDs", maps.Keys(mutableState.GetPendingChildExecutionInfos())),
+		tag.Dynamic("signalIDs", maps.Keys(mutableState.GetPendingSignalExternalInfos())),
+		tag.Dynamic("cancelIDs", maps.Keys(mutableState.GetPendingRequestCancelExternalInfos())),
+	)
 
 	r.logger.Warn("Mutable state corruption detected: checksum mismatch", logTags...)
-
-	return CorruptionTypeChecksumMismatch, persistedChecksum, checksum.ErrMismatch
 }
 
 // checksumMatches returns true if both checksums are non-empty and equal

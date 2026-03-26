@@ -687,7 +687,7 @@ func TestWorkflowRepairer_DetectAndRepairIfNeeded(t *testing.T) {
 				scope:          mockMetricsClient.Scope(metrics.WorkflowCorruptionRepairScope),
 			}
 
-			err := repairer.DetectAndRepairIfNeeded(context.Background(), mockMutableState, checksumToUse)
+			err := repairer.DetectAndRepairIfNeeded(context.Background(), mockMutableState, checksumToUse, false)
 
 			if tt.wantErr {
 				require.Error(t, err)

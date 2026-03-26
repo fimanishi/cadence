@@ -368,10 +368,9 @@ func (e *mutableStateBuilder) Load(
 			// Fast path: verify checksum first before allocating repairer
 			if err := verifyMutableStateChecksum(e, state.Checksum); err != nil {
 				// Checksum mismatch - create repairer and attempt detection/repair
-				// Note: DetectAndRepairIfNeeded will verify checksum again, but this is acceptable
-				// since the mismatch case is rare and repair is expensive compared to verification
+				// Pass checksumCorrupted=true since we already verified it above
 				repairer := NewWorkflowRepairer(e.shard, e.logger, e.metricsClient)
-				repairErr := repairer.DetectAndRepairIfNeeded(ctx, e, state.Checksum)
+				repairErr := repairer.DetectAndRepairIfNeeded(ctx, e, state.Checksum, true)
 				// Always propagate ErrWorkflowRepairedRetryOperation (auto-repair forces retry),
 				// otherwise only propagate if enableChecksumFailureRetry is true
 				if repairErr != nil && (errors.Is(repairErr, ErrWorkflowRepairedRetryOperation) || e.enableChecksumFailureRetry()) {

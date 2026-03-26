@@ -43,17 +43,17 @@ func (m *MockWorkflowRepairer) EXPECT() *MockWorkflowRepairerMockRecorder {
 }
 
 // DetectAndRepairIfNeeded mocks base method.
-func (m *MockWorkflowRepairer) DetectAndRepairIfNeeded(ctx context.Context, mutableState MutableState, persistedChecksum checksum.Checksum) error {
+func (m *MockWorkflowRepairer) DetectAndRepairIfNeeded(ctx context.Context, mutableState MutableState, persistedChecksum checksum.Checksum, checksumCorrupted bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DetectAndRepairIfNeeded", ctx, mutableState, persistedChecksum)
+	ret := m.ctrl.Call(m, "DetectAndRepairIfNeeded", ctx, mutableState, persistedChecksum, checksumCorrupted)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DetectAndRepairIfNeeded indicates an expected call of DetectAndRepairIfNeeded.
-func (mr *MockWorkflowRepairerMockRecorder) DetectAndRepairIfNeeded(ctx, mutableState, persistedChecksum any) *gomock.Call {
+func (mr *MockWorkflowRepairerMockRecorder) DetectAndRepairIfNeeded(ctx, mutableState, persistedChecksum, checksumCorrupted any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DetectAndRepairIfNeeded", reflect.TypeOf((*MockWorkflowRepairer)(nil).DetectAndRepairIfNeeded), ctx, mutableState, persistedChecksum)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DetectAndRepairIfNeeded", reflect.TypeOf((*MockWorkflowRepairer)(nil).DetectAndRepairIfNeeded), ctx, mutableState, persistedChecksum, checksumCorrupted)
 }
 
 // RepairWorkflow mocks base method.
