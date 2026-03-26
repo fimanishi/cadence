@@ -28,12 +28,12 @@ var (
 	// This error is ALWAYS returned after successful repair, regardless of enableChecksumFailureRetry config.
 	// The repaired state has been successfully persisted to the database.
 	//
-	// The caller MUST NOT proceed with the current operation context because:
-	// 1. The operation may be based on stale/corrupted state that is no longer valid
-	// 2. Concurrent repairs could race if the caller proceeds to update
-	// 3. The operation context may not reflect the full state after repair
+	// The caller MUST NOT proceed with the current in-memory mutableState because:
+	// 1. It was loaded from corrupted data - any workflow logic based on it may be incorrect
+	// 2. Writing it back could race with other operations that loaded the repaired state
+	// 3. It lacks the fully-rebuilt internal maps and indexes from StateRebuilder
 	//
-	// The caller should retry the entire operation, which will reload fresh state from DB.
+	// The caller should retry the entire workflow operation, which will reload fresh state from DB.
 	ErrWorkflowRepairedRetryOperation = errors.New("workflow corruption was repaired and persisted - retry operation to load fresh state")
 )
 
@@ -143,6 +143,15 @@ func (r *workflowRepairerImpl) RepairWorkflow(
 
 	startTime := time.Now()
 	taggedScope := r.scope.Tagged(metrics.CorruptionTypeTag(corruptionType.String()))
+
+	// Common log tags for both success and failure paths
+	workflowTags := []tag.Tag{
+		tag.WorkflowDomainID(domainID),
+		tag.WorkflowID(workflowID),
+		tag.WorkflowRunID(runID),
+		tag.Dynamic("corruptionType", corruptionType.String()),
+	}
+
 	defer func() {
 		taggedScope.RecordHistogramDuration(metrics.WorkflowRepairDuration, time.Since(startTime))
 
@@ -158,22 +167,11 @@ func (r *workflowRepairerImpl) RepairWorkflow(
 
 			taggedScope.IncCounter(metrics.WorkflowRepairFailure)
 
-			r.logger.Error("Workflow repair failed",
-				tag.Error(retErr),
-				tag.WorkflowDomainID(domainID),
-				tag.WorkflowID(workflowID),
-				tag.WorkflowRunID(runID),
-				tag.Dynamic("corruptionType", corruptionType.String()),
-			)
+			r.logger.Error("Workflow repair failed", append(workflowTags, tag.Error(retErr))...)
 		} else {
 			taggedScope.IncCounter(metrics.WorkflowRepairSuccess)
 
-			r.logger.Info("Workflow repair succeeded",
-				tag.WorkflowDomainID(domainID),
-				tag.WorkflowID(workflowID),
-				tag.WorkflowRunID(runID),
-				tag.Dynamic("corruptionType", corruptionType.String()),
-			)
+			r.logger.Info("Workflow repair succeeded", workflowTags...)
 		}
 	}()
 
@@ -201,7 +199,6 @@ func (r *workflowRepairerImpl) RepairWorkflow(
 }
 
 // repairViaRebuild attempts to repair by rebuilding mutable state from history
-// and loading it into the passed-in mutableState
 func (r *workflowRepairerImpl) repairViaRebuild(
 	ctx context.Context,
 	mutableState MutableState,
@@ -276,48 +273,24 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 		rebuiltInfo.StickyTaskList = ""
 	}
 
-	rebuiltPersistence := rebuiltMutableState.CopyToPersistence()
-
-	// CRITICAL: Preserve values for conditional write to succeed
+	// CRITICAL: Set the update condition (nextEventIDInDB) for conditional write to succeed
 	//
 	// When we persist the repaired state, we use optimistic concurrency control:
 	// - PreviousNextEventIDCondition = what we expect DB to currently have (for the WHERE clause)
 	// - ExecutionInfo.NextEventID = the correct value we want to write (for the SET clause)
 	//
-	// The condition is derived from mutableState.nextEventIDInDB, which gets set by Load() from
-	// ExecutionInfo.NextEventID. To make the conditional write pass, we need:
-	// - nextEventIDInDB = original DB value we loaded (possibly corrupted)
-	// - ExecutionInfo.NextEventID = rebuilt correct value
-	//
-	// Strategy:
-	// 1. Temporarily set ExecutionInfo.NextEventID to original value before Load()
-	// 2. Load() will copy this to nextEventIDInDB (correct for condition check)
-	// 3. Restore ExecutionInfo.NextEventID to rebuilt value (correct for DB write)
+	// rebuiltMutableState already has the correct NextEventID from StateRebuilder.
+	// We just need to set the update condition to the original (possibly corrupted) value
+	// that's currently in the database, so the conditional write passes.
 	originalNextEventIDInDB := executionInfo.NextEventID
-	rebuiltNextEventID := rebuiltPersistence.ExecutionInfo.NextEventID
-
-	// Temporarily use original value so Load() sets nextEventIDInDB correctly
-	rebuiltPersistence.ExecutionInfo.NextEventID = originalNextEventIDInDB
-
-	// CRITICAL: Clear checksum to prevent recursive repair during Load()
-	//
-	// Load() verifies the checksum (line 366-372 in mutable_state_builder.go) and would call
-	// DetectAndRepairIfNeeded() again, creating infinite recursion. By clearing the checksum,
-	// we skip verification during Load(). A fresh checksum will be automatically generated
-	// when we call CloseTransactionAsMutation() in persistRepairedState().
-	rebuiltPersistence.Checksum = checksum.Checksum{}
-
-	if err := mutableState.Load(ctx, rebuiltPersistence); err != nil {
-		return err
-	}
-
-	// Restore the rebuilt NextEventID - this is the correct value to write to DB
-	mutableState.GetExecutionInfo().NextEventID = rebuiltNextEventID
+	rebuiltMutableState.SetUpdateCondition(originalNextEventIDInDB)
 
 	// Persist the repaired state immediately to DB
-	// Without this, if the caller's context times out or fails before persisting,
-	// we'll detect the same corruption on the next Load() without actually fixing the issue.
-	if err := r.persistRepairedState(ctx, mutableState); err != nil {
+	// We use rebuiltMutableState directly (not the original mutableState) because:
+	// - rebuiltMutableState is fully populated by replaying history (all maps, indexes, etc.)
+	// - We force retry via ErrWorkflowRepairedRetryOperation, so the original mutableState is discarded
+	// - The retry will load fresh, repaired state from DB
+	if err := r.persistRepairedState(ctx, rebuiltMutableState); err != nil {
 		return err
 	}
 

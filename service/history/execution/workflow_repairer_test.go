@@ -124,21 +124,6 @@ func setupRebuiltMutableState(ctrl *gomock.Controller, checksumMatch bool) *Mock
 	mockRebuiltMS := NewMockMutableState(ctrl)
 	setupChecksumVerificationMocks(mockRebuiltMS, testDomainID, testWorkflowID, testRunID, checksumMatch)
 
-	expectedChecksum := mismatchedChecksum
-	if checksumMatch {
-		expectedChecksum = matchingChecksum
-	}
-
-	mockRebuiltMS.EXPECT().CopyToPersistence().Return(&persistence.WorkflowMutableState{
-		ExecutionInfo: &persistence.WorkflowExecutionInfo{
-			DomainID:    testDomainID,
-			WorkflowID:  testWorkflowID,
-			RunID:       testRunID,
-			NextEventID: 15,
-		},
-		Checksum: expectedChecksum,
-	}).Times(1)
-
 	return mockRebuiltMS
 }
 
@@ -163,9 +148,10 @@ func setupSuccessfulRebuild(
 		"",
 	).Return(mockRebuiltMS, int64(0), nil).Times(1)
 
-	mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-	mockMutableState.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
-	mockMutableState.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(
+	// New flow: use rebuiltMutableState directly without Load()
+	mockRebuiltMS.EXPECT().SetUpdateCondition(int64(0)).Times(1)
+	mockRebuiltMS.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
+	mockRebuiltMS.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(
 		&persistence.WorkflowMutation{
 			ExecutionInfo: &persistence.WorkflowExecutionInfo{
 				DomainID:   testDomainID,
@@ -377,29 +363,6 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 			wantErrIs: ErrChecksumMismatchAfterRebuild,
 		},
 		{
-			name:              "Load fails",
-			corruptionType:    CorruptionTypeChecksumMismatch,
-			persistedChecksum: matchingChecksum,
-			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(testTimeout)
-				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFn(false)
-
-				setupBasicExecutionInfo(mockMutableState)
-				setupVersionHistories(mockMutableState)
-
-				mockRebuiltMS := setupRebuiltMutableState(ctrl, true)
-				mockStateRebuilder.EXPECT().Rebuild(
-					gomock.Any(), gomock.Any(), gomock.Any(),
-					[]byte(testBranchToken), int64(9), int64(1),
-					gomock.Any(), gomock.Any(), "",
-				).Return(mockRebuiltMS, int64(0), nil).Times(1)
-
-				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Return(testError).Times(1)
-			},
-			wantErr:   true,
-			wantErrIs: testError,
-		},
-		{
 			name:              "GetDomainName fails",
 			corruptionType:    CorruptionTypeChecksumMismatch,
 			persistedChecksum: matchingChecksum,
@@ -417,7 +380,7 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 					gomock.Any(), gomock.Any(), "",
 				).Return(mockRebuiltMS, int64(0), nil).Times(1)
 
-				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+				mockRebuiltMS.EXPECT().SetUpdateCondition(int64(0)).Times(1)
 				testShard.Resource.DomainCache.EXPECT().GetDomainName(testDomainID).Return("", testError).Times(1)
 			},
 			wantErr:   true,
@@ -441,8 +404,8 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 					gomock.Any(), gomock.Any(), "",
 				).Return(mockRebuiltMS, int64(0), nil).Times(1)
 
-				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-				mockMutableState.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(nil, nil, testError).Times(1)
+				mockRebuiltMS.EXPECT().SetUpdateCondition(int64(0)).Times(1)
+				mockRebuiltMS.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(nil, nil, testError).Times(1)
 
 				testShard.Resource.DomainCache.EXPECT().GetDomainName(testDomainID).Return(testDomainName, nil).Times(1)
 			},
@@ -467,9 +430,9 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 					gomock.Any(), gomock.Any(), "",
 				).Return(mockRebuiltMS, int64(0), nil).Times(1)
 
-				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-				mockMutableState.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
-				mockMutableState.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(
+				mockRebuiltMS.EXPECT().SetUpdateCondition(int64(0)).Times(1)
+				mockRebuiltMS.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
+				mockRebuiltMS.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(
 					&persistence.WorkflowMutation{
 						ExecutionInfo: &persistence.WorkflowExecutionInfo{
 							DomainID:   testDomainID,
@@ -503,9 +466,9 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 					gomock.Any(), gomock.Any(), "",
 				).Return(mockRebuiltMS, int64(0), nil).Times(1)
 
-				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-				mockMutableState.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
-				mockMutableState.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(
+				mockRebuiltMS.EXPECT().SetUpdateCondition(int64(0)).Times(1)
+				mockRebuiltMS.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
+				mockRebuiltMS.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(
 					&persistence.WorkflowMutation{
 						ExecutionInfo: &persistence.WorkflowExecutionInfo{
 							DomainID:   testDomainID,
@@ -669,9 +632,9 @@ func TestWorkflowRepairer_DetectAndRepairIfNeeded(t *testing.T) {
 					gomock.Any(), gomock.Any(), "",
 				).Return(mockRebuiltMS, int64(0), nil).Times(1)
 
-				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-				mockMutableState.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
-				mockMutableState.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(
+				mockRebuiltMS.EXPECT().SetUpdateCondition(int64(0)).Times(1)
+				mockRebuiltMS.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
+				mockRebuiltMS.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(
 					&persistence.WorkflowMutation{
 						ExecutionInfo: &persistence.WorkflowExecutionInfo{
 							DomainID:   testDomainID,
