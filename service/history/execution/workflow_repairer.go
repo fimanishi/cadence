@@ -320,7 +320,8 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 			return ErrChecksumMismatchAfterRebuild
 		}
 
-		// Checksum didn't match - can't trust original sticky state, clear it all
+		// Checksum didn't match - can't trust original sticky state, clear sticky fields.
+		// Client version fields are preserved as they are metadata not included in checksum.
 		rebuiltInfo.StickyTaskList = ""
 		rebuiltInfo.StickyScheduleToStartTimeout = 0
 	}
