@@ -153,11 +153,28 @@ func (r *workflowRepairerImpl) RepairWorkflow(
 		}
 	}
 
-	// Create repair context that inherits cancellation from caller but has its own timeout.
-	// This ensures repair stops on shard shutdown while giving sufficient time to complete.
+	// Create repair context with its own independent timeout.
+	// We use context.Background() so the timeout is not bound by the caller's deadline,
+	// but we still propagate cancellation (not timeout) from the caller.
+	// This ensures repair gets full repairTimeout duration even if caller times out sooner,
+	// while still stopping on shard shutdown (cancellation).
 	repairTimeout := r.shard.GetConfig().CorruptionRepairTimeout()
-	repairCtx, cancel := context.WithTimeout(callerCtx, repairTimeout)
+	repairCtx, cancel := context.WithTimeout(context.Background(), repairTimeout)
 	defer cancel()
+
+	// Propagate cancellation (but not timeout) from caller to repair context
+	go func() {
+		select {
+		case <-callerCtx.Done():
+			// Only propagate if caller was cancelled (not timed out)
+			// We want repair to have its full timeout regardless of caller's timeout
+			if callerCtx.Err() == context.Canceled {
+				cancel()
+			}
+		case <-repairCtx.Done():
+			// Repair finished or timed out
+		}
+	}()
 
 	executionInfo := mutableState.GetExecutionInfo()
 	domainID := executionInfo.DomainID
