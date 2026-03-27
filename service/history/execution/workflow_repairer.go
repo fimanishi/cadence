@@ -131,7 +131,8 @@ func (r *workflowRepairerImpl) DetectAndRepairIfNeeded(
 	}
 
 	// Corruption detected - attempt auto-repair if enabled
-	if r.shard.GetConfig().EnableCorruptionAutoRepair() {
+	domainName := mutableState.GetDomainEntry().GetInfo().Name
+	if r.shard.GetConfig().EnableCorruptionAutoRepair(domainName) {
 		return r.RepairWorkflow(ctx, mutableState, corruptionType, checksumValue)
 	}
 
@@ -158,7 +159,8 @@ func (r *workflowRepairerImpl) RepairWorkflow(
 	// but we still propagate cancellation (not timeout) from the caller.
 	// This ensures repair gets full repairTimeout duration even if caller times out sooner,
 	// while still stopping on shard shutdown (cancellation).
-	repairTimeout := r.shard.GetConfig().CorruptionRepairTimeout()
+	domainName := mutableState.GetDomainEntry().GetInfo().Name
+	repairTimeout := r.shard.GetConfig().CorruptionRepairTimeout(domainName)
 	repairCtx, cancel := context.WithTimeout(context.Background(), repairTimeout)
 	defer cancel()
 
@@ -248,6 +250,7 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 	domainID := executionInfo.DomainID
 	workflowID := executionInfo.WorkflowID
 	runID := executionInfo.RunID
+	domainName := mutableState.GetDomainEntry().GetInfo().Name
 
 	branchToken, err := mutableState.GetCurrentBranchToken()
 	if err != nil {
@@ -292,12 +295,16 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 	// Sticky tasklist is a performance hint (not correctness) and isn't stored in history,
 	// so rebuilt state won't have it. Try preserving it to see if checksum matches.
 	//
-	// NOTE: We directly mutate rebuiltInfo.StickyTaskList here (bypassing write tracking)
+	// NOTE: We directly mutate rebuiltInfo sticky fields here (bypassing write tracking)
 	// because StickyTaskList is currently included in the checksum (checksum.go:70).
 	// If we change the checksum to exclude StickyTaskList (which would make sense since
 	// it's ephemeral), we can remove this preservation code entirely.
 	rebuiltInfo := rebuiltMutableState.GetExecutionInfo()
 	rebuiltInfo.StickyTaskList = executionInfo.StickyTaskList
+	rebuiltInfo.StickyScheduleToStartTimeout = executionInfo.StickyScheduleToStartTimeout
+	rebuiltInfo.ClientLibraryVersion = executionInfo.ClientLibraryVersion
+	rebuiltInfo.ClientFeatureVersion = executionInfo.ClientFeatureVersion
+	rebuiltInfo.ClientImpl = executionInfo.ClientImpl
 
 	rebuiltChecksum, err := generateMutableStateChecksum(rebuiltMutableState)
 	if err != nil {
@@ -310,12 +317,13 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 		r.scope.IncCounter(metrics.MutableStateRebuildChecksumMismatch)
 
 		// If strict validation enabled, fail repair on checksum mismatch
-		if r.shard.GetConfig().RequireChecksumMatchAfterRebuildRepair() {
+		if r.shard.GetConfig().RequireChecksumMatchAfterRebuildRepair(domainName) {
 			return ErrChecksumMismatchAfterRebuild
 		}
 
-		// Checksum didn't match - can't trust original sticky tasklist, clear it
+		// Checksum didn't match - can't trust original sticky state, clear it all
 		rebuiltInfo.StickyTaskList = ""
+		rebuiltInfo.StickyScheduleToStartTimeout = 0
 	}
 
 	// CRITICAL: Set the update condition (nextEventIDInDB) for conditional write to succeed

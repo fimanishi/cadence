@@ -308,9 +308,9 @@ type Config struct {
 	EnableRetryForChecksumFailure         dynamicproperties.BoolPropertyFnWithDomainFilter
 
 	// Corruption detection and repair config knobs
-	EnableCorruptionAutoRepair             dynamicproperties.BoolPropertyFn
-	CorruptionRepairTimeout                dynamicproperties.DurationPropertyFn
-	RequireChecksumMatchAfterRebuildRepair dynamicproperties.BoolPropertyFn
+	EnableCorruptionAutoRepair             dynamicproperties.BoolPropertyFnWithDomainFilter
+	CorruptionRepairTimeout                dynamicproperties.DurationPropertyFnWithDomainFilter
+	RequireChecksumMatchAfterRebuildRepair dynamicproperties.BoolPropertyFnWithDomainFilter
 
 	// History check for corruptions
 	EnableHistoryCorruptionCheck dynamicproperties.BoolPropertyFnWithDomainFilter
@@ -584,9 +584,9 @@ func New(dc *dynamicconfig.Collection, numberOfShards int, maxMessageSize int, i
 		MutableStateChecksumInvalidateBefore:  dc.GetFloat64Property(dynamicproperties.MutableStateChecksumInvalidateBefore),
 		EnableRetryForChecksumFailure:         dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableRetryForChecksumFailure),
 
-		EnableCorruptionAutoRepair:             dc.GetBoolProperty(dynamicproperties.EnableCorruptionAutoRepair),
-		CorruptionRepairTimeout:                dc.GetDurationProperty(dynamicproperties.CorruptionRepairTimeout),
-		RequireChecksumMatchAfterRebuildRepair: dc.GetBoolProperty(dynamicproperties.RequireChecksumMatchAfterRebuildRepair),
+		EnableCorruptionAutoRepair:             dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableCorruptionAutoRepair),
+		CorruptionRepairTimeout:                dc.GetDurationPropertyFilteredByDomain(dynamicproperties.CorruptionRepairTimeout),
+		RequireChecksumMatchAfterRebuildRepair: dc.GetBoolPropertyFilteredByDomain(dynamicproperties.RequireChecksumMatchAfterRebuildRepair),
 
 		EnableHistoryCorruptionCheck: dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableHistoryCorruptionCheck),
 

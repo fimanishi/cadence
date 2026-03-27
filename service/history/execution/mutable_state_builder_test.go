@@ -109,7 +109,7 @@ func (s *mutableStateSuite) SetupTest() {
 	s.mockShard.GetConfig().MutableStateChecksumGenProbability = func(domain string) int { return 100 }
 	s.mockShard.GetConfig().MutableStateChecksumVerifyProbability = func(domain string) int { return 100 }
 	s.mockShard.GetConfig().EnableRetryForChecksumFailure = func(domain string) bool { return true }
-	s.mockShard.GetConfig().EnableCorruptionAutoRepair = func(...dynamicproperties.FilterOption) bool { return false }
+	s.mockShard.GetConfig().EnableCorruptionAutoRepair = func(domain string) bool { return false }
 
 	s.mockEventsCache = s.mockShard.GetEventsCache().(*events.MockCache)
 

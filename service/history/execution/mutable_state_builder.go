@@ -372,7 +372,7 @@ func (e *mutableStateBuilder) Load(
 				repairErr := repairer.DetectAndRepairIfNeeded(ctx, e, state.Checksum, true)
 				// Always propagate ErrWorkflowRepairedRetryOperation (auto-repair forces retry),
 				// otherwise only propagate if enableChecksumFailureRetry is true
-				if e.shard.GetConfig().EnableCorruptionAutoRepair() || e.enableChecksumFailureRetry() {
+				if e.shard.GetConfig().EnableCorruptionAutoRepair(e.domainEntry.GetInfo().Name) || e.enableChecksumFailureRetry() {
 					return repairErr
 				}
 			}

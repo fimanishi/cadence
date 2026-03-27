@@ -69,6 +69,12 @@ func setupChecksumVerificationMocks(ms *MockMutableState, domainID, workflowID, 
 		WorkflowID: workflowID,
 		RunID:      runID,
 	}).AnyTimes()
+	ms.EXPECT().GetDomainEntry().Return(cache.NewGlobalDomainCacheEntryForTest(
+		&persistence.DomainInfo{ID: domainID, Name: testDomainName},
+		&persistence.DomainConfig{},
+		&persistence.DomainReplicationConfig{ActiveClusterName: "active"},
+		0,
+	)).AnyTimes()
 	ms.EXPECT().GetVersionHistories().Return(nil).AnyTimes()
 	ms.EXPECT().GetPendingTimerInfos().Return(map[string]*persistence.TimerInfo{}).AnyTimes()
 	ms.EXPECT().GetPendingActivityInfos().Return(map[int64]*persistence.ActivityInfo{}).AnyTimes()
@@ -88,6 +94,12 @@ func setupBasicExecutionInfo(ms *MockMutableState) {
 		WorkflowID: testWorkflowID,
 		RunID:      testRunID,
 	}).AnyTimes()
+	ms.EXPECT().GetDomainEntry().Return(cache.NewGlobalDomainCacheEntryForTest(
+		&persistence.DomainInfo{ID: testDomainID, Name: testDomainName},
+		&persistence.DomainConfig{},
+		&persistence.DomainReplicationConfig{ActiveClusterName: "active"},
+		0,
+	)).AnyTimes()
 }
 
 func setupVersionHistories(ms *MockMutableState) {
@@ -219,8 +231,8 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 			corruptionType:    CorruptionTypeChecksumMismatch,
 			persistedChecksum: matchingChecksum,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(testTimeout)
-				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFn(false)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
+				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(false)
 
 				setupBasicExecutionInfo(mockMutableState)
 				setupVersionHistories(mockMutableState)
@@ -234,8 +246,8 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 			corruptionType:    CorruptionTypeChecksumMismatch,
 			persistedChecksum: matchingChecksum,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(testTimeout)
-				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFn(false)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
+				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(false)
 
 				setupBasicExecutionInfo(mockMutableState)
 				setupVersionHistories(mockMutableState)
@@ -249,7 +261,7 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 			corruptionType:    CorruptionTypeChecksumMismatch,
 			persistedChecksum: matchingChecksum,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(testTimeout)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
 
 				setupBasicExecutionInfo(mockMutableState)
 				mockMutableState.EXPECT().GetVersionHistories().Return(nil).AnyTimes()
@@ -263,7 +275,7 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 			corruptionType:    CorruptionTypeChecksumMismatch,
 			persistedChecksum: matchingChecksum,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(testTimeout)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
 
 				setupBasicExecutionInfo(mockMutableState)
 				mockMutableState.EXPECT().GetCurrentBranchToken().Return([]byte(testBranchToken), nil).Times(1)
@@ -277,7 +289,7 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 			corruptionType:    CorruptionTypeChecksumMismatch,
 			persistedChecksum: matchingChecksum,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(testTimeout)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
 
 				setupBasicExecutionInfo(mockMutableState)
 				mockMutableState.EXPECT().GetCurrentBranchToken().Return([]byte(testBranchToken), nil).Times(1)
@@ -293,7 +305,7 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 			corruptionType:    CorruptionTypeChecksumMismatch,
 			persistedChecksum: matchingChecksum,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(testTimeout)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
 
 				setupBasicExecutionInfo(mockMutableState)
 				mockMutableState.EXPECT().GetCurrentBranchToken().Return([]byte(testBranchToken), nil).Times(1)
@@ -314,7 +326,7 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 			corruptionType:    CorruptionTypeChecksumMismatch,
 			persistedChecksum: matchingChecksum,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(testTimeout)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
 
 				setupBasicExecutionInfo(mockMutableState)
 				setupVersionHistories(mockMutableState)
@@ -333,8 +345,8 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 			corruptionType:    CorruptionTypeChecksumMismatch,
 			persistedChecksum: matchingChecksum,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(testTimeout)
-				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFn(true)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
+				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
 
 				setupBasicExecutionInfo(mockMutableState)
 				setupVersionHistories(mockMutableState)
@@ -367,8 +379,8 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 			corruptionType:    CorruptionTypeChecksumMismatch,
 			persistedChecksum: matchingChecksum,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(testTimeout)
-				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFn(false)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
+				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(false)
 
 				setupBasicExecutionInfo(mockMutableState)
 				setupVersionHistories(mockMutableState)
@@ -391,8 +403,8 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 			corruptionType:    CorruptionTypeChecksumMismatch,
 			persistedChecksum: matchingChecksum,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(testTimeout)
-				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFn(false)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
+				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(false)
 
 				setupBasicExecutionInfo(mockMutableState)
 				setupVersionHistories(mockMutableState)
@@ -417,8 +429,8 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 			corruptionType:    CorruptionTypeChecksumMismatch,
 			persistedChecksum: matchingChecksum,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(testTimeout)
-				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFn(false)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
+				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(false)
 
 				setupBasicExecutionInfo(mockMutableState)
 				setupVersionHistories(mockMutableState)
@@ -453,8 +465,8 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 			corruptionType:    CorruptionTypeChecksumMismatch,
 			persistedChecksum: matchingChecksum,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(testTimeout)
-				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFn(false)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
+				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(false)
 
 				setupBasicExecutionInfo(mockMutableState)
 				setupVersionHistories(mockMutableState)
@@ -502,7 +514,7 @@ func TestWorkflowRepairer_RepairWorkflow(t *testing.T) {
 			corruptionType:    CorruptionTypeNone,
 			persistedChecksum: matchingChecksum,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(time.Second * 10)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(time.Second * 10)
 
 				mockMutableState.EXPECT().GetExecutionInfo().Return(&persistence.WorkflowExecutionInfo{
 					DomainID:   testDomainID,
@@ -585,7 +597,7 @@ func TestWorkflowRepairer_DetectAndRepairIfNeeded(t *testing.T) {
 			name:  "Mutable state corruption - checksum mismatch - repair disabled",
 			match: false,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.EnableCorruptionAutoRepair = dynamicproperties.GetBoolPropertyFn(false)
+				mockConfig.EnableCorruptionAutoRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(false)
 				mockMutableState.EXPECT().GetVersionHistories().Return(nil).AnyTimes()
 			},
 			wantErr:   true,
@@ -595,8 +607,8 @@ func TestWorkflowRepairer_DetectAndRepairIfNeeded(t *testing.T) {
 			name:  "Mutable state corruption - checksum mismatch - repair enabled and error",
 			match: false,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.EnableCorruptionAutoRepair = dynamicproperties.GetBoolPropertyFn(true)
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(time.Second * 10)
+				mockConfig.EnableCorruptionAutoRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(time.Second * 10)
 
 				mockMutableState.EXPECT().GetVersionHistories().Return(nil).AnyTimes()
 				mockMutableState.EXPECT().GetCurrentBranchToken().Return([]byte{}, testError).Times(1)
@@ -608,9 +620,9 @@ func TestWorkflowRepairer_DetectAndRepairIfNeeded(t *testing.T) {
 			name:  "Mutable state corruption - checksum mismatch - repair enabled and success",
 			match: false,
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, mockMutableState *MockMutableState, mockStateRebuilder *MockStateRebuilder) {
-				mockConfig.EnableCorruptionAutoRepair = dynamicproperties.GetBoolPropertyFn(true)
-				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFn(testTimeout)
-				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFn(false)
+				mockConfig.EnableCorruptionAutoRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
+				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(false)
 
 				mockMutableState.EXPECT().GetVersionHistories().Return(&persistence.VersionHistories{
 					CurrentVersionHistoryIndex: 0,

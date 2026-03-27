@@ -2191,14 +2191,14 @@ const (
 	// KeyName: history.enableCorruptionAutoRepair
 	// Value type: Bool
 	// Default value: false
-	// Allowed filters: N/A
+	// Allowed filters: DomainName
 	EnableCorruptionAutoRepair
 
 	// RequireChecksumMatchAfterRebuildRepair requires that rebuilt state produces same checksum as original
 	// KeyName: history.requireChecksumMatchAfterRebuildRepair
 	// Value type: Bool
 	// Default value: true
-	// Allowed filters: N/A
+	// Allowed filters: DomainName
 	RequireChecksumMatchAfterRebuildRepair
 
 	// EnableStrongIdempotency enables strong idempotency for APIs
@@ -2711,7 +2711,7 @@ const (
 	// KeyName: history.corruptionRepairTimeout
 	// Value type: Duration
 	// Default value: 30s
-	// Allowed filters: N/A
+	// Allowed filters: DomainName
 	CorruptionRepairTimeout
 
 	// FrontendShutdownDrainDuration is the duration of traffic drain during shutdown
@@ -4926,11 +4926,13 @@ var BoolKeys = map[BoolKey]DynamicBool{
 	},
 	EnableCorruptionAutoRepair: {
 		KeyName:      "history.enableCorruptionAutoRepair",
+		Filters:      []Filter{DomainName},
 		Description:  "EnableCorruptionAutoRepair enables automatic repair of corrupted workflows via StateRebuilder",
 		DefaultValue: false,
 	},
 	RequireChecksumMatchAfterRebuildRepair: {
 		KeyName:      "history.requireChecksumMatchAfterRebuildRepair",
+		Filters:      []Filter{DomainName},
 		Description:  "RequireChecksumMatchAfterRebuildRepair requires that rebuilt state produces same checksum as original",
 		DefaultValue: true,
 	},
@@ -5828,6 +5830,7 @@ var DurationKeys = map[DurationKey]DynamicDuration{
 	},
 	CorruptionRepairTimeout: {
 		KeyName:      "history.corruptionRepairTimeout",
+		Filters:      []Filter{DomainName},
 		Description:  "CorruptionRepairTimeout is the timeout for corruption repair operations",
 		DefaultValue: time.Second * 30,
 	},
