@@ -23,7 +23,6 @@ package execution
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/rand"
 	"runtime/debug"
@@ -373,7 +372,7 @@ func (e *mutableStateBuilder) Load(
 				repairErr := repairer.DetectAndRepairIfNeeded(ctx, e, state.Checksum, true)
 				// Always propagate ErrWorkflowRepairedRetryOperation (auto-repair forces retry),
 				// otherwise only propagate if enableChecksumFailureRetry is true
-				if repairErr != nil && (errors.Is(repairErr, ErrWorkflowRepairedRetryOperation) || e.enableChecksumFailureRetry()) {
+				if e.shard.GetConfig().EnableCorruptionAutoRepair() || e.enableChecksumFailureRetry() {
 					return repairErr
 				}
 			}
