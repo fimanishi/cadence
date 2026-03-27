@@ -295,10 +295,9 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 	// Sticky tasklist is a performance hint (not correctness) and isn't stored in history,
 	// so rebuilt state won't have it. Try preserving it to see if checksum matches.
 	//
-	// NOTE: We directly mutate rebuiltInfo sticky fields here (bypassing write tracking)
-	// because StickyTaskList is currently included in the checksum (checksum.go:70).
-	// If we change the checksum to exclude StickyTaskList (which would make sense since
-	// it's ephemeral), we can remove this preservation code entirely.
+	// NOTE: We directly mutate rebuiltInfo here:
+	// - StickyTaskList: included in checksum, must be set before comparison
+	// - Other fields: not in checksum, but preserved for metadata continuity
 	rebuiltInfo := rebuiltMutableState.GetExecutionInfo()
 	rebuiltInfo.StickyTaskList = executionInfo.StickyTaskList
 	rebuiltInfo.StickyScheduleToStartTimeout = executionInfo.StickyScheduleToStartTimeout
