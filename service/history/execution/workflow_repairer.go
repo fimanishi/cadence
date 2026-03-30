@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"maps"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/uber/cadence/common/checksum"
@@ -43,11 +44,12 @@ type (
 	CorruptionType int
 
 	workflowRepairerImpl struct {
-		shard          shard.Context
-		stateRebuilder StateRebuilder
-		logger         log.Logger
-		metricsClient  metrics.Client
-		scope          metrics.Scope
+		shard                shard.Context
+		stateRebuilder       StateRebuilder
+		stateRebuilderOnce   sync.Once
+		logger               log.Logger
+		metricsClient        metrics.Client
+		scope                metrics.Scope
 	}
 )
 
@@ -74,10 +76,13 @@ func NewWorkflowRepairer(
 
 // getStateRebuilder returns the StateRebuilder, creating it lazily on first use.
 // StateRebuilder creation calls multiple shard methods, so we defer it until repair is actually needed.
+// In tests, stateRebuilder is injected directly, so lazy creation is bypassed.
 func (r *workflowRepairerImpl) getStateRebuilder() StateRebuilder {
-	if r.stateRebuilder == nil {
-		r.stateRebuilder = NewStateRebuilder(r.shard, r.logger)
-	}
+	r.stateRebuilderOnce.Do(func() {
+		if r.stateRebuilder == nil {
+			r.stateRebuilder = NewStateRebuilder(r.shard, r.logger)
+		}
+	})
 	return r.stateRebuilder
 }
 
@@ -250,7 +255,7 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 	// For local repair, source and target workflow are the same (we're rebuilding the same workflow from its own history)
 	workflowIdentifier := definition.NewWorkflowIdentifier(domainID, workflowID, runID)
 
-	rebuiltMutableState, _, err := r.getStateRebuilder().Rebuild(
+	rebuiltMutableState, rebuiltHistorySize, err := r.getStateRebuilder().Rebuild(
 		ctx,
 		time.Now(),
 		workflowIdentifier, // source workflow
@@ -264,6 +269,7 @@ func (r *workflowRepairerImpl) repairViaRebuild(
 	if err != nil {
 		return false, err
 	}
+	rebuiltMutableState.SetHistorySize(rebuiltHistorySize)
 
 	// Try preserving original sticky tasklist before generating checksum
 	// Sticky tasklist is a performance hint (not correctness) and isn't stored in history,

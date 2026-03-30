@@ -357,7 +357,8 @@ func (c *contextImpl) LoadWorkflowExecutionWithTaskVersion(
 
 	if c.mutableState == nil {
 		var response *persistence.GetWorkflowExecutionResponse
-		for i := 0; i < checksumErrorRetryCount; i++ {
+		var attempt int
+		for attempt = 0; attempt < checksumErrorRetryCount; attempt++ {
 			response, err = c.getWorkflowExecutionFn(ctx, &persistence.GetWorkflowExecutionRequest{
 				DomainID:   c.domainID,
 				Execution:  c.workflowExecution,
@@ -386,6 +387,11 @@ func (c *contextImpl) LoadWorkflowExecutionWithTaskVersion(
 
 		if err != nil {
 			return nil, err
+		}
+		if attempt == checksumErrorRetryCount {
+			return nil, &types.InternalServiceError{
+				Message: "failed to load stable mutable state after repair attempts",
+			}
 		}
 
 		c.stats = response.State.ExecutionStats

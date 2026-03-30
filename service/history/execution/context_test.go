@@ -3440,6 +3440,34 @@ func TestLoadWorkflowExecutionWithTaskVersion(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "repair keeps triggering until retries exhausted",
+			mockSetup: func(mockShard *shard.MockContext, mockMutableState *MockMutableState, mockDomainCache *cache.MockDomainCache) {
+				mockShard.EXPECT().GetDomainCache().Return(mockDomainCache)
+				mockDomainCache.EXPECT().GetDomainByID(gomock.Any()).Return(cache.NewDomainCacheEntryForTest(&persistence.DomainInfo{
+					Name: "test-domain",
+				}, nil, true, nil, 0, nil, 0, 0, 0), nil)
+				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Return(nil).Times(checksumErrorRetryCount)
+			},
+			mockGetWorkflowExecutionFn: func(context.Context, *persistence.GetWorkflowExecutionRequest) (*persistence.GetWorkflowExecutionResponse, error) {
+				return &persistence.GetWorkflowExecutionResponse{
+					State: &persistence.WorkflowMutableState{
+						ExecutionInfo: &persistence.WorkflowExecutionInfo{
+							DomainID:   "test-domain-id",
+							WorkflowID: "test-workflow-id",
+							RunID:      "test-run-id",
+						},
+						ExecutionStats: &persistence.ExecutionStats{HistorySize: 123},
+					},
+				}, nil
+			},
+			mockRepairerSetup: func(mockRepairer *MockWorkflowRepairer) {
+				// Repair keeps reporting success on every attempt
+				mockRepairer.EXPECT().VerifyAndRepairWorkflowIfNeeded(gomock.Any(), gomock.Any()).
+					Return(true, nil).Times(checksumErrorRetryCount)
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tc := range testCases {

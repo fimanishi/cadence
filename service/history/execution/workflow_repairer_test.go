@@ -155,6 +155,7 @@ func setupSuccessfulRebuild(
 		"",
 	).Return(mockRebuiltMS, int64(0), nil).Times(1)
 
+	mockRebuiltMS.EXPECT().SetHistorySize(int64(0)).Times(1)
 	mockRebuiltMS.EXPECT().SetUpdateCondition(int64(0)).Times(1)
 	mockRebuiltMS.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
 	mockRebuiltMS.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(
@@ -212,11 +213,11 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 	testPersistenceError := &persistence.ConditionFailedError{Msg: "conflict"}
 
 	tests := []struct {
-		name       string
-		setupFunc  func(*gomock.Controller, *shard.TestContext, *config.Config, *MockMutableState, *MockStateRebuilder)
+		name         string
+		setupFunc    func(*gomock.Controller, *shard.TestContext, *config.Config, *MockMutableState, *MockStateRebuilder)
 		wantRepaired bool
-		wantErr    bool
-		wantErrIs  error
+		wantErr      bool
+		wantErrIs    error
 	}{
 		{
 			name: "no checksum stored - skip verification",
@@ -267,8 +268,8 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				ms.EXPECT().GetVersionHistories().Return(nil).AnyTimes()
 			},
 			wantRepaired: false,
-			wantErr:    true,
-			wantErrIs:  checksum.ErrMismatch,
+			wantErr:      true,
+			wantErrIs:    checksum.ErrMismatch,
 		},
 		{
 			name: "checksum mismatch - repair enabled - rebuild fails",
@@ -281,8 +282,8 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				ms.EXPECT().GetVersionHistories().Return(nil).AnyTimes()
 			},
 			wantRepaired: false,
-			wantErr:    true,
-			wantErrIs:  testError,
+			wantErr:      true,
+			wantErrIs:    testError,
 		},
 		{
 			name: "checksum mismatch - repair enabled - version histories nil",
@@ -296,8 +297,8 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				ms.EXPECT().GetVersionHistories().Return(nil).AnyTimes()
 			},
 			wantRepaired: false,
-			wantErr:    true,
-			wantErrIs:  ErrMissingVersionHistories,
+			wantErr:      true,
+			wantErrIs:    ErrMissingVersionHistories,
 		},
 		{
 			name: "checksum mismatch - repair enabled - GetCurrentVersionHistory fails",
@@ -313,7 +314,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				}).AnyTimes()
 			},
 			wantRepaired: false,
-			wantErr:    true,
+			wantErr:      true,
 		},
 		{
 			name: "checksum mismatch - repair enabled - GetLastItem fails",
@@ -331,7 +332,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				}).AnyTimes()
 			},
 			wantRepaired: false,
-			wantErr:    true,
+			wantErr:      true,
 		},
 		{
 			name: "checksum mismatch - repair enabled - rebuild timeout",
@@ -348,8 +349,8 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				).Return(nil, int64(0), context.DeadlineExceeded).Times(1)
 			},
 			wantRepaired: false,
-			wantErr:    true,
-			wantErrIs:  context.DeadlineExceeded,
+			wantErr:      true,
+			wantErrIs:    context.DeadlineExceeded,
 		},
 		{
 			name: "checksum mismatch - repair enabled - RequireChecksumMatchAfterRebuildRepair blocks repair",
@@ -380,10 +381,11 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 					[]byte(testBranchToken), int64(9), int64(1),
 					gomock.Any(), gomock.Any(), "",
 				).Return(mockRebuiltMS, int64(0), nil).Times(1)
-			},
-			wantRepaired: false,
-			wantErr:    true,
-			wantErrIs:  ErrChecksumMismatchAfterRebuild,
+				mockRebuiltMS.EXPECT().SetHistorySize(int64(0)).Times(1)
+				},
+				wantRepaired: false,
+				wantErr:      true,
+			wantErrIs:    ErrChecksumMismatchAfterRebuild,
 		},
 		{
 			name: "checksum mismatch - repair enabled - GetDomainName fails",
@@ -413,12 +415,13 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 					[]byte(testBranchToken), int64(9), int64(1),
 					gomock.Any(), gomock.Any(), "",
 				).Return(mockRebuiltMS, int64(0), nil).Times(1)
+				mockRebuiltMS.EXPECT().SetHistorySize(int64(0)).Times(1)
 				mockRebuiltMS.EXPECT().SetUpdateCondition(int64(0)).Times(1)
 				testShard.Resource.DomainCache.EXPECT().GetDomainName(testDomainID).Return("", testError).Times(1)
 			},
 			wantRepaired: false,
-			wantErr:    true,
-			wantErrIs:  testError,
+			wantErr:      true,
+			wantErrIs:    testError,
 		},
 		{
 			name: "checksum mismatch - repair enabled - CloseTransactionAsMutation fails",
@@ -449,13 +452,14 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 					gomock.Any(), gomock.Any(), "",
 				).Return(mockRebuiltMS, int64(0), nil).Times(1)
 
+				mockRebuiltMS.EXPECT().SetHistorySize(int64(0)).Times(1)
 				mockRebuiltMS.EXPECT().SetUpdateCondition(int64(0)).Times(1)
 				mockRebuiltMS.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(nil, nil, testError).Times(1)
 				testShard.Resource.DomainCache.EXPECT().GetDomainName(testDomainID).Return(testDomainName, nil).Times(1)
 			},
 			wantRepaired: false,
-			wantErr:    true,
-			wantErrIs:  testError,
+			wantErr:      true,
+			wantErrIs:    testError,
 		},
 		{
 			name: "checksum mismatch - repair enabled - CloseTransactionAsMutation returns unexpected events",
@@ -486,6 +490,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 					gomock.Any(), gomock.Any(), "",
 				).Return(mockRebuiltMS, int64(0), nil).Times(1)
 
+				mockRebuiltMS.EXPECT().SetHistorySize(int64(0)).Times(1)
 				mockRebuiltMS.EXPECT().SetUpdateCondition(int64(0)).Times(1)
 				mockRebuiltMS.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
 				mockRebuiltMS.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(
@@ -496,7 +501,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				testShard.Resource.DomainCache.EXPECT().GetDomainName(testDomainID).Return(testDomainName, nil).Times(1)
 			},
 			wantRepaired: false,
-			wantErr:    true,
+			wantErr:      true,
 		},
 		{
 			name: "checksum mismatch - repair enabled - UpdateWorkflowExecution fails",
@@ -527,6 +532,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 					gomock.Any(), gomock.Any(), "",
 				).Return(mockRebuiltMS, int64(0), nil).Times(1)
 
+				mockRebuiltMS.EXPECT().SetHistorySize(int64(0)).Times(1)
 				mockRebuiltMS.EXPECT().SetUpdateCondition(int64(0)).Times(1)
 				mockRebuiltMS.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
 				mockRebuiltMS.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(
@@ -546,8 +552,8 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				testShard.Resource.ExecutionMgr.On("UpdateWorkflowExecution", mock.Anything, mock.Anything).Return(nil, testPersistenceError).Once()
 			},
 			wantRepaired: false,
-			wantErr:    true,
-			wantErrIs:  testPersistenceError,
+			wantErr:      true,
+			wantErrIs:    testPersistenceError,
 		},
 		{
 			name: "checksum mismatch - repair enabled and succeeds - checksum matches after rebuild",
