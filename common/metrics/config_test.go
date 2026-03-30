@@ -67,10 +67,16 @@ func TestGaugeMigration_EmitGauge(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "migration metric with default empty mode emits gauge",
+			name:     "migration metric with default empty mode does not emit gauge",
 			config:   GaugeMigration{},
 			metric:   "metric_a",
-			expected: true,
+			expected: false,
+		},
+		{
+			name:     "migration metric with default timer mode does not emit gauge",
+			config:   GaugeMigration{Default: "timer"},
+			metric:   "metric_a",
+			expected: false,
 		},
 		{
 			name:     "migration metric with default gauge mode emits",
@@ -79,15 +85,15 @@ func TestGaugeMigration_EmitGauge(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "migration metric with default none mode does not emit",
-			config:   GaugeMigration{Default: "none"},
+			name:     "migration metric with default both mode emits",
+			config:   GaugeMigration{Default: "both"},
 			metric:   "metric_a",
-			expected: false,
+			expected: true,
 		},
 		{
-			name: "explicit true overrides default none",
+			name: "explicit true overrides default timer",
 			config: GaugeMigration{
-				Default: "none",
+				Default: "timer",
 				Names:   map[string]bool{"metric_a": true},
 			},
 			metric:   "metric_a",
@@ -107,6 +113,69 @@ func TestGaugeMigration_EmitGauge(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, tt.config.EmitGauge(tt.metric))
+		})
+	}
+}
+
+func TestGaugeMigration_EmitTimer(t *testing.T) {
+	orig := GaugeMigrationMetrics
+	t.Cleanup(func() { GaugeMigrationMetrics = orig })
+
+	GaugeMigrationMetrics = map[string]struct{}{
+		"metric_a": {},
+		"metric_b": {},
+	}
+
+	tests := []struct {
+		name     string
+		config   GaugeMigration
+		metric   string
+		expected bool
+	}{
+		{
+			name:     "non-migration metric always emits timer",
+			config:   GaugeMigration{},
+			metric:   "some_other_metric",
+			expected: true,
+		},
+		{
+			name:     "migration metric with default empty mode emits timer",
+			config:   GaugeMigration{},
+			metric:   "metric_a",
+			expected: true,
+		},
+		{
+			name:     "migration metric with default timer mode emits timer",
+			config:   GaugeMigration{Default: "timer"},
+			metric:   "metric_a",
+			expected: true,
+		},
+		{
+			name:     "migration metric with default gauge mode does not emit timer",
+			config:   GaugeMigration{Default: "gauge"},
+			metric:   "metric_a",
+			expected: false,
+		},
+		{
+			name:     "migration metric with default both mode emits timer",
+			config:   GaugeMigration{Default: "both"},
+			metric:   "metric_a",
+			expected: true,
+		},
+		{
+			name: "explicit false overrides default timer",
+			config: GaugeMigration{
+				Default: "timer",
+				Names:   map[string]bool{"metric_b": false},
+			},
+			metric:   "metric_b",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.config.EmitTimer(tt.metric))
 		})
 	}
 }
@@ -133,21 +202,33 @@ func TestCounterMigration_EmitCounter(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "migration counter with default empty mode emits",
+			name:     "migration counter with default empty mode does not emit counter",
 			config:   CounterMigration{},
-			metric:   "counter_a",
-			expected: true,
-		},
-		{
-			name:     "migration counter with default none mode does not emit",
-			config:   CounterMigration{Default: "none"},
 			metric:   "counter_a",
 			expected: false,
 		},
 		{
-			name: "explicit true overrides default none",
+			name:     "migration counter with default timer mode does not emit counter",
+			config:   CounterMigration{Default: "timer"},
+			metric:   "counter_a",
+			expected: false,
+		},
+		{
+			name:     "migration counter with default counter mode emits",
+			config:   CounterMigration{Default: "counter"},
+			metric:   "counter_a",
+			expected: true,
+		},
+		{
+			name:     "migration counter with default both mode emits",
+			config:   CounterMigration{Default: "both"},
+			metric:   "counter_a",
+			expected: true,
+		},
+		{
+			name: "explicit true overrides default timer",
 			config: CounterMigration{
-				Default: "none",
+				Default: "timer",
 				Names:   map[string]bool{"counter_a": true},
 			},
 			metric:   "counter_a",
@@ -171,14 +252,78 @@ func TestCounterMigration_EmitCounter(t *testing.T) {
 	}
 }
 
+func TestCounterMigration_EmitTimer(t *testing.T) {
+	orig := CounterMigrationMetrics
+	t.Cleanup(func() { CounterMigrationMetrics = orig })
+
+	CounterMigrationMetrics = map[string]struct{}{
+		"counter_a": {},
+		"counter_b": {},
+	}
+
+	tests := []struct {
+		name     string
+		config   CounterMigration
+		metric   string
+		expected bool
+	}{
+		{
+			name:     "non-migration counter always emits timer",
+			config:   CounterMigration{},
+			metric:   "some_other_counter",
+			expected: true,
+		},
+		{
+			name:     "migration counter with default empty mode emits timer",
+			config:   CounterMigration{},
+			metric:   "counter_a",
+			expected: true,
+		},
+		{
+			name:     "migration counter with default timer mode emits timer",
+			config:   CounterMigration{Default: "timer"},
+			metric:   "counter_a",
+			expected: true,
+		},
+		{
+			name:     "migration counter with default counter mode does not emit timer",
+			config:   CounterMigration{Default: "counter"},
+			metric:   "counter_a",
+			expected: false,
+		},
+		{
+			name:     "migration counter with default both mode emits timer",
+			config:   CounterMigration{Default: "both"},
+			metric:   "counter_a",
+			expected: true,
+		},
+		{
+			name: "explicit false overrides default timer",
+			config: CounterMigration{
+				Default: "timer",
+				Names:   map[string]bool{"counter_b": false},
+			},
+			metric:   "counter_b",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.config.EmitTimer(tt.metric))
+		})
+	}
+}
+
 func TestGaugeMigrationMode_UnmarshalYAML(t *testing.T) {
 	tests := []struct {
 		input    string
 		valid    bool
 		expected GaugeMigrationMode
 	}{
+		{"timer", true, "timer"},
 		{"gauge", true, "gauge"},
-		{"none", true, "none"},
+		{"both", true, "both"},
 		{"invalid", false, ""},
 	}
 	for _, tt := range tests {
@@ -204,8 +349,9 @@ func TestCounterMigrationMode_UnmarshalYAML(t *testing.T) {
 		valid    bool
 		expected CounterMigrationMode
 	}{
+		{"timer", true, "timer"},
 		{"counter", true, "counter"},
-		{"none", true, "none"},
+		{"both", true, "both"},
 		{"invalid", false, ""},
 	}
 	for _, tt := range tests {
