@@ -188,7 +188,7 @@ func TestNewWorkflowRepairer(t *testing.T) {
 	)
 
 	mockLogger := log.NewNoop()
-	mockMetricsClient := metrics.NewClient(tally.NoopScope, metrics.History, metrics.HistogramMigration{})
+	mockMetricsClient := metrics.NewClient(tally.NoopScope, metrics.History, metrics.MigrationConfig{})
 
 	repairer := NewWorkflowRepairer(testShard, mockLogger, mockMetricsClient)
 
@@ -382,9 +382,9 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 					gomock.Any(), gomock.Any(), "",
 				).Return(mockRebuiltMS, int64(0), nil).Times(1)
 				mockRebuiltMS.EXPECT().SetHistorySize(int64(0)).Times(1)
-				},
-				wantRepaired: false,
-				wantErr:      true,
+			},
+			wantRepaired: false,
+			wantErr:      true,
 			wantErrIs:    ErrChecksumMismatchAfterRebuild,
 		},
 		{
@@ -594,7 +594,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 
 			ms := NewMockMutableState(ctrl)
 			mockLogger := log.NewNoop()
-			mockMetricsClient := metrics.NewClient(tally.NoopScope, metrics.History, metrics.HistogramMigration{})
+			mockMetricsClient := metrics.NewClient(tally.NoopScope, metrics.History, metrics.MigrationConfig{})
 			mockConfig := config.NewForTest()
 			mockConfig.MutableStateChecksumVerifyProbability = func(domain string) int { return 100 }
 			sr := NewMockStateRebuilder(ctrl)
