@@ -268,8 +268,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				ms.EXPECT().GetVersionHistories().Return(nil).AnyTimes()
 			},
 			wantRepaired: false,
-			wantErr:      true,
-			wantErrIs:    checksum.ErrMismatch,
+			wantErr:      false,
 		},
 		{
 			name: "checksum mismatch - repair enabled - rebuild fails",

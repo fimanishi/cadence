@@ -2697,13 +2697,6 @@ const (
 	TestGetDurationPropertyFilteredByDomainIDKey
 	TestGetDurationPropertyFilteredByShardID
 
-	// CorruptionRepairTimeout is the timeout for corruption repair operations
-	// KeyName: history.corruptionRepairTimeout
-	// Value type: Duration
-	// Default value: 30s
-	// Allowed filters: DomainName
-	CorruptionRepairTimeout
-
 	// FrontendShutdownDrainDuration is the duration of traffic drain during shutdown
 	// KeyName: frontend.shutdownDrainDuration
 	// Value type: Duration
@@ -2836,6 +2829,12 @@ const (
 	// Default value: 20s( time.Second*20)
 	// Allowed filters: DomainName
 	HistoryLongPollExpirationInterval
+	// CorruptionRepairTimeout is the timeout for corruption repair operations
+	// KeyName: history.corruptionRepairTimeout
+	// Value type: Duration
+	// Default value: 30s
+	// Allowed filters: DomainName
+	CorruptionRepairTimeout
 	// HistoryCacheTTL is TTL of history cache
 	// KeyName: history.cacheTTL
 	// Value type: Duration

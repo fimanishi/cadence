@@ -44,12 +44,12 @@ type (
 	CorruptionType int
 
 	workflowRepairerImpl struct {
-		shard                shard.Context
-		stateRebuilder       StateRebuilder
-		stateRebuilderOnce   sync.Once
-		logger               log.Logger
-		metricsClient        metrics.Client
-		scope                metrics.Scope
+		shard              shard.Context
+		stateRebuilder     StateRebuilder
+		stateRebuilderOnce sync.Once
+		logger             log.Logger
+		metricsClient      metrics.Client
+		scope              metrics.Scope
 	}
 )
 
@@ -119,7 +119,7 @@ func (r *workflowRepairerImpl) VerifyAndRepairWorkflowIfNeeded(
 		return false, nil
 	}
 
-	corruptionType, checksumValue, err := r.verifyChecksumAndAnalyze(mutableState, persistedChecksum)
+	corruptionType, checksumValue, _ := r.verifyChecksumAndAnalyze(mutableState, persistedChecksum)
 	if corruptionType == CorruptionTypeNone {
 		return false, nil
 	}
@@ -129,7 +129,9 @@ func (r *workflowRepairerImpl) VerifyAndRepairWorkflowIfNeeded(
 		return r.repairWorkflow(ctx, mutableState, corruptionType, checksumValue)
 	}
 
-	return false, err
+	// Auto-repair disabled — log and continue to preserve old behavior.
+	// Corruption is already recorded via metrics and logs in verifyChecksumAndAnalyze.
+	return false, nil
 }
 
 // repairWorkflow orchestrates repair for a detected corruption
