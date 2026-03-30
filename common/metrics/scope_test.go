@@ -29,7 +29,7 @@ func TestGaugeMode(t *testing.T) {
 	})
 
 	GaugeMigrationMetrics = map[string]struct{}{
-		findName(BaseCacheByteSize):          {},
+		findName(BaseCacheByteSize):           {},
 		findName(BaseCacheByteSizeLimitGauge): {},
 	}
 
@@ -37,7 +37,7 @@ func TestGaugeMode(t *testing.T) {
 		Gauge: GaugeMigration{
 			// Default: ..., left at default value (timer)
 			Names: map[string]bool{
-				findName(BaseCacheByteSize):          true,  // timer mode
+				findName(BaseCacheByteSize):           true,  // timer mode
 				findName(BaseCacheByteSizeLimitGauge): false, // gauge mode
 			},
 		},
