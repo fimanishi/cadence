@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/uber/cadence/common/cache"
+	"github.com/uber/cadence/common/checksum"
 	"github.com/uber/cadence/common/definition"
 	"github.com/uber/cadence/common/persistence"
 	"github.com/uber/cadence/common/types"
@@ -236,6 +237,8 @@ type (
 
 		GetHistorySize() int64
 		SetHistorySize(size int64)
+
+		GetChecksum() checksum.Checksum
 
 		cache.Sizeable
 	}

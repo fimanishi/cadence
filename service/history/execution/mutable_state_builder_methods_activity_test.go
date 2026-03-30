@@ -62,7 +62,6 @@ func testMutableStateBuilder(t *testing.T) *mutableStateBuilder {
 	// set the checksum probabilities to 100% for exercising during test
 	mockShard.GetConfig().MutableStateChecksumGenProbability = func(domain string) int { return 100 }
 	mockShard.GetConfig().MutableStateChecksumVerifyProbability = func(domain string) int { return 100 }
-	mockShard.GetConfig().EnableRetryForChecksumFailure = func(domain string) bool { return true }
 	logger := log.NewNoop()
 
 	mockShard.Resource.MatchingClient.EXPECT().AddActivityTask(gomock.Any(), gomock.Any()).Return(&types.AddActivityTaskResponse{}, nil).AnyTimes()

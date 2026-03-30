@@ -359,23 +359,9 @@ func (e *mutableStateBuilder) Load(
 	e.fillForBackwardsCompatibility()
 
 	if len(state.Checksum.Value) > 0 {
-		switch {
-		case e.shouldInvalidateChecksum():
+		if e.shouldInvalidateChecksum() {
 			e.checksum = checksum.Checksum{}
 			e.metricsClient.IncCounter(metrics.WorkflowContextScope, metrics.MutableStateChecksumInvalidated)
-		case e.shouldVerifyChecksum():
-			// Fast path: verify checksum first before allocating repairer
-			if err := verifyMutableStateChecksum(e, state.Checksum); err != nil {
-				// Checksum mismatch - create repairer and attempt detection/repair
-				// Pass checksumCorrupted=true since we already verified it above
-				repairer := NewWorkflowRepairer(e.shard, e.logger, e.metricsClient)
-				repairErr := repairer.DetectAndRepairIfNeeded(ctx, e, state.Checksum, true)
-				// Always propagate ErrWorkflowRepairedRetryOperation (auto-repair forces retry),
-				// otherwise only propagate if enableChecksumFailureRetry is true
-				if e.shard.GetConfig().EnableCorruptionAutoRepair(e.domainEntry.GetInfo().Name) || e.enableChecksumFailureRetry() {
-					return repairErr
-				}
-			}
 		}
 	}
 	return nil
@@ -409,6 +395,10 @@ func (e *mutableStateBuilder) GetCurrentBranchToken() ([]byte, error) {
 
 func (e *mutableStateBuilder) GetVersionHistories() *persistence.VersionHistories {
 	return e.versionHistories
+}
+
+func (e *mutableStateBuilder) GetChecksum() checksum.Checksum {
+	return e.checksum
 }
 
 // set treeID/historyBranches
@@ -2183,20 +2173,6 @@ func (e *mutableStateBuilder) shouldGenerateChecksum() bool {
 		return false
 	}
 	return rand.Intn(100) < e.config.MutableStateChecksumGenProbability(e.domainEntry.GetInfo().Name)
-}
-
-func (e *mutableStateBuilder) shouldVerifyChecksum() bool {
-	if e.domainEntry == nil {
-		return false
-	}
-	return rand.Intn(100) < e.config.MutableStateChecksumVerifyProbability(e.domainEntry.GetInfo().Name)
-}
-
-func (e *mutableStateBuilder) enableChecksumFailureRetry() bool {
-	if e.domainEntry == nil {
-		return false
-	}
-	return e.config.EnableRetryForChecksumFailure(e.domainEntry.GetInfo().Name)
 }
 
 func (e *mutableStateBuilder) shouldInvalidateChecksum() bool {

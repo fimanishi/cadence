@@ -239,7 +239,6 @@ func TestNewConfig(t *testing.T) {
 		"MutableStateChecksumGenProbability":                   {dynamicproperties.MutableStateChecksumGenProbability, 90},
 		"MutableStateChecksumVerifyProbability":                {dynamicproperties.MutableStateChecksumVerifyProbability, 91},
 		"MutableStateChecksumInvalidateBefore":                 {dynamicproperties.MutableStateChecksumInvalidateBefore, 15.0},
-		"EnableRetryForChecksumFailure":                        {dynamicproperties.EnableRetryForChecksumFailure, true},
 		"EnableHistoryCorruptionCheck":                         {dynamicproperties.EnableHistoryCorruptionCheck, true},
 		"NotifyFailoverMarkerInterval":                         {dynamicproperties.NotifyFailoverMarkerInterval, time.Second},
 		"NotifyFailoverMarkerTimerJitterCoefficient":           {dynamicproperties.NotifyFailoverMarkerTimerJitterCoefficient, 16.0},

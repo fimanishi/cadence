@@ -108,7 +108,6 @@ func (s *mutableStateSuite) SetupTest() {
 	// set the checksum probabilities to 100% for exercising during test
 	s.mockShard.GetConfig().MutableStateChecksumGenProbability = func(domain string) int { return 100 }
 	s.mockShard.GetConfig().MutableStateChecksumVerifyProbability = func(domain string) int { return 100 }
-	s.mockShard.GetConfig().EnableRetryForChecksumFailure = func(domain string) bool { return true }
 	s.mockShard.GetConfig().EnableCorruptionAutoRepair = func(domain string) bool { return false }
 
 	s.mockEventsCache = s.mockShard.GetEventsCache().(*events.MockCache)
@@ -449,11 +448,11 @@ func (s *mutableStateSuite) TestChecksum() {
 			s.NotNil(csum.Value)
 			s.Equal(dbState.Checksum.Value, csum.Value)
 
-			// modify checksum and verify Load fails
+			// modify checksum — Load now succeeds (checksum verification moved to WorkflowRepairer)
 			dbState.Checksum.Value[0]++
 			err = s.msBuilder.Load(context.Background(), dbState)
-			s.Error(err)
-			s.Equal(loadErrors+1, loadErrorsFunc())
+			s.NoError(err)
+			s.Equal(loadErrors, loadErrorsFunc()) // no counter: repairer does verification, not Load
 			s.EqualValues(dbState.Checksum, s.msBuilder.checksum)
 
 			// test checksum is invalidated
@@ -477,12 +476,9 @@ func (s *mutableStateSuite) TestChecksum() {
 func (s *mutableStateSuite) TestChecksumProbabilities() {
 	for _, prob := range []int{0, 100} {
 		s.mockShard.GetConfig().MutableStateChecksumGenProbability = func(domain string) int { return prob }
-		s.mockShard.GetConfig().MutableStateChecksumVerifyProbability = func(domain string) int { return prob }
 		for i := 0; i < 100; i++ {
 			shouldGenerate := s.msBuilder.shouldGenerateChecksum()
-			shouldVerify := s.msBuilder.shouldVerifyChecksum()
 			s.Equal(prob == 100, shouldGenerate)
-			s.Equal(prob == 100, shouldVerify)
 		}
 	}
 }

@@ -27,7 +27,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -186,6 +185,8 @@ type (
 		mutableState    MutableState
 		stats           *persistence.ExecutionStats
 
+		repairer WorkflowRepairer
+
 		appendHistoryNodesFn                  func(context.Context, string, types.WorkflowExecution, *persistence.AppendHistoryNodesRequest) (*persistence.AppendHistoryNodesResponse, error)
 		persistStartWorkflowBatchEventsFn     func(context.Context, *persistence.WorkflowEvents) (events.PersistedBlob, error)
 		persistNonStartWorkflowBatchEventsFn  func(context.Context, *persistence.WorkflowEvents) (events.PersistedBlob, error)
@@ -218,13 +219,15 @@ func NewContext(
 	logger log.Logger,
 ) Context {
 	logger = logger.WithTags(tag.WorkflowDomainID(domainID), tag.WorkflowID(execution.GetWorkflowID()), tag.WorkflowRunID(execution.GetRunID()))
+	metricsClient := shard.GetMetricsClient()
 	ctx := &contextImpl{
 		domainID:          domainID,
 		workflowExecution: execution,
 		shard:             shard,
 		executionManager:  executionManager,
 		logger:            logger,
-		metricsClient:     shard.GetMetricsClient(),
+		metricsClient:     metricsClient,
+		repairer:          NewWorkflowRepairer(shard, logger, metricsClient),
 		mutex:             locks.NewMutex(),
 		maxLockDuration:   maxLockDuration,
 		stats: &persistence.ExecutionStats{
@@ -343,13 +346,6 @@ func (c *contextImpl) LoadExecutionStats(
 	return c.stats, nil
 }
 
-func isChecksumError(err error) bool {
-	if err == nil {
-		return false
-	}
-	return strings.Contains(err.Error(), "checksum mismatch error")
-}
-
 func (c *contextImpl) LoadWorkflowExecutionWithTaskVersion(
 	ctx context.Context,
 	incomingVersion int64,
@@ -371,19 +367,25 @@ func (c *contextImpl) LoadWorkflowExecutionWithTaskVersion(
 				return nil, err
 			}
 			c.mutableState = c.createMutableStateFn(c.shard, c.logger, domainEntry)
-			err = c.mutableState.Load(ctx, response.State)
-			if err == nil {
-				break
-			} else if !isChecksumError(err) {
+			if err = c.mutableState.Load(ctx, response.State); err != nil {
 				c.logger.Error("failed to load mutable state", tag.Error(err))
 				break
 			}
-			// backoff before retry
-			c.shard.GetTimeSource().Sleep(time.Millisecond * 100)
+			var isRepaired bool
+			isRepaired, err = c.repairer.VerifyAndRepairWorkflowIfNeeded(ctx, c.mutableState)
+			if err != nil {
+				break
+			}
+			if isRepaired {
+				// Repair succeeded — reload fresh state from DB
+				continue
+			}
+			// No corruption detected — state is clean
+			break
 		}
-		if isChecksumError(err) {
-			c.metricsClient.IncCounter(metrics.WorkflowContextScope, metrics.StaleMutableStateCounter)
-			c.logger.Error("encounter stale mutable state after retry", tag.Error(err))
+
+		if err != nil {
+			return nil, err
 		}
 
 		c.stats = response.State.ExecutionStats

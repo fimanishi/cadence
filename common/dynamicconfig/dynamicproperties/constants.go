@@ -2176,18 +2176,8 @@ const (
 	// Allowed filters: DomainID
 	EnableTimerDebugLogByDomainID
 
-	// EnableRetryForChecksumFailure enables retry if mutable state checksum verification fails
-	// Note: When EnableCorruptionAutoRepair is true, repair errors always force retry regardless
-	// of this setting. This flag only controls non-repair checksum mismatch errors.
-	// KeyName: history.enableMutableStateChecksumFailureRetry
-	// Value type: Bool
-	// Default value: false
-	// Allowed filters: DomainName
-	EnableRetryForChecksumFailure
-
 	// EnableCorruptionAutoRepair enables automatic repair of corrupted workflows via StateRebuilder
-	// When enabled, detected corruption triggers automatic repair and ALWAYS forces operation retry
-	// (regardless of EnableRetryForChecksumFailure setting) to prevent race conditions.
+	// When enabled, detected corruption triggers automatic repair and forces operation retry.
 	// KeyName: history.enableCorruptionAutoRepair
 	// Value type: Bool
 	// Default value: false
@@ -4916,12 +4906,6 @@ var BoolKeys = map[BoolKey]DynamicBool{
 		KeyName:      "history.enableTimerDebugLogByDomainID",
 		Filters:      []Filter{DomainID},
 		Description:  "Enable log for debugging timer task issue by domain",
-		DefaultValue: false,
-	},
-	EnableRetryForChecksumFailure: {
-		KeyName:      "history.enableMutableStateChecksumFailureRetry",
-		Filters:      []Filter{DomainName},
-		Description:  "EnableRetryForChecksumFailure enables retry if mutable state checksum verification fails",
 		DefaultValue: false,
 	},
 	EnableCorruptionAutoRepair: {

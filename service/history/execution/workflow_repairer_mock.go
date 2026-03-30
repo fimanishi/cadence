@@ -14,8 +14,6 @@ import (
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
-
-	checksum "github.com/uber/cadence/common/checksum"
 )
 
 // MockWorkflowRepairer is a mock of WorkflowRepairer interface.
@@ -42,30 +40,17 @@ func (m *MockWorkflowRepairer) EXPECT() *MockWorkflowRepairerMockRecorder {
 	return m.recorder
 }
 
-// DetectAndRepairIfNeeded mocks base method.
-func (m *MockWorkflowRepairer) DetectAndRepairIfNeeded(ctx context.Context, mutableState MutableState, persistedChecksum checksum.Checksum, checksumCorrupted bool) error {
+// VerifyAndRepairWorkflowIfNeeded mocks base method.
+func (m *MockWorkflowRepairer) VerifyAndRepairWorkflowIfNeeded(ctx context.Context, mutableState MutableState) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DetectAndRepairIfNeeded", ctx, mutableState, persistedChecksum, checksumCorrupted)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "VerifyAndRepairWorkflowIfNeeded", ctx, mutableState)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// DetectAndRepairIfNeeded indicates an expected call of DetectAndRepairIfNeeded.
-func (mr *MockWorkflowRepairerMockRecorder) DetectAndRepairIfNeeded(ctx, mutableState, persistedChecksum, checksumCorrupted any) *gomock.Call {
+// VerifyAndRepairWorkflowIfNeeded indicates an expected call of VerifyAndRepairWorkflowIfNeeded.
+func (mr *MockWorkflowRepairerMockRecorder) VerifyAndRepairWorkflowIfNeeded(ctx, mutableState any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DetectAndRepairIfNeeded", reflect.TypeOf((*MockWorkflowRepairer)(nil).DetectAndRepairIfNeeded), ctx, mutableState, persistedChecksum, checksumCorrupted)
-}
-
-// RepairWorkflow mocks base method.
-func (m *MockWorkflowRepairer) RepairWorkflow(ctx context.Context, mutableState MutableState, corruptionType CorruptionType, persistedChecksum checksum.Checksum) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RepairWorkflow", ctx, mutableState, corruptionType, persistedChecksum)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RepairWorkflow indicates an expected call of RepairWorkflow.
-func (mr *MockWorkflowRepairerMockRecorder) RepairWorkflow(ctx, mutableState, corruptionType, persistedChecksum any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RepairWorkflow", reflect.TypeOf((*MockWorkflowRepairer)(nil).RepairWorkflow), ctx, mutableState, corruptionType, persistedChecksum)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyAndRepairWorkflowIfNeeded", reflect.TypeOf((*MockWorkflowRepairer)(nil).VerifyAndRepairWorkflowIfNeeded), ctx, mutableState)
 }
