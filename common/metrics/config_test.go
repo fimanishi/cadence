@@ -315,6 +315,99 @@ func TestCounterMigration_EmitTimer(t *testing.T) {
 	}
 }
 
+func TestMigrationConfig_EmitTimer(t *testing.T) {
+	origH := HistogramMigrationMetrics
+	origG := GaugeMigrationMetrics
+	origC := CounterMigrationMetrics
+	t.Cleanup(func() {
+		HistogramMigrationMetrics = origH
+		GaugeMigrationMetrics = origG
+		CounterMigrationMetrics = origC
+	})
+
+	HistogramMigrationMetrics = map[string]struct{}{"histogram_metric": {}}
+	GaugeMigrationMetrics = map[string]struct{}{"gauge_metric": {}}
+	CounterMigrationMetrics = map[string]struct{}{"counter_metric": {}}
+
+	tests := []struct {
+		name     string
+		config   MigrationConfig
+		metric   string
+		expected bool
+	}{
+		{
+			name:     "metric not in any migration map always emits timer",
+			config:   MigrationConfig{},
+			metric:   "some_other_metric",
+			expected: true,
+		},
+		{
+			name:     "histogram metric with default empty mode emits timer",
+			config:   MigrationConfig{},
+			metric:   "histogram_metric",
+			expected: true,
+		},
+		{
+			name: "histogram metric with histogram mode suppresses timer",
+			config: MigrationConfig{
+				Histogram: HistogramMigration{Default: "histogram"},
+			},
+			metric:   "histogram_metric",
+			expected: false,
+		},
+		{
+			name:     "gauge metric with default empty mode emits timer",
+			config:   MigrationConfig{},
+			metric:   "gauge_metric",
+			expected: true,
+		},
+		{
+			name: "gauge metric with gauge mode suppresses timer",
+			config: MigrationConfig{
+				Gauge: GaugeMigration{Default: "gauge"},
+			},
+			metric:   "gauge_metric",
+			expected: false,
+		},
+		{
+			name: "gauge metric with both mode emits timer",
+			config: MigrationConfig{
+				Gauge: GaugeMigration{Default: "both"},
+			},
+			metric:   "gauge_metric",
+			expected: true,
+		},
+		{
+			name:     "counter metric with default empty mode emits timer",
+			config:   MigrationConfig{},
+			metric:   "counter_metric",
+			expected: true,
+		},
+		{
+			name: "counter metric with counter mode suppresses timer",
+			config: MigrationConfig{
+				Counter: CounterMigration{Default: "counter"},
+			},
+			metric:   "counter_metric",
+			expected: false,
+		},
+		{
+			name: "counter metric with both mode emits timer",
+			config: MigrationConfig{
+				Counter: CounterMigration{Default: "both"},
+			},
+			metric:   "counter_metric",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.config.EmitTimer(tt.metric))
+		})
+	}
+}
+
 func TestGaugeMigrationMode_UnmarshalYAML(t *testing.T) {
 	tests := []struct {
 		input    string

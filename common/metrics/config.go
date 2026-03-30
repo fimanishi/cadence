@@ -10,6 +10,16 @@ type MigrationConfig struct {
 	Counter   CounterMigration
 }
 
+// EmitTimer returns true if the metric should be emitted as a timer.
+// A metric is suppressed from timer emission if the migration that owns it
+// has been configured to move away from timer.
+// Metrics not in any migration map are always emitted.
+func (mc MigrationConfig) EmitTimer(name string) bool {
+	return mc.Histogram.EmitTimer(name) &&
+		mc.Gauge.EmitTimer(name) &&
+		mc.Counter.EmitTimer(name)
+}
+
 type HistogramMigration struct {
 	Default HistogramMigrationMode `yaml:"default"`
 	// Names maps "metric name" -> "should it be emitted".
