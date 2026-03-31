@@ -325,9 +325,9 @@ func TestMigrationConfig_EmitTimer(t *testing.T) {
 		CounterMigrationMetrics = origC
 	})
 
-	HistogramMigrationMetrics = map[string]struct{}{"histogram_metric": {}}
-	GaugeMigrationMetrics = map[string]struct{}{"gauge_metric": {}}
-	CounterMigrationMetrics = map[string]struct{}{"counter_metric": {}}
+	HistogramMigrationMetrics = map[string]struct{}{"histogram_metric": {}, "multi_metric": {}}
+	GaugeMigrationMetrics = map[string]struct{}{"gauge_metric": {}, "multi_metric": {}}
+	CounterMigrationMetrics = map[string]struct{}{"counter_metric": {}, "multi_metric": {}}
 
 	tests := []struct {
 		name     string
@@ -354,6 +354,14 @@ func TestMigrationConfig_EmitTimer(t *testing.T) {
 			},
 			metric:   "histogram_metric",
 			expected: false,
+		},
+		{
+			name: "histogram metric with both mode emits timer",
+			config: MigrationConfig{
+				Histogram: HistogramMigration{Default: "both"},
+			},
+			metric:   "histogram_metric",
+			expected: true,
 		},
 		{
 			name:     "gauge metric with default empty mode emits timer",
@@ -398,6 +406,33 @@ func TestMigrationConfig_EmitTimer(t *testing.T) {
 			},
 			metric:   "counter_metric",
 			expected: true,
+		},
+		{
+			name: "histogram and gauge suppress timer, counter allows: result false",
+			config: MigrationConfig{
+				Histogram: HistogramMigration{Default: "histogram"},
+				Gauge:     GaugeMigration{Default: "gauge"},
+			},
+			metric:   "multi_metric",
+			expected: false,
+		},
+		{
+			name: "histogram and counter suppress timer, gauge allows: result false",
+			config: MigrationConfig{
+				Histogram: HistogramMigration{Default: "histogram"},
+				Counter:   CounterMigration{Default: "counter"},
+			},
+			metric:   "multi_metric",
+			expected: false,
+		},
+		{
+			name: "gauge and counter suppress timer, histogram allows: result false",
+			config: MigrationConfig{
+				Gauge:   GaugeMigration{Default: "gauge"},
+				Counter: CounterMigration{Default: "counter"},
+			},
+			metric:   "multi_metric",
+			expected: false,
 		},
 	}
 

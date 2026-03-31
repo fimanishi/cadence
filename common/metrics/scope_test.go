@@ -29,31 +29,40 @@ func TestGaugeMode(t *testing.T) {
 	})
 
 	GaugeMigrationMetrics = map[string]struct{}{
+		findName(CadenceLatency):              {},
 		findName(BaseCacheByteSize):           {},
-		findName(BaseCacheByteSizeLimitGauge): {},
+		findName(PersistenceLatency):          {},
+		findName(GlobalRatelimiterQuota):      {},
+		findName(CadenceDcRedirectionClientLatency): {},
+		findName(CadenceShardSuccessGauge):    {},
 	}
 
 	c := NewClient(ts, History, MigrationConfig{
 		Gauge: GaugeMigration{
 			// Default: ..., left at default value (timer)
 			Names: map[string]bool{
-				findName(BaseCacheByteSize):           true,  // timer mode
-				findName(BaseCacheByteSizeLimitGauge): false, // gauge mode
+				findName(CadenceLatency):         true,  // timer type
+				findName(BaseCacheByteSize):       false, // gauge type
+				findName(PersistenceLatency):      false, // timer type
+				findName(GlobalRatelimiterQuota):  true,  // gauge type
 			},
 		},
 	})
 	scope := c.Scope(HistoryDescribeQueueScope) // scope doesn't matter for this test
 
-	// migration metrics: call both old (timer) and new (gauge) paths
-	scope.RecordTimer(BaseCacheByteSize, time.Second)
+	scope.RecordTimer(CadenceLatency, time.Second)
 	scope.UpdateGauge(BaseCacheByteSize, 1.0)
 
-	scope.RecordTimer(BaseCacheByteSizeLimitGauge, 2*time.Second)
-	scope.UpdateGauge(BaseCacheByteSizeLimitGauge, 2.0)
+	scope.RecordTimer(PersistenceLatency, 2*time.Second)
+	scope.UpdateGauge(GlobalRatelimiterQuota, 2.0)
+
+	// unspecified -> default config (timer)
+	scope.RecordTimer(CadenceDcRedirectionClientLatency, 3*time.Second)
+	scope.UpdateGauge(CadenceShardSuccessGauge, 3.0)
 
 	// not migrating -> always emit
-	scope.RecordTimer(CadenceDcRedirectionClientLatency, 3*time.Second)
-	scope.UpdateGauge(GlobalRatelimiterQuota, 3.0)
+	scope.RecordTimer(CadenceErrBadRequestCounter, 4*time.Second)
+	scope.UpdateGauge(BaseCacheByteSizeLimitGauge, 4.0)
 
 	s := ts.Snapshot()
 	findMetric := func(idx MetricIdx) (timer, gauge bool) {
@@ -81,13 +90,18 @@ func TestGaugeMode(t *testing.T) {
 		assert.Equalf(t, gauge, foundGauge, "wrong gauge behavior for %v", name)
 	}
 
-	// Names[...] = true: EmitTimer=true, EmitGauge=true → both paths emit
-	assertFound(BaseCacheByteSize, true, true)
-	// Names[...] = false: EmitTimer=false, EmitGauge=false → neither emits
-	assertFound(BaseCacheByteSizeLimitGauge, false, false)
-	// not migrating: always emit the type that was called
-	assertFound(CadenceDcRedirectionClientLatency, true, false)
+	// only the timer
+	assertFound(CadenceLatency, true, false)
+	assertFound(BaseCacheByteSize, false, false)
+	// only the gauge
+	assertFound(PersistenceLatency, false, false)
 	assertFound(GlobalRatelimiterQuota, false, true)
+	// timers only (via default)
+	assertFound(CadenceDcRedirectionClientLatency, true, false)
+	assertFound(CadenceShardSuccessGauge, false, false)
+	// not migrating, the correct type should be emitted
+	assertFound(CadenceErrBadRequestCounter, true, false)
+	assertFound(BaseCacheByteSizeLimitGauge, false, true)
 }
 
 func TestCounterMode(t *testing.T) {
@@ -111,31 +125,40 @@ func TestCounterMode(t *testing.T) {
 	})
 
 	CounterMigrationMetrics = map[string]struct{}{
-		findName(CadenceRequests): {},
-		findName(CadenceFailures): {},
+		findName(CadenceLatency):              {},
+		findName(CadenceRequests):             {},
+		findName(PersistenceLatency):          {},
+		findName(CadenceFailures):             {},
+		findName(CadenceDcRedirectionClientLatency): {},
+		findName(CadenceErrBadRequestCounter): {},
 	}
 
 	c := NewClient(ts, History, MigrationConfig{
 		Counter: CounterMigration{
 			// Default: ..., left at default value (timer)
 			Names: map[string]bool{
-				findName(CadenceRequests): true,  // timer mode
-				findName(CadenceFailures): false, // counter mode
+				findName(CadenceLatency):    true,  // timer type
+				findName(CadenceRequests):   false, // counter type
+				findName(PersistenceLatency): false, // timer type
+				findName(CadenceFailures):   true,  // counter type
 			},
 		},
 	})
 	scope := c.Scope(HistoryDescribeQueueScope) // scope doesn't matter for this test
 
-	// migration metrics: call both old (timer) and new (counter) paths
-	scope.RecordTimer(CadenceRequests, time.Second)
+	scope.RecordTimer(CadenceLatency, time.Second)
 	scope.IncCounter(CadenceRequests)
 
-	scope.RecordTimer(CadenceFailures, 2*time.Second)
+	scope.RecordTimer(PersistenceLatency, 2*time.Second)
 	scope.IncCounter(CadenceFailures)
 
-	// not migrating -> always emit
+	// unspecified -> default config (timer)
 	scope.RecordTimer(CadenceDcRedirectionClientLatency, 3*time.Second)
 	scope.IncCounter(CadenceErrBadRequestCounter)
+
+	// not migrating -> always emit
+	scope.RecordTimer(CadenceErrServiceBusyCounter, 4*time.Second)
+	scope.IncCounter(CadenceErrDomainNotActiveCounter)
 
 	s := ts.Snapshot()
 	findMetric := func(idx MetricIdx) (timer, counter bool) {
@@ -163,13 +186,18 @@ func TestCounterMode(t *testing.T) {
 		assert.Equalf(t, counter, foundCounter, "wrong counter behavior for %v", name)
 	}
 
-	// Names[...] = true: EmitTimer=true, EmitCounter=true → both paths emit
-	assertFound(CadenceRequests, true, true)
-	// Names[...] = false: EmitTimer=false, EmitCounter=false → neither emits
-	assertFound(CadenceFailures, false, false)
-	// not migrating: always emit the type that was called
+	// only the timer
+	assertFound(CadenceLatency, true, false)
+	assertFound(CadenceRequests, false, false)
+	// only the counter
+	assertFound(PersistenceLatency, false, false)
+	assertFound(CadenceFailures, false, true)
+	// timers only (via default)
 	assertFound(CadenceDcRedirectionClientLatency, true, false)
-	assertFound(CadenceErrBadRequestCounter, false, true)
+	assertFound(CadenceErrBadRequestCounter, false, false)
+	// not migrating, the correct type should be emitted
+	assertFound(CadenceErrServiceBusyCounter, true, false)
+	assertFound(CadenceErrDomainNotActiveCounter, false, true)
 }
 
 func TestHistogramMode(t *testing.T) {
