@@ -29,12 +29,12 @@ func TestGaugeMode(t *testing.T) {
 	})
 
 	GaugeMigrationMetrics = map[string]struct{}{
-		findName(CadenceLatency):              {},
-		findName(BaseCacheByteSize):           {},
-		findName(PersistenceLatency):          {},
-		findName(GlobalRatelimiterQuota):      {},
+		findName(CadenceLatency):                    {},
+		findName(BaseCacheByteSize):                 {},
+		findName(PersistenceLatency):                {},
+		findName(GlobalRatelimiterQuota):            {},
 		findName(CadenceDcRedirectionClientLatency): {},
-		findName(CadenceShardSuccessGauge):    {},
+		findName(CadenceShardSuccessGauge):          {},
 	}
 
 	c := NewClient(ts, History, MigrationConfig{
@@ -42,9 +42,9 @@ func TestGaugeMode(t *testing.T) {
 			// Default: ..., left at default value (timer)
 			Names: map[string]bool{
 				findName(CadenceLatency):         true,  // timer type
-				findName(BaseCacheByteSize):       false, // gauge type
-				findName(PersistenceLatency):      false, // timer type
-				findName(GlobalRatelimiterQuota):  true,  // gauge type
+				findName(BaseCacheByteSize):      false, // gauge type
+				findName(PersistenceLatency):     false, // timer type
+				findName(GlobalRatelimiterQuota): true,  // gauge type
 			},
 		},
 	})
@@ -125,22 +125,22 @@ func TestCounterMode(t *testing.T) {
 	})
 
 	CounterMigrationMetrics = map[string]struct{}{
-		findName(CadenceLatency):              {},
-		findName(CadenceRequests):             {},
-		findName(PersistenceLatency):          {},
-		findName(CadenceFailures):             {},
+		findName(CadenceLatency):                    {},
+		findName(CadenceRequests):                   {},
+		findName(PersistenceLatency):                {},
+		findName(CadenceFailures):                   {},
 		findName(CadenceDcRedirectionClientLatency): {},
-		findName(CadenceErrBadRequestCounter): {},
+		findName(CadenceErrBadRequestCounter):       {},
 	}
 
 	c := NewClient(ts, History, MigrationConfig{
 		Counter: CounterMigration{
 			// Default: ..., left at default value (timer)
 			Names: map[string]bool{
-				findName(CadenceLatency):    true,  // timer type
-				findName(CadenceRequests):   false, // counter type
+				findName(CadenceLatency):     true,  // timer type
+				findName(CadenceRequests):    false, // counter type
 				findName(PersistenceLatency): false, // timer type
-				findName(CadenceFailures):   true,  // counter type
+				findName(CadenceFailures):    true,  // counter type
 			},
 		},
 	})
