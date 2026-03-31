@@ -390,7 +390,7 @@ func (c *contextImpl) LoadWorkflowExecutionWithTaskVersion(
 		}
 		if attempt == checksumErrorRetryCount {
 			return nil, &types.InternalServiceError{
-				Message: "failed to load stable mutable state after repair attempts",
+				Message: "mutable state could not be loaded after multiple attempts",
 			}
 		}
 

@@ -584,6 +584,56 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 			},
 			wantRepaired: true,
 		},
+		{
+			// Covers the MutableStateRebuildChecksumMatch counter (line 298 in workflow_repairer.go).
+			// The stored checksum equals what the rebuilt state produces (matchingChecksum), but the
+			// original mutable state has non-nil version histories so its fresh checksum differs from
+			// the stored one — corruption is detected, repair runs, and the rebuilt checksum matches.
+			name: "checksum mismatch - repair enabled and succeeds - rebuilt checksum matches persisted checksum",
+			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, ms *MockMutableState, sr *MockStateRebuilder) {
+				mockConfig.MutableStateChecksumVerifyProbability = func(domain string) int { return 100 }
+				mockConfig.EnableCorruptionAutoRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
+				mockConfig.RequireChecksumMatchAfterRebuildRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(false)
+
+				// Stored checksum = matchingChecksum (same as what the rebuild will produce).
+				ms.EXPECT().GetChecksum().Return(matchingChecksum).Times(1)
+				ms.EXPECT().GetDomainEntry().Return(cache.NewGlobalDomainCacheEntryForTest(
+					&persistence.DomainInfo{ID: testDomainID, Name: testDomainName},
+					&persistence.DomainConfig{},
+					&persistence.DomainReplicationConfig{ActiveClusterName: "active"},
+					0,
+				)).AnyTimes()
+				ms.EXPECT().GetExecutionInfo().Return(&persistence.WorkflowExecutionInfo{
+					DomainID:   testDomainID,
+					WorkflowID: testWorkflowID,
+					RunID:      testRunID,
+				}).AnyTimes()
+				// Non-nil version histories are included in the checksum payload, so
+				// generateMutableStateChecksum(ms) != matchingChecksum → corruption detected.
+				ms.EXPECT().GetVersionHistories().Return(&persistence.VersionHistories{
+					CurrentVersionHistoryIndex: 0,
+					Histories: []*persistence.VersionHistory{
+						{
+							BranchToken: []byte(testBranchToken),
+							Items:       []*persistence.VersionHistoryItem{{EventID: 9, Version: 1}},
+						},
+					},
+				}).AnyTimes()
+				ms.EXPECT().GetCurrentBranchToken().Return([]byte(testBranchToken), nil).Times(1)
+				ms.EXPECT().GetPendingTimerInfos().Return(map[string]*persistence.TimerInfo{}).AnyTimes()
+				ms.EXPECT().GetPendingActivityInfos().Return(map[int64]*persistence.ActivityInfo{}).AnyTimes()
+				ms.EXPECT().GetPendingChildExecutionInfos().Return(map[int64]*persistence.ChildExecutionInfo{}).AnyTimes()
+				ms.EXPECT().GetPendingRequestCancelExternalInfos().Return(map[int64]*persistence.RequestCancelInfo{}).AnyTimes()
+				ms.EXPECT().GetPendingSignalExternalInfos().Return(map[int64]*persistence.SignalInfo{}).AnyTimes()
+
+				// Rebuilt state has nil version histories + standard exec info → checksum = matchingChecksum = stored.
+				setupSuccessfulRebuild(ctrl, sr, true)
+				setupDomainCacheMocks(testShard)
+				testShard.Resource.ExecutionMgr.On("UpdateWorkflowExecution", mock.Anything, mock.Anything).Return(&persistence.UpdateWorkflowExecutionResponse{}, nil).Once()
+			},
+			wantRepaired: true,
+		},
 	}
 
 	for _, tt := range tests {
