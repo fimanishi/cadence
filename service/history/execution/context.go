@@ -368,10 +368,7 @@ func (c *contextImpl) LoadWorkflowExecutionWithTaskVersion(
 				return nil, err
 			}
 			c.mutableState = c.createMutableStateFn(c.shard, c.logger, domainEntry)
-			if err = c.mutableState.Load(ctx, response.State); err != nil {
-				c.logger.Error("failed to load mutable state", tag.Error(err))
-				break
-			}
+			c.mutableState.Load(ctx, response.State)
 			var isRepaired bool
 			isRepaired, err = c.repairer.VerifyAndRepairWorkflowIfNeeded(ctx, c.mutableState)
 			if err != nil {

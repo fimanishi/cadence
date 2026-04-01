@@ -3257,7 +3257,7 @@ func TestLoadWorkflowExecutionWithTaskVersion(t *testing.T) {
 				mockDomainCache.EXPECT().GetDomainByID(gomock.Any()).Return(cache.NewDomainCacheEntryForTest(&persistence.DomainInfo{
 					Name: "test-domain",
 				}, nil, true, nil, 0, nil, 0, 0, 0), nil)
-				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Return(nil)
+				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any())
 				mockMutableState.EXPECT().StartTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(false, errors.New("some error"))
 			},
 			mockGetWorkflowExecutionFn: func(context.Context, *persistence.GetWorkflowExecutionRequest) (*persistence.GetWorkflowExecutionResponse, error) {
@@ -3296,7 +3296,7 @@ func TestLoadWorkflowExecutionWithTaskVersion(t *testing.T) {
 					0,
 					0,
 					0), nil)
-				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Return(nil)
+				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any())
 				mockMutableState.EXPECT().StartTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil)
 			},
 			mockGetWorkflowExecutionFn: func(context.Context, *persistence.GetWorkflowExecutionRequest) (*persistence.GetWorkflowExecutionResponse, error) {
@@ -3326,7 +3326,7 @@ func TestLoadWorkflowExecutionWithTaskVersion(t *testing.T) {
 				mockDomainCache.EXPECT().GetDomainByID(gomock.Any()).Return(cache.NewDomainCacheEntryForTest(&persistence.DomainInfo{
 					Name: "test-domain",
 				}, nil, true, nil, 0, nil, 0, 0, 0), nil)
-				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Return(nil)
+				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any())
 				mockMutableState.EXPECT().StartTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil)
 				mockMutableState.EXPECT().StartTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil)
 				mockShard.EXPECT().GetTimeSource().Return(clock.NewMockedTimeSource())
@@ -3355,36 +3355,13 @@ func TestLoadWorkflowExecutionWithTaskVersion(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "load fails",
-			mockSetup: func(mockShard *shard.MockContext, mockMutableState *MockMutableState, mockDomainCache *cache.MockDomainCache) {
-				mockShard.EXPECT().GetDomainCache().Return(mockDomainCache)
-				mockDomainCache.EXPECT().GetDomainByID(gomock.Any()).Return(cache.NewDomainCacheEntryForTest(&persistence.DomainInfo{
-					Name: "test-domain",
-				}, nil, true, nil, 0, nil, 0, 0, 0), nil)
-				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Return(errors.New("some error"))
-			},
-			mockGetWorkflowExecutionFn: func(context.Context, *persistence.GetWorkflowExecutionRequest) (*persistence.GetWorkflowExecutionResponse, error) {
-				return &persistence.GetWorkflowExecutionResponse{
-					State: &persistence.WorkflowMutableState{
-						ExecutionInfo: &persistence.WorkflowExecutionInfo{
-							DomainID:   "test-domain-id",
-							WorkflowID: "test-workflow-id",
-							RunID:      "test-run-id",
-						},
-						ExecutionStats: &persistence.ExecutionStats{HistorySize: 123},
-					},
-				}, nil
-			},
-			wantErr: true,
-		},
-		{
 			name: "VerifyAndRepairWorkflowIfNeeded fails",
 			mockSetup: func(mockShard *shard.MockContext, mockMutableState *MockMutableState, mockDomainCache *cache.MockDomainCache) {
 				mockShard.EXPECT().GetDomainCache().Return(mockDomainCache)
 				mockDomainCache.EXPECT().GetDomainByID(gomock.Any()).Return(cache.NewDomainCacheEntryForTest(&persistence.DomainInfo{
 					Name: "test-domain",
 				}, nil, true, nil, 0, nil, 0, 0, 0), nil)
-				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Return(nil)
+				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any())
 			},
 			mockGetWorkflowExecutionFn: func(context.Context, *persistence.GetWorkflowExecutionRequest) (*persistence.GetWorkflowExecutionResponse, error) {
 				return &persistence.GetWorkflowExecutionResponse{
@@ -3411,7 +3388,7 @@ func TestLoadWorkflowExecutionWithTaskVersion(t *testing.T) {
 				mockDomainCache.EXPECT().GetDomainByID(gomock.Any()).Return(cache.NewDomainCacheEntryForTest(&persistence.DomainInfo{
 					Name: "test-domain",
 				}, nil, true, nil, 0, nil, 0, 0, 0), nil)
-				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Return(nil).Times(2)
+				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Times(2)
 				mockMutableState.EXPECT().StartTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil)
 			},
 			mockGetWorkflowExecutionFn: func(context.Context, *persistence.GetWorkflowExecutionRequest) (*persistence.GetWorkflowExecutionResponse, error) {
@@ -3447,7 +3424,7 @@ func TestLoadWorkflowExecutionWithTaskVersion(t *testing.T) {
 				mockDomainCache.EXPECT().GetDomainByID(gomock.Any()).Return(cache.NewDomainCacheEntryForTest(&persistence.DomainInfo{
 					Name: "test-domain",
 				}, nil, true, nil, 0, nil, 0, 0, 0), nil)
-				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Return(nil).Times(checksumErrorRetryCount)
+				mockMutableState.EXPECT().Load(gomock.Any(), gomock.Any()).Times(checksumErrorRetryCount)
 			},
 			mockGetWorkflowExecutionFn: func(context.Context, *persistence.GetWorkflowExecutionRequest) (*persistence.GetWorkflowExecutionResponse, error) {
 				return &persistence.GetWorkflowExecutionResponse{

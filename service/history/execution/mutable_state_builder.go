@@ -329,7 +329,7 @@ func (e *mutableStateBuilder) CopyToPersistence() *persistence.WorkflowMutableSt
 func (e *mutableStateBuilder) Load(
 	ctx context.Context,
 	state *persistence.WorkflowMutableState,
-) error {
+) {
 
 	e.pendingActivityInfoIDs = state.ActivityInfos
 	for _, activityInfo := range state.ActivityInfos {
@@ -364,7 +364,6 @@ func (e *mutableStateBuilder) Load(
 			e.metricsClient.IncCounter(metrics.WorkflowContextScope, metrics.MutableStateChecksumInvalidated)
 		}
 	}
-	return nil
 }
 
 func (e *mutableStateBuilder) fillForBackwardsCompatibility() {
