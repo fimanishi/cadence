@@ -2799,6 +2799,11 @@ const (
 	WorkflowRepairFailure
 	WorkflowRepairTimeout
 	WorkflowRepairDuration
+	WorkflowCorruptionTerminationAttempted
+	WorkflowCorruptionTerminationSuccess
+	WorkflowCorruptionTerminationFailure
+	WorkflowCorruptionForcedCloseAttempted
+	WorkflowCorruptionForcedCloseSuccess
 	FailoverMarkerCount
 	FailoverMarkerReplicationLatency
 	FailoverMarkerInsertFailure
@@ -3661,6 +3666,11 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		WorkflowRepairFailure:                                        {metricName: "workflow_repair_failure", metricType: Counter},
 		WorkflowRepairTimeout:                                        {metricName: "workflow_repair_timeout", metricType: Counter},
 		WorkflowRepairDuration:                                       {metricName: "workflow_repair_duration_ns", metricType: Histogram, exponentialBuckets: Low1ms100s},
+		WorkflowCorruptionTerminationAttempted:                       {metricName: "workflow_corruption_termination_attempted", metricType: Counter},
+		WorkflowCorruptionTerminationSuccess:                         {metricName: "workflow_corruption_termination_success", metricType: Counter},
+		WorkflowCorruptionTerminationFailure:                         {metricName: "workflow_corruption_termination_failure", metricType: Counter},
+		WorkflowCorruptionForcedCloseAttempted:                       {metricName: "workflow_corruption_forced_close_attempted", metricType: Counter},
+		WorkflowCorruptionForcedCloseSuccess:                         {metricName: "workflow_corruption_forced_close_success", metricType: Counter},
 		FailoverMarkerCount:                                          {metricName: "failover_marker_count", metricType: Counter},
 		FailoverMarkerReplicationLatency:                             {metricName: "failover_marker_replication_latency", metricType: Timer},
 		FailoverMarkerInsertFailure:                                  {metricName: "failover_marker_insert_failures", metricType: Counter},

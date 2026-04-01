@@ -2191,6 +2191,15 @@ const (
 	// Allowed filters: DomainName
 	RequireChecksumMatchAfterRebuildRepair
 
+	// EnableCorruptionForcedTermination enables force-termination of workflows that cannot be repaired.
+	// When enabled and repair fails, the workflow is terminated (with a history event if possible,
+	// or force-closed directly in DB if history is unreadable).
+	// KeyName: history.enableCorruptionForcedTermination
+	// Value type: Bool
+	// Default value: false
+	// Allowed filters: DomainName
+	EnableCorruptionForcedTermination
+
 	// EnableStrongIdempotency enables strong idempotency for APIs
 	// KeyName: history.enableStrongIdempotency
 	// Value type: Bool
@@ -4124,13 +4133,13 @@ var IntKeys = map[IntKey]DynamicInt{
 		KeyName:      "history.mutableStateChecksumGenProbability",
 		Filters:      []Filter{DomainName},
 		Description:  "MutableStateChecksumGenProbability is the probability [0-100] that checksum will be generated for mutable state",
-		DefaultValue: 0,
+		DefaultValue: 100,
 	},
 	MutableStateChecksumVerifyProbability: {
 		KeyName:      "history.mutableStateChecksumVerifyProbability",
 		Filters:      []Filter{DomainName},
 		Description:  "MutableStateChecksumVerifyProbability is the probability [0-100] that checksum will be verified for mutable state",
-		DefaultValue: 0,
+		DefaultValue: 100,
 	},
 	TaskSchedulerMigrationRatio: {
 		KeyName:      "history.taskSchedulerMigrationRatio",
@@ -4911,13 +4920,19 @@ var BoolKeys = map[BoolKey]DynamicBool{
 		KeyName:      "history.enableCorruptionAutoRepair",
 		Filters:      []Filter{DomainName},
 		Description:  "EnableCorruptionAutoRepair enables automatic repair of corrupted workflows via StateRebuilder",
-		DefaultValue: false,
+		DefaultValue: true,
 	},
 	RequireChecksumMatchAfterRebuildRepair: {
 		KeyName:      "history.requireChecksumMatchAfterRebuildRepair",
 		Filters:      []Filter{DomainName},
 		Description:  "RequireChecksumMatchAfterRebuildRepair requires that rebuilt state produces same checksum as original",
 		DefaultValue: true,
+	},
+	EnableCorruptionForcedTermination: {
+		KeyName:      "history.enableCorruptionForcedTermination",
+		Filters:      []Filter{DomainName},
+		Description:  "EnableCorruptionForcedTermination enables force-termination of workflows that cannot be repaired",
+		DefaultValue: false,
 	},
 	EnableStrongIdempotency: {
 		KeyName:      "history.enableStrongIdempotency",
