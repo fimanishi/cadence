@@ -1047,7 +1047,9 @@ func TestWorkflowRepairer_AddRetentionTasksToMutation(t *testing.T) {
 		}
 
 		closeTime := time.Now()
-		mutation := &persistence.WorkflowMutation{}
+		mutation := &persistence.WorkflowMutation{
+			TasksByCategory: map[persistence.HistoryTaskCategory][]persistence.Task{},
+		}
 		repairer.addRetentionTasksToMutation(mutation, executionInfo, testVersion, closeTime)
 
 		require.NotNil(t, mutation.TasksByCategory)
@@ -1087,7 +1089,9 @@ func TestWorkflowRepairer_AddRetentionTasksToMutation(t *testing.T) {
 		}
 
 		closeTime := time.Now()
-		mutation := &persistence.WorkflowMutation{}
+		mutation := &persistence.WorkflowMutation{
+			TasksByCategory: map[persistence.HistoryTaskCategory][]persistence.Task{},
+		}
 		repairer.addRetentionTasksToMutation(mutation, executionInfo, testVersion, closeTime)
 
 		timerTasks := mutation.TasksByCategory[persistence.HistoryTaskCategoryTimer]

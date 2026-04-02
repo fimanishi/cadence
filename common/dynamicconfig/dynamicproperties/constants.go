@@ -4920,7 +4920,7 @@ var BoolKeys = map[BoolKey]DynamicBool{
 		KeyName:      "history.enableCorruptionAutoRepair",
 		Filters:      []Filter{DomainName},
 		Description:  "EnableCorruptionAutoRepair enables automatic repair of corrupted workflows via StateRebuilder",
-		DefaultValue: true,
+		DefaultValue: false,
 	},
 	RequireChecksumMatchAfterRebuildRepair: {
 		KeyName:      "history.requireChecksumMatchAfterRebuildRepair",
