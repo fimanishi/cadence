@@ -735,7 +735,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				ms.EXPECT().GetCurrentBranchToken().Return(nil, testError).Times(1)
 				ms.EXPECT().GetVersionHistories().Return(nil).AnyTimes()
 				// terminateWithHistoryEvent mocks
-				ms.EXPECT().GetNextEventID().Return(int64(10)).Times(1)
+				ms.EXPECT().GetNextEventID().Return(int64(10)).Times(2) // once in terminateCorruptedWorkflow (condition capture), once in terminateWithHistoryEvent
 				ms.EXPECT().GetInFlightDecision().Return(nil, false).Times(1)
 				ms.EXPECT().AddWorkflowExecutionTerminatedEvent(int64(10), "workflow state is corrupted and could not be repaired", nil, "cadence-system").Return(&types.HistoryEvent{}, nil).Times(1)
 				ms.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(
@@ -769,7 +769,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				ms.EXPECT().GetCurrentBranchToken().Return(nil, testError).Times(1)
 				ms.EXPECT().GetVersionHistories().Return(nil).AnyTimes()
 				// terminateWithHistoryEvent mocks — eventsSeq has one batch, triggering AppendHistoryV2Events
-				ms.EXPECT().GetNextEventID().Return(int64(10)).Times(1)
+				ms.EXPECT().GetNextEventID().Return(int64(10)).Times(2) // once in terminateCorruptedWorkflow (condition capture), once in terminateWithHistoryEvent
 				ms.EXPECT().GetInFlightDecision().Return(nil, false).Times(1)
 				ms.EXPECT().AddWorkflowExecutionTerminatedEvent(int64(10), "workflow state is corrupted and could not be repaired", nil, "cadence-system").Return(&types.HistoryEvent{}, nil).Times(1)
 				branchToken := []byte("branch-token")
@@ -815,7 +815,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				ms.EXPECT().GetCurrentBranchToken().Return(nil, testError).Times(1)
 				ms.EXPECT().GetVersionHistories().Return(nil).AnyTimes()
 				// terminateWithHistoryEvent: AppendHistoryV2Events fails → fallback to force-close
-				ms.EXPECT().GetNextEventID().Return(int64(10)).Times(1)
+				ms.EXPECT().GetNextEventID().Return(int64(10)).Times(2) // once in terminateCorruptedWorkflow (condition capture), once in terminateWithHistoryEvent
 				ms.EXPECT().GetInFlightDecision().Return(nil, false).Times(1)
 				ms.EXPECT().AddWorkflowExecutionTerminatedEvent(int64(10), "workflow state is corrupted and could not be repaired", nil, "cadence-system").Return(&types.HistoryEvent{}, nil).Times(1)
 				branchToken := []byte("branch-token")
@@ -861,7 +861,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				ms.EXPECT().GetCurrentBranchToken().Return(nil, testError).Times(1)
 				ms.EXPECT().GetVersionHistories().Return(nil).AnyTimes()
 				// terminateWithHistoryEvent fails at AddWorkflowExecutionTerminatedEvent
-				ms.EXPECT().GetNextEventID().Return(int64(10)).Times(1)
+				ms.EXPECT().GetNextEventID().Return(int64(10)).Times(2) // once in terminateCorruptedWorkflow (condition capture), once in terminateWithHistoryEvent
 				ms.EXPECT().GetInFlightDecision().Return(nil, false).Times(1)
 				ms.EXPECT().AddWorkflowExecutionTerminatedEvent(int64(10), "workflow state is corrupted and could not be repaired", nil, "cadence-system").Return(nil, testError).Times(1)
 				// forceCloseWorkflow: GetExecutionInfo already set up, GetHistorySize and GetCurrentVersion needed
@@ -893,7 +893,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				ms.EXPECT().GetCurrentBranchToken().Return(nil, testError).Times(1)
 				ms.EXPECT().GetVersionHistories().Return(nil).AnyTimes()
 				// terminateWithHistoryEvent fails
-				ms.EXPECT().GetNextEventID().Return(int64(10)).Times(1)
+				ms.EXPECT().GetNextEventID().Return(int64(10)).Times(2) // once in terminateCorruptedWorkflow (condition capture), once in terminateWithHistoryEvent
 				ms.EXPECT().GetInFlightDecision().Return(nil, false).Times(1)
 				ms.EXPECT().AddWorkflowExecutionTerminatedEvent(int64(10), "workflow state is corrupted and could not be repaired", nil, "cadence-system").Return(nil, testError).Times(1)
 				// forceCloseWorkflow also fails
@@ -947,7 +947,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				mockRebuiltMS.EXPECT().SetHistorySize(int64(0)).Times(1)
 
 				// terminateWithHistoryEvent on the original ms (not the rebuilt one)
-				ms.EXPECT().GetNextEventID().Return(int64(10)).Times(1)
+				ms.EXPECT().GetNextEventID().Return(int64(10)).Times(2) // once in terminateCorruptedWorkflow (condition capture), once in terminateWithHistoryEvent
 				ms.EXPECT().GetInFlightDecision().Return(nil, false).Times(1)
 				ms.EXPECT().AddWorkflowExecutionTerminatedEvent(int64(10), "workflow state is corrupted and could not be repaired", nil, "cadence-system").Return(&types.HistoryEvent{}, nil).Times(1)
 				ms.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(

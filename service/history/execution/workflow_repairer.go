@@ -493,13 +493,19 @@ func (r *workflowRepairerImpl) terminateCorruptedWorkflow(
 ) error {
 	r.scope.IncCounter(metrics.WorkflowCorruptionTerminationAttempted)
 
+	// Capture the DB condition before terminateWithHistoryEvent mutates in-memory state
+	// (e.g. AddWorkflowExecutionTerminatedEvent increments NextEventID). If proper termination
+	// fails after that mutation, forceCloseWorkflow must use the original value — the DB still
+	// has the pre-mutation NextEventID and will reject a condition that doesn't match.
+	originalNextEventID := mutableState.GetNextEventID()
+
 	if err := r.terminateWithHistoryEvent(ctx, mutableState, domainName); err != nil {
 		r.logger.Warn("termination via history event of corrupted workflow failed, falling back to force-close",
 			append(workflowTags, tag.Error(err))...)
 		r.scope.IncCounter(metrics.WorkflowCorruptionTerminationFailure)
 		r.scope.IncCounter(metrics.WorkflowCorruptionForcedCloseAttempted)
 
-		if forceErr := r.forceCloseWorkflow(ctx, mutableState, domainName); forceErr != nil {
+		if forceErr := r.forceCloseWorkflow(ctx, mutableState, domainName, originalNextEventID); forceErr != nil {
 			r.scope.IncCounter(metrics.WorkflowCorruptionForcedCloseFailure)
 			r.logger.Error("repair failed and termination also failed",
 				append(workflowTags, tag.Error(repairErr), tag.Dynamic("terminationError", forceErr))...)
@@ -579,10 +585,12 @@ func (r *workflowRepairerImpl) terminateWithHistoryEvent(
 
 // forceCloseWorkflow directly writes a terminated state to the DB without creating a history event.
 // Used as a last resort when proper termination fails (e.g. history is unreadable).
+// condition must be the NextEventID from the DB (before any in-memory mutations by terminateWithHistoryEvent).
 func (r *workflowRepairerImpl) forceCloseWorkflow(
 	ctx context.Context,
 	mutableState MutableState,
 	domainName string,
+	condition int64,
 ) error {
 	info := mutableState.GetExecutionInfo()
 	info.State = persistence.WorkflowStateCompleted
@@ -596,7 +604,7 @@ func (r *workflowRepairerImpl) forceCloseWorkflow(
 		ExecutionInfo:    info,
 		VersionHistories: mutableState.GetVersionHistories(),
 		ExecutionStats:   &persistence.ExecutionStats{HistorySize: mutableState.GetHistorySize()},
-		Condition:        info.NextEventID,
+		Condition:        condition,
 	}
 	r.addRetentionTasksToMutation(&mutation, info, mutableState.GetCurrentVersion(), closeTime)
 
