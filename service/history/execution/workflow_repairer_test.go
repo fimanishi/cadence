@@ -689,6 +689,42 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 			wantErr:      true,
 		},
 		{
+			name: "forced termination enabled - repair fails with condition failed error - no termination attempted",
+			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, ms *MockMutableState, sr *MockStateRebuilder) {
+				mockConfig.MutableStateChecksumVerifyProbability = func(domain string) int { return 100 }
+				mockConfig.EnableCorruptionAutoRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
+				mockConfig.EnableCorruptionForcedTermination = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+				setupDetectionMocks(ms, testDomainID, testWorkflowID, testRunID)
+				setupVersionHistories(ms)
+				sr.EXPECT().Rebuild(
+					gomock.Any(), gomock.Any(), gomock.Any(),
+					[]byte(testBranchToken), int64(9), int64(1),
+					gomock.Any(), gomock.Any(), "",
+				).Return(nil, int64(0), &persistence.ConditionFailedError{Msg: "nextEventID mismatch"}).Times(1)
+			},
+			wantRepaired: false,
+			wantErr:      true,
+		},
+		{
+			name: "forced termination enabled - repair fails with shard ownership lost - no termination attempted",
+			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, ms *MockMutableState, sr *MockStateRebuilder) {
+				mockConfig.MutableStateChecksumVerifyProbability = func(domain string) int { return 100 }
+				mockConfig.EnableCorruptionAutoRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
+				mockConfig.EnableCorruptionForcedTermination = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+				setupDetectionMocks(ms, testDomainID, testWorkflowID, testRunID)
+				setupVersionHistories(ms)
+				sr.EXPECT().Rebuild(
+					gomock.Any(), gomock.Any(), gomock.Any(),
+					[]byte(testBranchToken), int64(9), int64(1),
+					gomock.Any(), gomock.Any(), "",
+				).Return(nil, int64(0), &types.ShardOwnershipLostError{Message: "shard moved"}).Times(1)
+			},
+			wantRepaired: false,
+			wantErr:      true,
+		},
+		{
 			name: "forced termination enabled - rebuild fails - termination via history event succeeds",
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, ms *MockMutableState, sr *MockStateRebuilder) {
 				mockConfig.MutableStateChecksumVerifyProbability = func(domain string) int { return 100 }
@@ -723,6 +759,98 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 			wantErrIs:    ErrWorkflowTerminatedDueToCorruption,
 		},
 		{
+			name: "forced termination enabled - rebuild fails - termination via history event with events written succeeds",
+			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, ms *MockMutableState, sr *MockStateRebuilder) {
+				mockConfig.MutableStateChecksumVerifyProbability = func(domain string) int { return 100 }
+				mockConfig.EnableCorruptionAutoRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
+				mockConfig.EnableCorruptionForcedTermination = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+				setupDetectionMocks(ms, testDomainID, testWorkflowID, testRunID)
+				ms.EXPECT().GetCurrentBranchToken().Return(nil, testError).Times(1)
+				ms.EXPECT().GetVersionHistories().Return(nil).AnyTimes()
+				// terminateWithHistoryEvent mocks — eventsSeq has one batch, triggering AppendHistoryV2Events
+				ms.EXPECT().GetNextEventID().Return(int64(10)).Times(1)
+				ms.EXPECT().GetInFlightDecision().Return(nil, false).Times(1)
+				ms.EXPECT().AddWorkflowExecutionTerminatedEvent(int64(10), "workflow state is corrupted and could not be repaired", nil, "cadence-system").Return(&types.HistoryEvent{}, nil).Times(1)
+				branchToken := []byte("branch-token")
+				ms.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(
+					&persistence.WorkflowMutation{ExecutionInfo: &persistence.WorkflowExecutionInfo{DomainID: testDomainID, WorkflowID: testWorkflowID, RunID: testRunID}},
+					[]*persistence.WorkflowEvents{{
+						DomainID:    testDomainID,
+						WorkflowID:  testWorkflowID,
+						RunID:       testRunID,
+						BranchToken: branchToken,
+						Events:      []*types.HistoryEvent{{}},
+					}},
+					nil,
+				).Times(1)
+				ms.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
+				testShard.Resource.DomainCache.EXPECT().GetDomainName(testDomainID).Return(testDomainName, nil).Times(1) // AppendHistoryV2Events
+				testShard.Resource.HistoryMgr.On("AppendHistoryNodes", mock.Anything, mock.MatchedBy(func(req *persistence.AppendHistoryNodesRequest) bool {
+					return !req.IsNewBranch && string(req.BranchToken) == string(branchToken)
+				})).Return(&persistence.AppendHistoryNodesResponse{}, nil).Once()
+				testShard.Resource.DomainCache.EXPECT().GetDomainByID(testDomainID).Return(cache.NewGlobalDomainCacheEntryForTest(
+					&persistence.DomainInfo{ID: testDomainID, Name: testDomainName},
+					&persistence.DomainConfig{},
+					&persistence.DomainReplicationConfig{
+						ActiveClusterName: "active",
+						Clusters:          []*persistence.ClusterReplicationConfig{{ClusterName: "active"}},
+					},
+					1234,
+				), nil).Times(1) // UpdateWorkflowExecution
+				testShard.Resource.ExecutionMgr.On("UpdateWorkflowExecution", mock.Anything, mock.Anything).Return(&persistence.UpdateWorkflowExecutionResponse{}, nil).Once()
+			},
+			wantRepaired: false,
+			wantErr:      true,
+			wantErrIs:    ErrWorkflowTerminatedDueToCorruption,
+		},
+		{
+			name: "forced termination enabled - rebuild fails - AppendHistoryV2Events fails - falls back to force-close",
+			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, ms *MockMutableState, sr *MockStateRebuilder) {
+				mockConfig.MutableStateChecksumVerifyProbability = func(domain string) int { return 100 }
+				mockConfig.EnableCorruptionAutoRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
+				mockConfig.EnableCorruptionForcedTermination = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+				setupDetectionMocks(ms, testDomainID, testWorkflowID, testRunID)
+				ms.EXPECT().GetCurrentBranchToken().Return(nil, testError).Times(1)
+				ms.EXPECT().GetVersionHistories().Return(nil).AnyTimes()
+				// terminateWithHistoryEvent: AppendHistoryV2Events fails → fallback to force-close
+				ms.EXPECT().GetNextEventID().Return(int64(10)).Times(1)
+				ms.EXPECT().GetInFlightDecision().Return(nil, false).Times(1)
+				ms.EXPECT().AddWorkflowExecutionTerminatedEvent(int64(10), "workflow state is corrupted and could not be repaired", nil, "cadence-system").Return(&types.HistoryEvent{}, nil).Times(1)
+				branchToken := []byte("branch-token")
+				ms.EXPECT().CloseTransactionAsMutation(gomock.Any(), TransactionPolicyPassive).Return(
+					&persistence.WorkflowMutation{ExecutionInfo: &persistence.WorkflowExecutionInfo{DomainID: testDomainID, WorkflowID: testWorkflowID, RunID: testRunID}},
+					[]*persistence.WorkflowEvents{{
+						DomainID:    testDomainID,
+						WorkflowID:  testWorkflowID,
+						RunID:       testRunID,
+						BranchToken: branchToken,
+						Events:      []*types.HistoryEvent{{}},
+					}},
+					nil,
+				).Times(1)
+				ms.EXPECT().GetHistorySize().Return(int64(1024)).Times(2)                                                // once in terminateWithHistoryEvent, once in forceCloseWorkflow
+				testShard.Resource.DomainCache.EXPECT().GetDomainName(testDomainID).Return(testDomainName, nil).Times(1) // AppendHistoryV2Events
+				testShard.Resource.HistoryMgr.On("AppendHistoryNodes", mock.Anything, mock.Anything).Return(nil, testError).Once()
+				// forceCloseWorkflow mocks
+				ms.EXPECT().GetCurrentVersion().Return(int64(1)).Times(1)
+				testShard.Resource.DomainCache.EXPECT().GetDomainByID(testDomainID).Return(cache.NewGlobalDomainCacheEntryForTest(
+					&persistence.DomainInfo{ID: testDomainID, Name: testDomainName},
+					&persistence.DomainConfig{Retention: 7},
+					&persistence.DomainReplicationConfig{
+						ActiveClusterName: "active",
+						Clusters:          []*persistence.ClusterReplicationConfig{{ClusterName: "active"}},
+					},
+					1234,
+				), nil).Times(2) // addRetentionTasksToMutation + UpdateWorkflowExecution
+				testShard.Resource.ExecutionMgr.On("UpdateWorkflowExecution", mock.Anything, mock.Anything).Return(&persistence.UpdateWorkflowExecutionResponse{}, nil).Once()
+			},
+			wantRepaired: false,
+			wantErr:      true,
+			wantErrIs:    ErrWorkflowTerminatedDueToCorruption,
+		},
+		{
 			name: "forced termination enabled - rebuild fails - proper termination fails - force-close succeeds",
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, ms *MockMutableState, sr *MockStateRebuilder) {
 				mockConfig.MutableStateChecksumVerifyProbability = func(domain string) int { return 100 }
@@ -736,8 +864,9 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				ms.EXPECT().GetNextEventID().Return(int64(10)).Times(1)
 				ms.EXPECT().GetInFlightDecision().Return(nil, false).Times(1)
 				ms.EXPECT().AddWorkflowExecutionTerminatedEvent(int64(10), "workflow state is corrupted and could not be repaired", nil, "cadence-system").Return(nil, testError).Times(1)
-				// forceCloseWorkflow: GetExecutionInfo already set up, GetHistorySize needed
+				// forceCloseWorkflow: GetExecutionInfo already set up, GetHistorySize and GetCurrentVersion needed
 				ms.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
+				ms.EXPECT().GetCurrentVersion().Return(int64(1)).Times(1)
 				testShard.Resource.DomainCache.EXPECT().GetDomainByID(testDomainID).Return(cache.NewGlobalDomainCacheEntryForTest(
 					&persistence.DomainInfo{ID: testDomainID, Name: testDomainName},
 					&persistence.DomainConfig{},
@@ -746,7 +875,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 						Clusters:          []*persistence.ClusterReplicationConfig{{ClusterName: "active"}},
 					},
 					1234,
-				), nil).Times(1)
+				), nil).Times(2) // once for UpdateWorkflowExecution, once for addRetentionTasksToMutation
 				testShard.Resource.ExecutionMgr.On("UpdateWorkflowExecution", mock.Anything, mock.Anything).Return(&persistence.UpdateWorkflowExecutionResponse{}, nil).Once()
 			},
 			wantRepaired: false,
@@ -769,6 +898,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				ms.EXPECT().AddWorkflowExecutionTerminatedEvent(int64(10), "workflow state is corrupted and could not be repaired", nil, "cadence-system").Return(nil, testError).Times(1)
 				// forceCloseWorkflow also fails
 				ms.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
+				ms.EXPECT().GetCurrentVersion().Return(int64(1)).Times(1)
 				testShard.Resource.DomainCache.EXPECT().GetDomainByID(testDomainID).Return(cache.NewGlobalDomainCacheEntryForTest(
 					&persistence.DomainInfo{ID: testDomainID, Name: testDomainName},
 					&persistence.DomainConfig{},
@@ -777,7 +907,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 						Clusters:          []*persistence.ClusterReplicationConfig{{ClusterName: "active"}},
 					},
 					1234,
-				), nil).Times(1)
+				), nil).Times(2) // once for UpdateWorkflowExecution, once for addRetentionTasksToMutation
 				testShard.Resource.ExecutionMgr.On("UpdateWorkflowExecution", mock.Anything, mock.Anything).Return(nil, testPersistenceError).Once()
 			},
 			wantRepaired: false,
@@ -884,4 +1014,87 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWorkflowRepairer_AddRetentionTasksToMutation(t *testing.T) {
+	const testVersion = int64(42)
+	executionInfo := &persistence.WorkflowExecutionInfo{
+		DomainID:   testDomainID,
+		WorkflowID: testWorkflowID,
+		RunID:      testRunID,
+		TaskList:   "test-tasklist",
+	}
+
+	t.Run("domain cache hit - uses domain retention days", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		testShard := shard.NewTestContext(t, ctrl, &persistence.ShardInfo{ShardID: 0, RangeID: 1}, config.NewForTest())
+		testShard.Resource.DomainCache.EXPECT().GetDomainByID(testDomainID).Return(
+			cache.NewGlobalDomainCacheEntryForTest(
+				&persistence.DomainInfo{ID: testDomainID, Name: testDomainName},
+				&persistence.DomainConfig{Retention: 7}, // 7-day retention
+				&persistence.DomainReplicationConfig{ActiveClusterName: "active"},
+				0,
+			), nil,
+		).Times(1)
+
+		repairer := &workflowRepairerImpl{
+			shard:         testShard,
+			logger:        log.NewNoop(),
+			metricsClient: metrics.NewClient(tally.NoopScope, metrics.History, metrics.MigrationConfig{}),
+			scope:         metrics.NewClient(tally.NoopScope, metrics.History, metrics.MigrationConfig{}).Scope(metrics.WorkflowCorruptionRepairScope),
+		}
+
+		closeTime := time.Now()
+		mutation := &persistence.WorkflowMutation{}
+		repairer.addRetentionTasksToMutation(mutation, executionInfo, testVersion, closeTime)
+
+		require.NotNil(t, mutation.TasksByCategory)
+
+		transferTasks := mutation.TasksByCategory[persistence.HistoryTaskCategoryTransfer]
+		require.Len(t, transferTasks, 1)
+		closeTask, ok := transferTasks[0].(*persistence.CloseExecutionTask)
+		require.True(t, ok)
+		require.Equal(t, testDomainID, closeTask.DomainID)
+		require.Equal(t, testWorkflowID, closeTask.WorkflowID)
+		require.Equal(t, testRunID, closeTask.RunID)
+		require.Equal(t, testVersion, closeTask.Version)
+		require.Equal(t, "test-tasklist", closeTask.TaskList)
+
+		timerTasks := mutation.TasksByCategory[persistence.HistoryTaskCategoryTimer]
+		require.Len(t, timerTasks, 1)
+		deleteTask, ok := timerTasks[0].(*persistence.DeleteHistoryEventTask)
+		require.True(t, ok)
+		require.Equal(t, testDomainID, deleteTask.DomainID)
+		require.Equal(t, testVersion, deleteTask.Version)
+		expectedDeadline := closeTime.Add(7 * 24 * time.Hour)
+		require.WithinDuration(t, expectedDeadline, deleteTask.VisibilityTimestamp, time.Second)
+	})
+
+	t.Run("domain cache miss - falls back to 1-day retention", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		testShard := shard.NewTestContext(t, ctrl, &persistence.ShardInfo{ShardID: 0, RangeID: 1}, config.NewForTest())
+		testShard.Resource.DomainCache.EXPECT().GetDomainByID(testDomainID).Return(nil, errors.New("cache miss")).Times(1)
+
+		repairer := &workflowRepairerImpl{
+			shard:         testShard,
+			logger:        log.NewNoop(),
+			metricsClient: metrics.NewClient(tally.NoopScope, metrics.History, metrics.MigrationConfig{}),
+			scope:         metrics.NewClient(tally.NoopScope, metrics.History, metrics.MigrationConfig{}).Scope(metrics.WorkflowCorruptionRepairScope),
+		}
+
+		closeTime := time.Now()
+		mutation := &persistence.WorkflowMutation{}
+		repairer.addRetentionTasksToMutation(mutation, executionInfo, testVersion, closeTime)
+
+		timerTasks := mutation.TasksByCategory[persistence.HistoryTaskCategoryTimer]
+		require.Len(t, timerTasks, 1)
+		deleteTask, ok := timerTasks[0].(*persistence.DeleteHistoryEventTask)
+		require.True(t, ok)
+		expectedDeadline := closeTime.Add(1 * 24 * time.Hour)
+		require.WithinDuration(t, expectedDeadline, deleteTask.VisibilityTimestamp, time.Second)
+	})
 }
