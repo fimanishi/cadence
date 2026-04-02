@@ -4133,13 +4133,13 @@ var IntKeys = map[IntKey]DynamicInt{
 		KeyName:      "history.mutableStateChecksumGenProbability",
 		Filters:      []Filter{DomainName},
 		Description:  "MutableStateChecksumGenProbability is the probability [0-100] that checksum will be generated for mutable state",
-		DefaultValue: 100,
+		DefaultValue: 0,
 	},
 	MutableStateChecksumVerifyProbability: {
 		KeyName:      "history.mutableStateChecksumVerifyProbability",
 		Filters:      []Filter{DomainName},
 		Description:  "MutableStateChecksumVerifyProbability is the probability [0-100] that checksum will be verified for mutable state",
-		DefaultValue: 100,
+		DefaultValue: 0,
 	},
 	TaskSchedulerMigrationRatio: {
 		KeyName:      "history.taskSchedulerMigrationRatio",

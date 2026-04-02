@@ -483,6 +483,7 @@ func (r *workflowRepairerImpl) terminateCorruptedWorkflow(
 		r.scope.IncCounter(metrics.WorkflowCorruptionForcedCloseAttempted)
 
 		if forceErr := r.forceCloseWorkflow(ctx, mutableState, domainName); forceErr != nil {
+			r.scope.IncCounter(metrics.WorkflowCorruptionForcedCloseFailure)
 			r.logger.Error("repair failed and termination also failed",
 				append(workflowTags, tag.Error(repairErr), tag.Dynamic("terminationError", forceErr))...)
 			return ErrRepairAndTerminationFailed
@@ -570,9 +571,10 @@ func (r *workflowRepairerImpl) forceCloseWorkflow(
 	_, err := r.shard.UpdateWorkflowExecution(ctx, &persistence.UpdateWorkflowExecutionRequest{
 		Mode: persistence.UpdateWorkflowModeIgnoreCurrent,
 		UpdateWorkflowMutation: persistence.WorkflowMutation{
-			ExecutionInfo:  info,
-			ExecutionStats: &persistence.ExecutionStats{HistorySize: mutableState.GetHistorySize()},
-			Condition:      info.NextEventID,
+			ExecutionInfo:    info,
+			VersionHistories: mutableState.GetVersionHistories(),
+			ExecutionStats:   &persistence.ExecutionStats{HistorySize: mutableState.GetHistorySize()},
+			Condition:        info.NextEventID,
 		},
 		DomainName: domainName,
 	})

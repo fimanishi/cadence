@@ -2804,6 +2804,7 @@ const (
 	WorkflowCorruptionTerminationFailure
 	WorkflowCorruptionForcedCloseAttempted
 	WorkflowCorruptionForcedCloseSuccess
+	WorkflowCorruptionForcedCloseFailure
 	FailoverMarkerCount
 	FailoverMarkerReplicationLatency
 	FailoverMarkerInsertFailure
@@ -3671,6 +3672,7 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		WorkflowCorruptionTerminationFailure:                         {metricName: "workflow_corruption_termination_failure", metricType: Counter},
 		WorkflowCorruptionForcedCloseAttempted:                       {metricName: "workflow_corruption_forced_close_attempted", metricType: Counter},
 		WorkflowCorruptionForcedCloseSuccess:                         {metricName: "workflow_corruption_forced_close_success", metricType: Counter},
+		WorkflowCorruptionForcedCloseFailure:                         {metricName: "workflow_corruption_forced_close_failure", metricType: Counter},
 		FailoverMarkerCount:                                          {metricName: "failover_marker_count", metricType: Counter},
 		FailoverMarkerReplicationLatency:                             {metricName: "failover_marker_replication_latency", metricType: Timer},
 		FailoverMarkerInsertFailure:                                  {metricName: "failover_marker_insert_failures", metricType: Counter},
