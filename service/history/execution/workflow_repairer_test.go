@@ -834,7 +834,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				testShard.Resource.DomainCache.EXPECT().GetDomainName(testDomainID).Return(testDomainName, nil).Times(1) // AppendHistoryV2Events
 				testShard.Resource.HistoryMgr.On("AppendHistoryNodes", mock.Anything, mock.Anything).Return(nil, testError).Once()
 				// forceCloseWorkflow mocks
-				ms.EXPECT().GetCurrentVersion().Return(int64(1)).Times(1)
+				ms.EXPECT().GetCurrentVersion().Return(int64(1)).Times(2) // once for CompletionEvent, once for addRetentionTasksToMutation
 				testShard.Resource.DomainCache.EXPECT().GetDomainByID(testDomainID).Return(cache.NewGlobalDomainCacheEntryForTest(
 					&persistence.DomainInfo{ID: testDomainID, Name: testDomainName},
 					&persistence.DomainConfig{Retention: 7},
@@ -866,7 +866,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				ms.EXPECT().AddWorkflowExecutionTerminatedEvent(int64(10), "workflow state is corrupted and could not be repaired", nil, "cadence-system").Return(nil, testError).Times(1)
 				// forceCloseWorkflow: GetExecutionInfo already set up, GetHistorySize and GetCurrentVersion needed
 				ms.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
-				ms.EXPECT().GetCurrentVersion().Return(int64(1)).Times(1)
+				ms.EXPECT().GetCurrentVersion().Return(int64(1)).Times(2) // once for CompletionEvent, once for addRetentionTasksToMutation
 				testShard.Resource.DomainCache.EXPECT().GetDomainByID(testDomainID).Return(cache.NewGlobalDomainCacheEntryForTest(
 					&persistence.DomainInfo{ID: testDomainID, Name: testDomainName},
 					&persistence.DomainConfig{},
@@ -898,7 +898,7 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 				ms.EXPECT().AddWorkflowExecutionTerminatedEvent(int64(10), "workflow state is corrupted and could not be repaired", nil, "cadence-system").Return(nil, testError).Times(1)
 				// forceCloseWorkflow also fails
 				ms.EXPECT().GetHistorySize().Return(int64(1024)).Times(1)
-				ms.EXPECT().GetCurrentVersion().Return(int64(1)).Times(1)
+				ms.EXPECT().GetCurrentVersion().Return(int64(1)).Times(2) // once for CompletionEvent, once for addRetentionTasksToMutation
 				testShard.Resource.DomainCache.EXPECT().GetDomainByID(testDomainID).Return(cache.NewGlobalDomainCacheEntryForTest(
 					&persistence.DomainInfo{ID: testDomainID, Name: testDomainName},
 					&persistence.DomainConfig{},

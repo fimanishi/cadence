@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/uber/cadence/common"
 	"github.com/uber/cadence/common/checksum"
 	"github.com/uber/cadence/common/definition"
 	"github.com/uber/cadence/common/log"
@@ -601,10 +602,22 @@ func (r *workflowRepairerImpl) forceCloseWorkflow(
 	info.State = persistence.WorkflowStateCompleted
 	info.CloseStatus = persistence.WorkflowCloseStatusTerminated
 
-	// Unlike terminateWithHistoryEvent, this path writes no history event, so
-	// GenerateWorkflowCloseTasks is never called. Add retention tasks explicitly so the
-	// workflow is eventually cleaned up by the timer and transfer queues.
+	// Unlike terminateWithHistoryEvent, this path writes no history event. When the CloseExecutionTask
+	// fires later, the transfer executor calls GetCompletionEvent to read the close timestamp for
+	// visibility. GetCompletionEvent normally reads CompletionEventBatchID to locate the event in
+	// history — which we never wrote — so it would return ErrMissingWorkflowCompletionEvent and the
+	// task would fail and retry forever. We store the completion event inline in ExecutionInfo so
+	// GetCompletionEvent can return it without a history read. This is the same mechanism used for
+	// workflows written before the batch ID scheme was introduced.
 	closeTime := time.Now()
+	info.CompletionEvent = &types.HistoryEvent{
+		Version:   mutableState.GetCurrentVersion(),
+		Timestamp: common.Int64Ptr(closeTime.UnixNano()),
+		WorkflowExecutionTerminatedEventAttributes: &types.WorkflowExecutionTerminatedEventAttributes{
+			Reason:   "workflow state is corrupted and could not be repaired",
+			Identity: "cadence-system",
+		},
+	}
 	mutation := persistence.WorkflowMutation{
 		ExecutionInfo:    info,
 		VersionHistories: mutableState.GetVersionHistories(),
