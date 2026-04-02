@@ -652,6 +652,43 @@ func TestWorkflowRepairer_VerifyAndRepairWorkflowIfNeeded(t *testing.T) {
 			wantErrIs:    testError,
 		},
 		{
+			name: "forced termination enabled - repair fails with timeout - no termination attempted",
+			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, ms *MockMutableState, sr *MockStateRebuilder) {
+				mockConfig.MutableStateChecksumVerifyProbability = func(domain string) int { return 100 }
+				mockConfig.EnableCorruptionAutoRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
+				mockConfig.EnableCorruptionForcedTermination = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+				setupDetectionMocks(ms, testDomainID, testWorkflowID, testRunID)
+				setupVersionHistories(ms)
+				sr.EXPECT().Rebuild(
+					gomock.Any(), gomock.Any(), gomock.Any(),
+					[]byte(testBranchToken), int64(9), int64(1),
+					gomock.Any(), gomock.Any(), "",
+				).Return(nil, int64(0), context.DeadlineExceeded).Times(1)
+			},
+			wantRepaired: false,
+			wantErr:      true,
+			wantErrIs:    context.DeadlineExceeded,
+		},
+		{
+			name: "forced termination enabled - repair fails with service busy - no termination attempted",
+			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, ms *MockMutableState, sr *MockStateRebuilder) {
+				mockConfig.MutableStateChecksumVerifyProbability = func(domain string) int { return 100 }
+				mockConfig.EnableCorruptionAutoRepair = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+				mockConfig.CorruptionRepairTimeout = dynamicproperties.GetDurationPropertyFnFilteredByDomain(testTimeout)
+				mockConfig.EnableCorruptionForcedTermination = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+				setupDetectionMocks(ms, testDomainID, testWorkflowID, testRunID)
+				setupVersionHistories(ms)
+				sr.EXPECT().Rebuild(
+					gomock.Any(), gomock.Any(), gomock.Any(),
+					[]byte(testBranchToken), int64(9), int64(1),
+					gomock.Any(), gomock.Any(), "",
+				).Return(nil, int64(0), &types.ServiceBusyError{Message: "too many requests"}).Times(1)
+			},
+			wantRepaired: false,
+			wantErr:      true,
+		},
+		{
 			name: "forced termination enabled - rebuild fails - termination via history event succeeds",
 			setupFunc: func(ctrl *gomock.Controller, testShard *shard.TestContext, mockConfig *config.Config, ms *MockMutableState, sr *MockStateRebuilder) {
 				mockConfig.MutableStateChecksumVerifyProbability = func(domain string) int { return 100 }

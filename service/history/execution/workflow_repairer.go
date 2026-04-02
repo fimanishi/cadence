@@ -218,12 +218,26 @@ func (r *workflowRepairerImpl) repairWorkflow(
 
 	repairErr := r.attemptRepairByType(repairCtx, mutableState, corruptionType, persistedChecksum)
 	if repairErr != nil {
-		if r.shard.GetConfig().EnableCorruptionForcedTermination(domainName) {
+		if r.shard.GetConfig().EnableCorruptionForcedTermination(domainName) && !isRepairErrorTransient(repairErr) {
 			return r.terminateCorruptedWorkflow(repairCtx, mutableState, domainName, workflowTags, repairErr)
 		}
 		return repairErr
 	}
 	return nil
+}
+
+// isRepairErrorTransient returns true if the repair error is due to a transient infrastructure
+// issue (timeout, DB unavailability, service busy) rather than permanent corruption.
+// Transient errors should not trigger workflow termination — the repair will be retried on the
+// next workflow load. Only permanent errors (unreadable history, checksum mismatch after rebuild)
+// justify termination.
+func isRepairErrorTransient(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
+	}
+	var timeoutErr *persistence.TimeoutError
+	var busyErr *types.ServiceBusyError
+	return errors.As(err, &timeoutErr) || errors.As(err, &busyErr)
 }
 
 // attemptRepairByType dispatches to the appropriate repair strategy for the given corruption type.
