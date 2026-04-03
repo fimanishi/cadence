@@ -30,6 +30,10 @@ var (
 	ErrWorkflowTerminatedDueToCorruption = errors.New("workflow terminated due to unrecoverable corruption")
 	// ErrRepairAndTerminationFailed indicates both repair and termination failed
 	ErrRepairAndTerminationFailed = errors.New("workflow repair failed and termination also failed")
+	// ErrUnknownCorruptionType indicates a corruption type with no registered repair strategy.
+	// This is a programming error (missing switch case) and is treated as transient to avoid
+	// terminating workflows due to a code bug.
+	ErrUnknownCorruptionType = errors.New("unknown corruption type")
 )
 
 type (
@@ -239,6 +243,9 @@ func isRepairErrorTransient(err error) bool {
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		return true
 	}
+	if errors.Is(err, ErrUnknownCorruptionType) {
+		return true
+	}
 	var timeoutErr *persistence.TimeoutError
 	var busyErr *types.ServiceBusyError
 	var condErr *persistence.ConditionFailedError
@@ -259,9 +266,7 @@ func (r *workflowRepairerImpl) attemptRepairByType(
 	case CorruptionTypeChecksumMismatch:
 		return r.repairViaRebuild(ctx, mutableState, persistedChecksum)
 	default:
-		return &types.InternalServiceError{
-			Message: fmt.Sprintf("unknown corruption type: %v", corruptionType),
-		}
+		return fmt.Errorf("%w: %v", ErrUnknownCorruptionType, corruptionType)
 	}
 }
 
