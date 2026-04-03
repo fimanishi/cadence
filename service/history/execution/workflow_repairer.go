@@ -611,6 +611,7 @@ func (r *workflowRepairerImpl) forceCloseWorkflow(
 	// workflows written before the batch ID scheme was introduced.
 	closeTime := time.Now()
 	info.CompletionEvent = &types.HistoryEvent{
+		EventType: types.EventTypeWorkflowExecutionTerminated.Ptr(),
 		Version:   mutableState.GetCurrentVersion(),
 		Timestamp: common.Int64Ptr(closeTime.UnixNano()),
 		WorkflowExecutionTerminatedEventAttributes: &types.WorkflowExecutionTerminatedEventAttributes{
