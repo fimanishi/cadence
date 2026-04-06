@@ -117,5 +117,8 @@ func GetTestClusterOption() *pt.TestBaseOptions {
 		DBName:       path.Join(os.TempDir(), uuid.New().String()),
 		SchemaDir:    testSchemaDir,
 		StoreType:    config.StoreTypeSQL,
+		// SQLite only allows one writer at a time; limiting to a single connection
+		// avoids "database is locked" errors under concurrent test load.
+		MaxConns: 1,
 	}
 }
