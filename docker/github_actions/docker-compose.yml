@@ -238,6 +238,14 @@ services:
     environment:
       - "PERSISTENCE_PLUGIN=sqlite"
       - "PERSISTENCE_TYPE=sql"
+      # SQLite uses a WASM runtime (ncruces/go-sqlite3) where each DB connection
+      # gets its own module instance with up to 256 MB of WASM linear memory.
+      # Under the race detector the shadow-memory overhead combined with multiple
+      # concurrent WASM instances exhausts available memory, causing memory.grow
+      # to fail and dlmalloc to trap with "out of bounds memory access".
+      # The persistence unit tests have the same skip (//go:build !race in
+      # sqlite_persistence_test.go). Skip -race here for the same reason.
+      - "TEST_ARG=-timeout 20m"
     volumes:
       - ../../:/cadence
     networks:
