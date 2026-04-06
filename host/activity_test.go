@@ -63,7 +63,7 @@ func (s *IntegrationSuite) TestActivityHeartBeatWorkflow_Success() {
 		Input:                               nil,
 		Header:                              header,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(100),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(1),
+		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(10),
 		Identity:                            identity,
 	}
 
@@ -188,7 +188,7 @@ func (s *IntegrationSuite) TestActivityHeartbeatDetailsDuringRetry() {
 		TaskList:                            taskList,
 		Input:                               nil,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(100),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(1),
+		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(10),
 		Identity:                            identity,
 	}
 
@@ -370,7 +370,7 @@ func (s *IntegrationSuite) TestActivityRetry() {
 		TaskList:                            taskList,
 		Input:                               nil,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(100),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(1),
+		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(10),
 		Identity:                            identity,
 	}
 
@@ -587,7 +587,7 @@ func (s *IntegrationSuite) TestActivityHeartBeatWorkflow_Timeout() {
 		TaskList:                            taskList,
 		Input:                               nil,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(100),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(1),
+		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(10),
 		Identity:                            identity,
 	}
 
@@ -693,7 +693,7 @@ func (s *IntegrationSuite) TestActivityTimeouts() {
 		TaskList:                            taskList,
 		Input:                               nil,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(300),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(2),
+		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(10),
 		Identity:                            identity,
 	}
 
@@ -939,7 +939,7 @@ func (s *IntegrationSuite) TestActivityHeartbeatTimeouts() {
 		TaskList:                            taskList,
 		Input:                               nil,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(70),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(2),
+		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(10),
 		Identity:                            identity,
 	}
 
@@ -1134,7 +1134,7 @@ func (s *IntegrationSuite) TestActivityCancellation() {
 		TaskList:                            taskList,
 		Input:                               nil,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(100),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(1),
+		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(10),
 		Identity:                            identity,
 	}
 
@@ -1265,7 +1265,7 @@ func (s *IntegrationSuite) TestActivityCancellationNotStarted() {
 		TaskList:                            taskList,
 		Input:                               nil,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(100),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(1),
+		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(10),
 		Identity:                            identity,
 	}
 
