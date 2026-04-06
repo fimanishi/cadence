@@ -73,7 +73,7 @@ func (s *IntegrationSuite) TestQueryWorkflow_Sticky() {
 					TaskList:                      &types.TaskList{Name: tl},
 					Input:                         buf.Bytes(),
 					ScheduleToCloseTimeoutSeconds: common.Int32Ptr(100),
-					ScheduleToStartTimeoutSeconds: common.Int32Ptr(2),
+					ScheduleToStartTimeoutSeconds: common.Int32Ptr(30),
 					StartToCloseTimeoutSeconds:    common.Int32Ptr(50),
 					HeartbeatTimeoutSeconds:       common.Int32Ptr(5),
 				},
@@ -141,7 +141,7 @@ func (s *IntegrationSuite) TestQueryWorkflow_Sticky() {
 		TaskList:                            taskList,
 		Input:                               nil,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(100),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(1),
+		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(10),
 		Identity:                            identity,
 	}
 
@@ -243,7 +243,7 @@ func (s *IntegrationSuite) TestQueryWorkflow_StickyTimeout() {
 		TaskList:                            taskList,
 		Input:                               nil,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(100),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(1),
+		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(10),
 		Identity:                            identity,
 	}
 
@@ -273,7 +273,7 @@ func (s *IntegrationSuite) TestQueryWorkflow_StickyTimeout() {
 					TaskList:                      &types.TaskList{Name: tl},
 					Input:                         buf.Bytes(),
 					ScheduleToCloseTimeoutSeconds: common.Int32Ptr(100),
-					ScheduleToStartTimeoutSeconds: common.Int32Ptr(2),
+					ScheduleToStartTimeoutSeconds: common.Int32Ptr(30),
 					StartToCloseTimeoutSeconds:    common.Int32Ptr(50),
 					HeartbeatTimeoutSeconds:       common.Int32Ptr(5),
 				},
@@ -391,7 +391,7 @@ func (s *IntegrationSuite) TestQueryWorkflow_NonSticky() {
 		TaskList:                            taskList,
 		Input:                               nil,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(100),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(1),
+		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(10),
 		Identity:                            identity,
 	}
 
@@ -421,7 +421,7 @@ func (s *IntegrationSuite) TestQueryWorkflow_NonSticky() {
 					TaskList:                      &types.TaskList{Name: tl},
 					Input:                         buf.Bytes(),
 					ScheduleToCloseTimeoutSeconds: common.Int32Ptr(100),
-					ScheduleToStartTimeoutSeconds: common.Int32Ptr(2),
+					ScheduleToStartTimeoutSeconds: common.Int32Ptr(30),
 					StartToCloseTimeoutSeconds:    common.Int32Ptr(50),
 					HeartbeatTimeoutSeconds:       common.Int32Ptr(5),
 				},
@@ -602,7 +602,7 @@ func (s *IntegrationSuite) TestQueryWorkflow_Consistent_PiggybackQuery() {
 		TaskList:                            taskList,
 		Input:                               nil,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(100),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(1),
+		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(10),
 		Identity:                            identity,
 	}
 
@@ -634,7 +634,7 @@ func (s *IntegrationSuite) TestQueryWorkflow_Consistent_PiggybackQuery() {
 					TaskList:                      &types.TaskList{Name: tl},
 					Input:                         buf.Bytes(),
 					ScheduleToCloseTimeoutSeconds: common.Int32Ptr(100),
-					ScheduleToStartTimeoutSeconds: common.Int32Ptr(2),
+					ScheduleToStartTimeoutSeconds: common.Int32Ptr(30),
 					StartToCloseTimeoutSeconds:    common.Int32Ptr(50),
 					HeartbeatTimeoutSeconds:       common.Int32Ptr(5),
 				},
@@ -1390,7 +1390,7 @@ func (s *IntegrationSuite) TestQueryWorkflow_BeforeFirstDecision() {
 		TaskList:                            taskList,
 		Input:                               nil,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(100),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(1),
+		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(10),
 		Identity:                            identity,
 	}
 
