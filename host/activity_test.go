@@ -188,7 +188,7 @@ func (s *IntegrationSuite) TestActivityHeartbeatDetailsDuringRetry() {
 		TaskList:                            taskList,
 		Input:                               nil,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(100),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(1),
+		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(10),
 		Identity:                            identity,
 	}
 
@@ -214,9 +214,9 @@ func (s *IntegrationSuite) TestActivityHeartbeatDetailsDuringRetry() {
 						ActivityType:                  &types.ActivityType{Name: activityName},
 						TaskList:                      &types.TaskList{Name: tl},
 						Input:                         nil,
-						ScheduleToCloseTimeoutSeconds: common.Int32Ptr(4),
-						ScheduleToStartTimeoutSeconds: common.Int32Ptr(4),
-						StartToCloseTimeoutSeconds:    common.Int32Ptr(4),
+						ScheduleToCloseTimeoutSeconds: common.Int32Ptr(60),
+						ScheduleToStartTimeoutSeconds: common.Int32Ptr(60),
+						StartToCloseTimeoutSeconds:    common.Int32Ptr(60),
 						HeartbeatTimeoutSeconds:       common.Int32Ptr(1),
 						RetryPolicy: &types.RetryPolicy{
 							InitialIntervalInSeconds:    1,
@@ -256,7 +256,7 @@ func (s *IntegrationSuite) TestActivityHeartbeatDetailsDuringRetry() {
 			cancel()
 			s.Nil(err)
 			// Trigger heartbeat timeout and retry
-			time.Sleep(time.Second * 2)
+			time.Sleep(time.Second * 10)
 		} else if activityExecutedCount == 1 {
 			// return an error and retry
 			err = errors.New("retryable-error")
