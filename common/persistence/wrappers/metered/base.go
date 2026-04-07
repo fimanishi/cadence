@@ -43,7 +43,6 @@ type base struct {
 	metricClient                  metrics.Client
 	logger                        log.Logger
 	enableLatencyHistogramMetrics bool
-	sampleLoggingRate             dynamicproperties.IntPropertyFn
 	enableShardIDMetrics          dynamicproperties.BoolPropertyFn
 	hostName                      string
 }
