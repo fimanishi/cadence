@@ -35,6 +35,12 @@ func createSharedDBConn(databaseName string, createDBConnFn func() (*sqlx.DB, er
 		return nil, err
 	}
 
+	// ncruces/go-sqlite3's WASM runtime is not safe for concurrent use from
+	// multiple goroutines. Limiting to a single connection serializes all WASM
+	// calls and prevents "out of bounds memory access" panics.
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+
 	dbPool[databaseName] = db
 	dbPoolCounter[databaseName]++
 
