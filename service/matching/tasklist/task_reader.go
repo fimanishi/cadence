@@ -484,7 +484,7 @@ func (tr *taskReader) dispatchSingleTaskFromBuffer(taskInfo *persistence.TaskInf
 	if errors.Is(err, context.Canceled) {
 		e.EventName = "Dispatch Failed because Context Cancelled"
 		event.Log(e)
-		tr.logger.Info("Tasklist manager context is cancelled, shutting down")
+		tr.logger.Debug("Tasklist manager context is cancelled, shutting down")
 		return true, true
 	}
 
