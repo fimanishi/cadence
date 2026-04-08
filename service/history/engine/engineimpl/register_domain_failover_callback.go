@@ -125,16 +125,10 @@ func (e *historyEngineImpl) domainChangeCB(nextDomains []*cache.DomainCacheEntry
 	}
 
 	if len(failoverActivePassiveDomainIDs) > 0 {
-		e.logger.Info("Domain Failover Start.", tag.WorkflowDomainIDs(failoverActivePassiveDomainIDs))
-
 		// Failover queues are not created for active-active domains. Will revisit after new queue framework implementation.
 		for _, processor := range e.queueProcessors {
 			processor.FailoverDomain(failoverActivePassiveDomainIDs)
 		}
-	}
-
-	if len(failoverActiveActiveDomainIDs) > 0 {
-		e.logger.Info("Active-Active Domain updated", tag.WorkflowDomainIDs(failoverActiveActiveDomainIDs))
 	}
 
 	// Notify queues for any domain update. (active-passive and active-active)
