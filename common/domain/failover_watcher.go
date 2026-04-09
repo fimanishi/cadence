@@ -173,7 +173,7 @@ func (p *failoverWatcherImpl) handleFailoverTimeout(
 		sourceCluster, err := p.clusterMetadata.ClusterNameForFailoverVersion(domain.GetPreviousFailoverVersion())
 		if err != nil {
 			p.logger.Error("Failed to resolve source cluster for graceful failover", tag.WorkflowDomainID(domainID), tag.WorkflowDomainName(domain.GetInfo().Name), tag.Error(err))
-			return
+			sourceCluster = "unknown"
 		}
 		p.logger.Info("Graceful failover completed",
 			tag.WorkflowDomainID(domainID),
