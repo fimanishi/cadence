@@ -2378,7 +2378,6 @@ const (
 
 	ArchivalConfigFailures
 	ActiveClusterGauge
-	ActiveDomainsInClusterGauge
 
 	ElasticsearchRequests
 	ElasticsearchFailures
@@ -3233,7 +3232,6 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		DecisionResultCount:                                          {metricName: "decision_result_count", metricType: Timer},
 		ArchivalConfigFailures:                                       {metricName: "archivalconfig_failures", metricType: Counter},
 		ActiveClusterGauge:                                           {metricName: "active_cluster", metricType: Gauge},
-		ActiveDomainsInClusterGauge:                                  {metricName: "active_domains_in_cluster", metricType: Gauge},
 		ElasticsearchRequests:                                        {metricName: "elasticsearch_requests", metricType: Counter},
 		ElasticsearchFailures:                                        {metricName: "elasticsearch_errors", metricType: Counter},
 		ElasticsearchLatency:                                         {metricName: "elasticsearch_latency", metricType: Timer},

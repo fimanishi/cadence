@@ -516,32 +516,6 @@ UpdateLoop:
 		}
 	}
 
-	// Emit per-cluster domain counts as a separate gauge.
-	// Unlike ActiveClusterGauge (which emits 1 per domain), this aggregates
-	// counts per cluster so that averaging across hosts gives the correct value.
-	type clusterKey struct {
-		activeCluster  string
-		isGlobal       bool
-		isActiveActive bool
-	}
-	clusterCounts := map[clusterKey]float64{}
-	for _, domain := range domains {
-		key := clusterKey{
-			activeCluster:  domain.replicationConfig.ActiveClusterName,
-			isGlobal:       domain.isGlobalDomain,
-			isActiveActive: domain.replicationConfig.IsActiveActive(),
-		}
-		clusterCounts[key]++
-	}
-	for key, count := range clusterCounts {
-		c.scope.Tagged(
-			metrics.DomainTypeTag(key.isGlobal),
-			metrics.ClusterGroupTag(c.clusterGroup),
-			metrics.ActiveClusterTag(key.activeCluster),
-			metrics.IsActiveActiveDomainTag(key.isActiveActive),
-		).UpdateGauge(metrics.ActiveDomainsInClusterGauge, count)
-	}
-
 	// NOTE: READ REF BEFORE MODIFICATION
 	// ref: historyEngine.go registerDomainFailoverCallback function
 	c.callbackLock.Lock()
