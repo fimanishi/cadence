@@ -1342,7 +1342,7 @@ func (s *contextImpl) allocateTimerIDsLocked(
 		// 2. current time. Otherwise the task timestamp is in the past and causes aritical load latency in queue processor metrics.
 		// Above cases can happen if shard move and new host have a time SKU,
 		// or there is db write delay, or we are simply (re-)generating tasks for an old workflow.
-	
+
 		// Only log warnings for local-domain tasks (EmptyVersion) and tasks owned by the current cluster.
 		// Remote/standby tasks are expected to have timestamps behind the local read level or current time,
 		// so these warnings would be noisy and not actionable for this host.
