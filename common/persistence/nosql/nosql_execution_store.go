@@ -932,11 +932,11 @@ func (d *nosqlExecutionStore) DeleteTimerTask(
 	ctx context.Context,
 	request *persistence.DeleteTimerTaskRequest,
 ) error {
-	return d.db.DeleteWorkflowTimerTask(
+	return d.db.DeleteTimerTask(
 		ctx,
 		d.shardID,
-		request.VisibilityTimestamp,
 		request.TaskID,
+		request.VisibilityTimestamp,
 	)
 }
 
