@@ -666,15 +666,13 @@ func (m *executionManagerImpl) CreateWorkflowExecution(
 	return &CreateWorkflowExecutionResponse{MutableStateUpdateSessionStats: msuss}, nil
 }
 
-// syncExecutionInfoWithTasks ensures that the mutable state / execution info is in sync with the tasks.
-// for the purpose of tracking them, such that when we go to clean up
+// syncExecutionInfoWithTasks records timer task IDs on the workflow snapshot so they can be
+// cleaned up when the workflow closes before its timers fire.
 //
-// The reason this must be done here is that the tasks are first created, then their IDs are assigned
-// after their creation. In order to track these via the execution / mutable state record, we
-// need to update these references after their creation and taskID assignment.
+// This runs inside CreateWorkflowExecution rather than at snapshot creation time because
+// task IDs are not assigned until the execution manager processes the snapshot. All workflow
+// creation paths (normal start, NdC replication, reset) pass through this single method.
 func (m *executionManagerImpl) syncExecutionInfoWithTasks(workflowSnapshot *WorkflowSnapshot) {
-	// for now, this is only a best effort thing. It might change for more rigourously
-	// tracking these.
 	if m.dc == nil || m.dc.EnableTimerCleanupOnWorkflowClose == nil || !m.dc.EnableTimerCleanupOnWorkflowClose() {
 		return
 	}
@@ -691,7 +689,7 @@ func (m *executionManagerImpl) syncExecutionInfoWithTasks(workflowSnapshot *Work
 					)
 					continue
 				}
-				workflowSnapshot.WorkflowTimerTasks = append(workflowSnapshot.WorkflowTimerTasks, &WorkflowTimerTaskInfo{
+				workflowSnapshot.WorkflowTimerTaskInfos = append(workflowSnapshot.WorkflowTimerTaskInfos, &WorkflowTimerTaskInfo{
 					TaskID:              task.GetTaskID(),
 					VisibilityTimestamp: task.GetVisibilityTimestamp(),
 					TimeoutType:         timerTaskInfo.TimeoutType,
@@ -729,7 +727,7 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 	if err != nil {
 		return nil, err
 	}
-	serializedWorkflowTimerTasks, err := m.SerializeWorkflowTimerTasks(input.WorkflowTimerTasks, encoding)
+	serializedWorkflowTimerTasks, err := m.SerializeWorkflowTimerTasks(input.WorkflowTimerTaskInfos, encoding)
 	if err != nil {
 		return nil, err
 	}
@@ -811,7 +809,7 @@ func (m *executionManagerImpl) SerializeWorkflowSnapshot(
 	if err != nil {
 		return nil, err
 	}
-	serializedWorkflowTimerTasks, err := m.SerializeWorkflowTimerTasks(input.WorkflowTimerTasks, encoding)
+	serializedWorkflowTimerTasks, err := m.SerializeWorkflowTimerTasks(input.WorkflowTimerTaskInfos, encoding)
 	if err != nil {
 		return nil, err
 	}
