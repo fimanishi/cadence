@@ -4,3 +4,6 @@ frontend.warmupDuration:
 frontend.enableActiveClusterSelectionPolicyInStartWorkflow:
 - value: true
   constraints: {}
+system.minRetentionDays:
+- value: 0
+  constraints: {}
