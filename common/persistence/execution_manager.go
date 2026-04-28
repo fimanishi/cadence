@@ -610,7 +610,6 @@ func (m *executionManagerImpl) CreateWorkflowExecution(
 	ctx context.Context,
 	request *CreateWorkflowExecutionRequest,
 ) (*CreateWorkflowExecutionResponse, error) {
-
 	serializedNewWorkflowSnapshot, err := m.SerializeWorkflowSnapshot(&request.NewWorkflowSnapshot, constants.EncodingType(m.dc.SerializationEncoding()))
 	if err != nil {
 		return nil, err
@@ -1059,7 +1058,7 @@ func (m *executionManagerImpl) RangeCompleteHistoryTask(
 	return m.persistence.RangeCompleteHistoryTask(ctx, request)
 }
 
-func (m *executionManagerImpl) DeleteTimerTask(
+func (m *executionManagerImpl) deleteTimerTask(
 	ctx context.Context,
 	request *DeleteTimerTaskRequest,
 ) error {
@@ -1089,7 +1088,7 @@ func (m *executionManagerImpl) CleanupWorkflowTimerTasks(
 		if visibilityTs.Sub(now) < minTTL {
 			continue
 		}
-		if delErr := m.DeleteTimerTask(ctx, &DeleteTimerTaskRequest{
+		if delErr := m.deleteTimerTask(ctx, &DeleteTimerTaskRequest{
 			DomainID:            request.DomainID,
 			WorkflowID:          request.WorkflowID,
 			RunID:               request.RunID,
