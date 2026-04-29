@@ -1106,6 +1106,11 @@ func (m *executionManagerImpl) DeleteWorkflowTimerTasks(
 	request *DeleteWorkflowTimerTasksRequest,
 ) error {
 	for taskID, visibilityTs := range request.Tasks {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
 		if delErr := m.persistence.DeleteTimerTask(ctx, &DeleteTimerTaskRequest{
 			DomainID:            request.DomainID,
 			WorkflowID:          request.WorkflowID,
