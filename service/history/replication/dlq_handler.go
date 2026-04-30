@@ -290,7 +290,12 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 
 	replicationTasks := make([]*types.ReplicationTask, 0, len(resp.Tasks))
 	for _, task := range resp.Tasks {
-		replicationTasks = append(replicationTasks, hydrated[task.Info.TaskID])
+		rt, ok := hydrated[task.Info.TaskID]
+		if !ok {
+			r.logger.Warn("replication task not found after hydration", tag.TaskID(task.Info.TaskID))
+			continue
+		}
+		replicationTasks = append(replicationTasks, rt)
 	}
 
 	return replicationTasks, taskInfo, resp.NextPageToken, nil
