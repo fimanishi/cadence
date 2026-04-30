@@ -266,16 +266,17 @@ func (s *dlqHandlerSuite) TestReadMessages_OK() {
 	pageSize := 1
 	var pageToken []byte
 
-	resp := &persistence.GetHistoryTasksResponse{
-		Tasks: []persistence.Task{
-			&persistence.HistoryReplicationTask{
-				WorkflowIdentifier: persistence.WorkflowIdentifier{
-					DomainID:   uuid.New(),
-					WorkflowID: uuid.New(),
-					RunID:      uuid.New(),
-				},
-				TaskData: persistence.TaskData{
-					TaskID: 1,
+	domainID := uuid.New()
+	workflowID := uuid.New()
+	runID := uuid.New()
+	resp := &persistence.GetReplicationDLQTasksResponse{
+		Tasks: []*persistence.ReplicationDLQTask{
+			{
+				Info: &persistence.ReplicationTaskInfo{
+					DomainID:   domainID,
+					WorkflowID: workflowID,
+					RunID:      runID,
+					TaskID:     1,
 				},
 			},
 		},
@@ -296,27 +297,26 @@ func (s *dlqHandlerSuite) TestReadMessages_OK() {
 	tasks, info, token, err := s.messageHandler.ReadMessages(ctx, s.sourceCluster, lastMessageID, pageSize, pageToken)
 	s.NoError(err)
 	s.Nil(token)
-	s.Equal(resp.Tasks[0].GetDomainID(), info[0].GetDomainID())
-	s.Equal(resp.Tasks[0].GetWorkflowID(), info[0].GetWorkflowID())
-	s.Equal(resp.Tasks[0].GetRunID(), info[0].GetRunID())
+	s.Equal(domainID, info[0].GetDomainID())
+	s.Equal(workflowID, info[0].GetWorkflowID())
+	s.Equal(runID, info[0].GetRunID())
 	s.Nil(tasks)
 }
 
 func (s *dlqHandlerSuite) TestReadMessagesWithAckLevel_OK() {
-	replicationTasksResponse := &persistence.GetHistoryTasksResponse{
-		Tasks: []persistence.Task{
-			&persistence.HistoryReplicationTask{
-				WorkflowIdentifier: persistence.WorkflowIdentifier{
-					DomainID:   "domainID",
-					WorkflowID: "workflowID",
-					RunID:      "runID",
+	replicationTasksResponse := &persistence.GetReplicationDLQTasksResponse{
+		Tasks: []*persistence.ReplicationDLQTask{
+			{
+				Info: &persistence.ReplicationTaskInfo{
+					DomainID:     "domainID",
+					WorkflowID:   "workflowID",
+					RunID:        "runID",
+					TaskID:       123,
+					TaskType:     persistence.ReplicationTaskTypeHistory,
+					Version:      1,
+					FirstEventID: 1,
+					NextEventID:  2,
 				},
-				TaskData: persistence.TaskData{
-					TaskID:  123,
-					Version: 1,
-				},
-				FirstEventID: 1,
-				NextEventID:  2,
 			},
 		},
 		NextPageToken: []byte("token"),
@@ -355,12 +355,9 @@ func (s *dlqHandlerSuite) TestReadMessagesWithAckLevel_OK() {
 	s.NoError(err)
 	s.Equal(replicationTasks, DLQReplicationMessagesResponse.ReplicationTasks)
 	s.Len(taskInfo, len(replicationTasksResponse.Tasks))
-	// testing content of taskInfo because it's assembled in the method using tasks from replicationTasksFromDLQ
-	for i, task := range taskInfo {
-		t, err := replicationTasksResponse.Tasks[i].ToInternalReplicationTaskInfo()
-		s.NoError(err)
-		s.Equal(task, t)
-	}
+	s.Equal("domainID", taskInfo[0].GetDomainID())
+	s.Equal("workflowID", taskInfo[0].GetWorkflowID())
+	s.Equal("runID", taskInfo[0].GetRunID())
 	s.Equal(nextPageToken, replicationTasksResponse.NextPageToken)
 }
 
@@ -416,10 +413,13 @@ func (s *dlqHandlerSuite) TestReadMessagesWithAckLevel_GetDLQReplicationMessages
 		ShardID:           common.Ptr(0),
 	}
 
-	replicationTasksResponse := &persistence.GetHistoryTasksResponse{
-		Tasks: []persistence.Task{
-			&persistence.FailoverMarkerTask{
-				DomainID: "domainID",
+	replicationTasksResponse := &persistence.GetReplicationDLQTasksResponse{
+		Tasks: []*persistence.ReplicationDLQTask{
+			{
+				Info: &persistence.ReplicationTaskInfo{
+					DomainID: "domainID",
+					TaskID:   1,
+				},
 			},
 		},
 	}
@@ -478,26 +478,22 @@ func (s *dlqHandlerSuite) TestMergeMessages_OK() {
 	pageSize := 1
 	var pageToken []byte
 
-	resp := &persistence.GetHistoryTasksResponse{
-		Tasks: []persistence.Task{
-			&persistence.HistoryReplicationTask{
-				WorkflowIdentifier: persistence.WorkflowIdentifier{
+	resp := &persistence.GetReplicationDLQTasksResponse{
+		Tasks: []*persistence.ReplicationDLQTask{
+			{
+				Info: &persistence.ReplicationTaskInfo{
 					DomainID:   uuid.New(),
 					WorkflowID: uuid.New(),
 					RunID:      uuid.New(),
-				},
-				TaskData: persistence.TaskData{
-					TaskID: 1,
+					TaskID:     1,
 				},
 			},
-			&persistence.HistoryReplicationTask{
-				WorkflowIdentifier: persistence.WorkflowIdentifier{
+			{
+				Info: &persistence.ReplicationTaskInfo{
 					DomainID:   uuid.New(),
 					WorkflowID: uuid.New(),
 					RunID:      uuid.New(),
-				},
-				TaskData: persistence.TaskData{
-					TaskID: 2,
+					TaskID:     2,
 				},
 			},
 		},
@@ -551,7 +547,7 @@ func (s *dlqHandlerSuite) TestMergeMessages_GetReplicationTasksFromDLQFailed() {
 
 func (s *dlqHandlerSuite) TestMergeMessages_RangeDeleteReplicationTaskFromDLQFailed() {
 	errorMessage := "RangeDeleteReplicationTaskFromDLQFailed"
-	s.executionManager.On("GetReplicationTasksFromDLQ", mock.Anything, mock.Anything).Return(&persistence.GetHistoryTasksResponse{}, nil).Times(1)
+	s.executionManager.On("GetReplicationTasksFromDLQ", mock.Anything, mock.Anything).Return(&persistence.GetReplicationDLQTasksResponse{}, nil).Times(1)
 	s.executionManager.On("RangeDeleteReplicationTaskFromDLQ", mock.Anything, mock.Anything).Return(nil, errors.New(errorMessage)).Times(1)
 	_, err := s.messageHandler.MergeMessages(context.Background(), s.sourceCluster, 1, 1, nil)
 	s.Error(err)
@@ -574,7 +570,7 @@ func (s *dlqHandlerSuite) TestMergeMessages_executeFailed() {
 		BatchSize:         pageSize,
 		NextPageToken:     pageToken,
 		ShardID:           common.Ptr(0),
-	}).Return(&persistence.GetHistoryTasksResponse{Tasks: []persistence.Task{&persistence.HistoryReplicationTask{TaskData: persistence.TaskData{TaskID: 1}}}}, nil).Times(1)
+	}).Return(&persistence.GetReplicationDLQTasksResponse{Tasks: []*persistence.ReplicationDLQTask{{Info: &persistence.ReplicationTaskInfo{TaskID: 1}}}}, nil).Times(1)
 
 	s.adminClient.EXPECT().GetDLQReplicationMessages(ctx, gomock.Any()).
 		Return(&types.GetDLQReplicationMessagesResponse{ReplicationTasks: []*types.ReplicationTask{{SourceTaskID: 1}}}, nil)

@@ -624,7 +624,7 @@ func (d *nosqlExecutionStore) PutReplicationTaskToDLQ(
 ) error {
 	err := d.db.InsertReplicationDLQTask(ctx, d.shardID, request.SourceClusterName, &nosqlplugin.HistoryMigrationTask{
 		Replication: request.TaskInfo,
-		Task:        nil, // TODO: encode task infor into datablob
+		Task:        request.Task,
 	})
 	if err != nil {
 		return convertCommonErrors(d.db, "PutReplicationTaskToDLQ", err)
@@ -636,7 +636,7 @@ func (d *nosqlExecutionStore) PutReplicationTaskToDLQ(
 func (d *nosqlExecutionStore) GetReplicationTasksFromDLQ(
 	ctx context.Context,
 	request *persistence.GetReplicationTasksFromDLQRequest,
-) (*persistence.GetHistoryTasksResponse, error) {
+) (*persistence.GetReplicationDLQTasksResponse, error) {
 	if request.ReadLevel > request.MaxReadLevel {
 		return nil, &types.BadRequestError{Message: "ReadLevel cannot be higher than MaxReadLevel"}
 	}
@@ -644,16 +644,29 @@ func (d *nosqlExecutionStore) GetReplicationTasksFromDLQ(
 	if err != nil {
 		return nil, convertCommonErrors(d.db, "GetReplicationTasksFromDLQ", err)
 	}
-	var tTasks []persistence.Task
+	var dlqTasks []*persistence.ReplicationDLQTask
 	for _, t := range tasks {
-		task, err := t.Replication.ToTask()
-		if err != nil {
-			return nil, convertCommonErrors(d.db, "GetReplicationTasksFromDLQ", err)
-		}
-		tTasks = append(tTasks, task)
+		r := t.Replication
+		dlqTasks = append(dlqTasks, &persistence.ReplicationDLQTask{
+			Info: &persistence.ReplicationTaskInfo{
+				DomainID:          r.DomainID,
+				WorkflowID:        r.WorkflowID,
+				RunID:             r.RunID,
+				TaskID:            r.TaskID,
+				TaskType:          r.TaskType,
+				FirstEventID:      r.FirstEventID,
+				NextEventID:       r.NextEventID,
+				Version:           r.Version,
+				ScheduledID:       r.ScheduledID,
+				BranchToken:       r.BranchToken,
+				NewRunBranchToken: r.NewRunBranchToken,
+				CreationTime:      r.CreationTime.UnixNano(),
+			},
+			Task: t.Task,
+		})
 	}
-	return &persistence.GetHistoryTasksResponse{
-		Tasks:         tTasks,
+	return &persistence.GetReplicationDLQTasksResponse{
+		Tasks:         dlqTasks,
 		NextPageToken: nextPageToken,
 	}, nil
 }

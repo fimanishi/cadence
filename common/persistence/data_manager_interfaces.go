@@ -972,6 +972,7 @@ type (
 		SourceClusterName string
 		TaskInfo          *ReplicationTaskInfo
 		DomainName        string
+		Task              *DataBlob
 	}
 
 	// GetReplicationTasksFromDLQRequest is used to get replication tasks from dlq
@@ -982,6 +983,19 @@ type (
 		MaxReadLevel      int64
 		BatchSize         int
 		NextPageToken     []byte
+	}
+
+	// ReplicationDLQTask pairs DLQ task metadata with its stored full task payload.
+	// Task may be nil for entries written before payload storage was implemented.
+	ReplicationDLQTask struct {
+		Info *ReplicationTaskInfo
+		Task *DataBlob
+	}
+
+	// GetReplicationDLQTasksResponse is returned by GetReplicationDLQTasks.
+	GetReplicationDLQTasksResponse struct {
+		Tasks         []*ReplicationDLQTask
+		NextPageToken []byte
 	}
 
 	// GetReplicationDLQSizeRequest is used to get one replication task from dlq
@@ -1648,7 +1662,7 @@ type (
 		// Replication task related methods
 
 		PutReplicationTaskToDLQ(ctx context.Context, request *PutReplicationTaskToDLQRequest) error
-		GetReplicationTasksFromDLQ(ctx context.Context, request *GetReplicationTasksFromDLQRequest) (*GetHistoryTasksResponse, error)
+		GetReplicationTasksFromDLQ(ctx context.Context, request *GetReplicationTasksFromDLQRequest) (*GetReplicationDLQTasksResponse, error)
 		GetReplicationDLQSize(ctx context.Context, request *GetReplicationDLQSizeRequest) (*GetReplicationDLQSizeResponse, error)
 		DeleteReplicationTaskFromDLQ(ctx context.Context, request *DeleteReplicationTaskFromDLQRequest) error
 		RangeDeleteReplicationTaskFromDLQ(ctx context.Context, request *RangeDeleteReplicationTaskFromDLQRequest) (*RangeDeleteReplicationTaskFromDLQResponse, error)

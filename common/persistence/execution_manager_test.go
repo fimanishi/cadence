@@ -612,42 +612,25 @@ func TestGetReplicationTasksFromDLQ(t *testing.T) {
 		NextPageToken:     nil,
 	}
 
-	now := time.Now().UTC().Round(time.Second)
-
-	mockedStore.EXPECT().GetReplicationTasksFromDLQ(gomock.Any(), request).Return(
-		&GetHistoryTasksResponse{
-			Tasks: []Task{
-				&HistoryReplicationTask{
-					WorkflowIdentifier: WorkflowIdentifier{
-						DomainID:   testDomainID,
-						WorkflowID: testWorkflowID,
-					},
-					TaskData: TaskData{
-						TaskID:              1,
-						VisibilityTimestamp: now,
-					},
-				},
-			},
-			NextPageToken: []byte("test-token"),
-		}, nil)
-
-	res, err := manager.GetReplicationTasksFromDLQ(context.Background(), request)
-	assert.NoError(t, err)
-	assert.Equal(t, &GetHistoryTasksResponse{
-		Tasks: []Task{
-			&HistoryReplicationTask{
-				WorkflowIdentifier: WorkflowIdentifier{
+	expected := &GetReplicationDLQTasksResponse{
+		Tasks: []*ReplicationDLQTask{
+			{
+				Info: &ReplicationTaskInfo{
 					DomainID:   testDomainID,
 					WorkflowID: testWorkflowID,
-				},
-				TaskData: TaskData{
-					TaskID:              1,
-					VisibilityTimestamp: now,
+					TaskID:     1,
+					TaskType:   ReplicationTaskTypeHistory,
 				},
 			},
 		},
 		NextPageToken: []byte("test-token"),
-	}, res)
+	}
+
+	mockedStore.EXPECT().GetReplicationTasksFromDLQ(gomock.Any(), request).Return(expected, nil)
+
+	res, err := manager.GetReplicationTasksFromDLQ(context.Background(), request)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, res)
 }
 
 func TestDeserializeChildExecutionInfos(t *testing.T) {

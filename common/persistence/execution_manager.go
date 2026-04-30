@@ -873,6 +873,7 @@ func (m *executionManagerImpl) PutReplicationTaskToDLQ(
 	internalRequest := &InternalPutReplicationTaskToDLQRequest{
 		SourceClusterName: request.SourceClusterName,
 		TaskInfo:          m.toInternalReplicationTaskInfo(request.TaskInfo),
+		Task:              request.Task,
 	}
 	return m.persistence.PutReplicationTaskToDLQ(ctx, internalRequest)
 }
@@ -880,7 +881,7 @@ func (m *executionManagerImpl) PutReplicationTaskToDLQ(
 func (m *executionManagerImpl) GetReplicationTasksFromDLQ(
 	ctx context.Context,
 	request *GetReplicationTasksFromDLQRequest,
-) (*GetHistoryTasksResponse, error) {
+) (*GetReplicationDLQTasksResponse, error) {
 	return m.persistence.GetReplicationTasksFromDLQ(ctx, request)
 }
 

@@ -240,11 +240,18 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 
 	taskInfo := make([]*types.ReplicationTaskInfo, 0, len(resp.Tasks))
 	for _, task := range resp.Tasks {
-		ti, err := task.ToInternalReplicationTaskInfo()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		taskInfo = append(taskInfo, ti)
+		info := task.Info
+		taskInfo = append(taskInfo, &types.ReplicationTaskInfo{
+			DomainID:     info.DomainID,
+			WorkflowID:   info.WorkflowID,
+			RunID:        info.RunID,
+			TaskType:     int16(info.TaskType),
+			TaskID:       info.TaskID,
+			Version:      info.Version,
+			FirstEventID: info.FirstEventID,
+			NextEventID:  info.NextEventID,
+			ScheduledID:  info.ScheduledID,
+		})
 	}
 	response := &types.GetDLQReplicationMessagesResponse{}
 	if len(taskInfo) > 0 {

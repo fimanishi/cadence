@@ -262,20 +262,7 @@ func (s *taskProcessorSuite) TestProcessorLoop_TaskExecuteFailed_PutDLQSuccess()
 	s.mockDomainCache.EXPECT().GetDomainName(testDomainID).Return(testDomainName, nil).AnyTimes()
 
 	// task will be put into dlq
-	dlqReq := &persistence.PutReplicationTaskToDLQRequest{
-		SourceClusterName: "standby", // TODO move to a constant
-		TaskInfo: &persistence.ReplicationTaskInfo{
-			DomainID:    testDomainID,
-			WorkflowID:  testWorkflowID,
-			RunID:       testRunID,
-			TaskID:      testTaskID,
-			TaskType:    persistence.ReplicationTaskTypeSyncActivity,
-			ScheduledID: testScheduleID,
-		},
-		DomainName: testDomainName,
-		ShardID:    common.Ptr(0),
-	}
-	s.mockShard.Resource.ExecutionMgr.On("PutReplicationTaskToDLQ", mock.Anything, dlqReq).Return(nil).Times(1)
+	s.mockShard.Resource.ExecutionMgr.On("PutReplicationTaskToDLQ", mock.Anything, mock.Anything).Return(nil).Times(1)
 
 	// start the process loop
 	s.taskProcessor.wg.Add(1)
@@ -316,21 +303,8 @@ func (s *taskProcessorSuite) TestProcessorLoop_TaskExecuteFailed_PutDLQFailed() 
 	dqlRetryPolicy := backoff.NewExponentialRetryPolicy(time.Millisecond)
 	dqlRetryPolicy.SetMaximumAttempts(2)
 	s.taskProcessor.dlqRetryPolicy = dqlRetryPolicy
-	dlqReq := &persistence.PutReplicationTaskToDLQRequest{
-		SourceClusterName: "standby", // TODO move to a constant
-		TaskInfo: &persistence.ReplicationTaskInfo{
-			DomainID:    testDomainID,
-			WorkflowID:  testWorkflowID,
-			RunID:       testRunID,
-			TaskID:      testTaskID,
-			TaskType:    persistence.ReplicationTaskTypeSyncActivity,
-			ScheduledID: testScheduleID,
-		},
-		DomainName: testDomainName,
-		ShardID:    common.Ptr(0),
-	}
 	s.mockShard.Resource.ExecutionMgr.
-		On("PutReplicationTaskToDLQ", mock.Anything, dlqReq).
+		On("PutReplicationTaskToDLQ", mock.Anything, mock.Anything).
 		Return(errors.New("failed to put to dlq")).
 		Times(3)
 
@@ -446,6 +420,7 @@ func (s *taskProcessorSuite) TestGenerateDLQRequest_ReplicationTaskTypeHistoryV2
 	s.Equal(workflowID, request.TaskInfo.GetWorkflowID())
 	s.Equal(runID, request.TaskInfo.GetRunID())
 	s.Equal(persistence.ReplicationTaskTypeHistory, request.TaskInfo.GetTaskType())
+	s.NotNil(request.Task, "task blob should be serialized")
 }
 
 func (s *taskProcessorSuite) TestGenerateDLQRequest_ReplicationTaskTypeSyncActivity() {
@@ -471,6 +446,7 @@ func (s *taskProcessorSuite) TestGenerateDLQRequest_ReplicationTaskTypeSyncActiv
 	s.Equal(workflowID, request.TaskInfo.GetWorkflowID())
 	s.Equal(runID, request.TaskInfo.GetRunID())
 	s.Equal(persistence.ReplicationTaskTypeSyncActivity, request.TaskInfo.GetTaskType())
+	s.NotNil(request.Task, "task blob should be serialized")
 }
 
 func (s *taskProcessorSuite) TestGenerateDLQRequest_InvalidTaskType() {
