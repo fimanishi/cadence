@@ -252,6 +252,8 @@ func TestGetReplicationTasksFromDLQ(t *testing.T) {
 							NewRunBranchToken: []byte(`nbt`),
 							CreationTime:      time.Time{}.UnixNano(),
 						},
+						// SQL has no column for the full task blob; Task is always nil for SQL backends.
+						Task: nil,
 					},
 				},
 				NextPageToken: serializePageToken(101),
