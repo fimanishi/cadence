@@ -22,6 +22,7 @@ package replication
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -79,6 +80,7 @@ type (
 	dlqHandlerImpl struct {
 		taskExecutors map[string]TaskExecutor
 		shard         shard.Context
+		serializer    persistence.PayloadSerializer
 		logger        log.Logger
 		metricsClient metrics.Client
 		done          chan struct{}
@@ -105,6 +107,7 @@ func NewDLQHandler(
 	return &dlqHandlerImpl{
 		shard:         shard,
 		taskExecutors: taskExecutors,
+		serializer:    persistence.NewPayloadSerializer(),
 		logger:        shard.GetLogger(),
 		metricsClient: shard.GetMetricsClient(),
 		done:          make(chan struct{}),
@@ -233,15 +236,16 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 		return nil, nil, nil, err
 	}
 
-	remoteAdminClient, err := r.shard.GetService().GetClientBean().GetRemoteAdminClient(sourceCluster)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	taskInfo := make([]*types.ReplicationTaskInfo, 0, len(resp.Tasks))
+	hydrated := make(map[int64]*types.ReplicationTask, len(resp.Tasks))
+	var needHydration []*types.ReplicationTaskInfo
+
 	for _, task := range resp.Tasks {
 		info := task.Info
-		taskInfo = append(taskInfo, &types.ReplicationTaskInfo{
+		if info == nil {
+			return nil, nil, nil, fmt.Errorf("nil task info in DLQ response")
+		}
+		ti := &types.ReplicationTaskInfo{
 			DomainID:     info.DomainID,
 			WorkflowID:   info.WorkflowID,
 			RunID:        info.RunID,
@@ -251,22 +255,45 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 			FirstEventID: info.FirstEventID,
 			NextEventID:  info.NextEventID,
 			ScheduledID:  info.ScheduledID,
-		})
+		}
+		taskInfo = append(taskInfo, ti)
+
+		if task.Task != nil {
+			replicationTask, err := r.serializer.DeserializeReplicationDLQTask(task.Task)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			hydrated[info.TaskID] = replicationTask
+		} else {
+			needHydration = append(needHydration, ti)
+		}
 	}
-	response := &types.GetDLQReplicationMessagesResponse{}
-	if len(taskInfo) > 0 {
-		response, err = remoteAdminClient.GetDLQReplicationMessages(
+
+	if len(needHydration) > 0 {
+		remoteAdminClient, err := r.shard.GetService().GetClientBean().GetRemoteAdminClient(sourceCluster)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		response, err := remoteAdminClient.GetDLQReplicationMessages(
 			ctx,
 			&types.GetDLQReplicationMessagesRequest{
-				TaskInfos: taskInfo,
+				TaskInfos: needHydration,
 			},
 		)
 		if err != nil {
 			return nil, nil, nil, err
 		}
+		for _, task := range response.ReplicationTasks {
+			hydrated[task.SourceTaskID] = task
+		}
 	}
 
-	return response.ReplicationTasks, taskInfo, resp.NextPageToken, nil
+	replicationTasks := make([]*types.ReplicationTask, 0, len(resp.Tasks))
+	for _, task := range resp.Tasks {
+		replicationTasks = append(replicationTasks, hydrated[task.Info.TaskID])
+	}
+
+	return replicationTasks, taskInfo, resp.NextPageToken, nil
 }
 
 func (r *dlqHandlerImpl) PurgeMessages(

@@ -577,7 +577,7 @@ func (p *taskProcessorImpl) generateDLQRequest(
 		if err != nil {
 			return nil, err
 		}
-		taskBlob, err := p.historySerializer.SerializeReplicationTask(replicationTask, constants.EncodingTypeThriftRW)
+		taskBlob, err := p.historySerializer.SerializeReplicationDLQTask(replicationTask, constants.EncodingTypeThriftRW)
 		if err != nil {
 			return nil, err
 		}
@@ -613,7 +613,7 @@ func (p *taskProcessorImpl) generateDLQRequest(
 			return nil, fmt.Errorf("corrupted history event batch, empty events")
 		}
 
-		taskBlob, err := p.historySerializer.SerializeReplicationTask(replicationTask, constants.EncodingTypeThriftRW)
+		taskBlob, err := p.historySerializer.SerializeReplicationDLQTask(replicationTask, constants.EncodingTypeThriftRW)
 		if err != nil {
 			return nil, err
 		}

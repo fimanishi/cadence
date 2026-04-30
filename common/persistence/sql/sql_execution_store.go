@@ -1058,6 +1058,9 @@ func (m *sqlExecutionStore) PutReplicationTaskToDLQ(
 		return err
 	}
 
+	// TODO: The SQL schema does not yet have a column for the full replication task blob.
+	// request.Task is intentionally not persisted here. A schema migration is needed to
+	// support skipping the cross-cluster GetDLQReplicationMessages RPC for SQL backends.
 	row := &sqlplugin.ReplicationTaskDLQRow{
 		SourceClusterName: request.SourceClusterName,
 		ShardID:           m.shardID,

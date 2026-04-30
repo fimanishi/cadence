@@ -251,16 +251,16 @@ func TestSerializers(t *testing.T) {
 			},
 		},
 		{
-			name: "replication task",
+			name: "replication DLQ task",
 			payloads: map[string]any{
 				"nil":    (*types.ReplicationTask)(nil),
 				"normal": generateReplicationTask(),
 			},
 			serializeFn: func(payload any, encoding constants.EncodingType) (*DataBlob, error) {
-				return serializer.SerializeReplicationTask(payload.(*types.ReplicationTask), encoding)
+				return serializer.SerializeReplicationDLQTask(payload.(*types.ReplicationTask), encoding)
 			},
 			deserializeFn: func(data *DataBlob) (any, error) {
-				return serializer.DeserializeReplicationTask(data)
+				return serializer.DeserializeReplicationDLQTask(data)
 			},
 		},
 	}

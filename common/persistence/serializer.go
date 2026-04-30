@@ -99,9 +99,9 @@ type (
 		SerializeActiveClusterSelectionPolicy(policy *types.ActiveClusterSelectionPolicy, encodingType constants.EncodingType) (*DataBlob, error)
 		DeserializeActiveClusterSelectionPolicy(data *DataBlob) (*types.ActiveClusterSelectionPolicy, error)
 
-		// serialize/deserialize replication task
-		SerializeReplicationTask(task *types.ReplicationTask, encodingType constants.EncodingType) (*DataBlob, error)
-		DeserializeReplicationTask(data *DataBlob) (*types.ReplicationTask, error)
+		// serialize/deserialize full replication task payload for DLQ storage
+		SerializeReplicationDLQTask(task *types.ReplicationTask, encodingType constants.EncodingType) (*DataBlob, error)
+		DeserializeReplicationDLQTask(data *DataBlob) (*types.ReplicationTask, error)
 	}
 
 	// CadenceSerializationError is an error type for cadence serialization
@@ -380,14 +380,14 @@ func (t *serializerImpl) DeserializeActiveClusterSelectionPolicy(data *DataBlob)
 	return &policy, err
 }
 
-func (t *serializerImpl) SerializeReplicationTask(task *types.ReplicationTask, encodingType constants.EncodingType) (*DataBlob, error) {
+func (t *serializerImpl) SerializeReplicationDLQTask(task *types.ReplicationTask, encodingType constants.EncodingType) (*DataBlob, error) {
 	if task == nil {
 		return nil, nil
 	}
 	return t.serialize(task, encodingType)
 }
 
-func (t *serializerImpl) DeserializeReplicationTask(data *DataBlob) (*types.ReplicationTask, error) {
+func (t *serializerImpl) DeserializeReplicationDLQTask(data *DataBlob) (*types.ReplicationTask, error) {
 	if data == nil {
 		return nil, nil
 	}
