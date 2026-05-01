@@ -152,7 +152,7 @@ func (r *dlqHandlerImpl) fetchAndEmitMessageCount(ctx context.Context) error {
 		request := persistence.GetReplicationDLQSizeRequest{SourceClusterName: sourceCluster, ShardID: common.Ptr(r.shard.GetShardID())}
 		response, err := r.shard.GetExecutionManager().GetReplicationDLQSize(ctx, &request)
 		if err != nil {
-			r.logger.Error("failed to get replication DLQ size", tag.Error(err))
+			r.logger.Error("failed to get replication DLQ size", tag.SourceCluster(sourceCluster), tag.Error(err))
 			r.metricsClient.Scope(metrics.ReplicationDLQStatsScope).IncCounter(metrics.ReplicationDLQProbeFailed)
 			return err
 		}
@@ -262,7 +262,7 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 			replicationTask, err := r.serializer.DeserializeReplicationDLQTask(task.Task)
 			if err != nil {
 				r.logger.Warn("failed to deserialize DLQ task blob, falling back to cross-cluster hydration",
-					tag.TaskID(info.TaskID), tag.Error(err))
+					tag.WorkflowDomainID(info.DomainID), tag.WorkflowID(info.WorkflowID), tag.WorkflowRunID(info.RunID), tag.TaskID(info.TaskID), tag.Error(err))
 				needHydration = append(needHydration, ti)
 			} else {
 				hydrated[info.TaskID] = replicationTask
@@ -295,7 +295,8 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 	for _, task := range resp.Tasks {
 		rt, ok := hydrated[task.Info.TaskID]
 		if !ok {
-			r.logger.Warn("replication task not found after hydration", tag.TaskID(task.Info.TaskID))
+			r.logger.Warn("replication task not found after hydration",
+				tag.WorkflowDomainID(task.Info.DomainID), tag.WorkflowID(task.Info.WorkflowID), tag.WorkflowRunID(task.Info.RunID), tag.TaskID(task.Info.TaskID))
 			continue
 		}
 		replicationTasks = append(replicationTasks, rt)
