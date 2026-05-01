@@ -236,14 +236,33 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 		return nil, nil, nil, err
 	}
 
-	hydrated := make(map[int64]*types.ReplicationTask, len(resp.Tasks))
-	taskInfos := make([]*types.ReplicationTaskInfo, 0, len(resp.Tasks)) // parallel to resp.Tasks
+	replicationTasks, taskInfo, err := r.hydrateDLQTasks(ctx, sourceCluster, resp.Tasks)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return replicationTasks, taskInfo, resp.NextPageToken, nil
+}
+
+// hydrateDLQTasks resolves the full replication task payload for each raw DLQ entry.
+// It first attempts local deserialization from the stored blob; tasks without a blob
+// or with a corrupt blob are fetched from the source cluster via GetDLQReplicationMessages.
+// Both returned slices are parallel and always have the same length — tasks that cannot
+// be resolved (source workflow deleted) are omitted from both.
+func (r *dlqHandlerImpl) hydrateDLQTasks(
+	ctx context.Context,
+	sourceCluster string,
+	rawTasks []*persistence.ReplicationDLQTask,
+) ([]*types.ReplicationTask, []*types.ReplicationTaskInfo, error) {
+
+	hydrated := make(map[int64]*types.ReplicationTask, len(rawTasks))
+	taskInfos := make([]*types.ReplicationTaskInfo, 0, len(rawTasks)) // parallel to rawTasks
 	var needHydration []*types.ReplicationTaskInfo
 
-	for _, task := range resp.Tasks {
+	for _, task := range rawTasks {
 		info := task.Info
 		if info == nil {
-			return nil, nil, nil, fmt.Errorf("nil task info in DLQ response")
+			return nil, nil, fmt.Errorf("nil task info in DLQ response")
 		}
 		ti := &types.ReplicationTaskInfo{
 			DomainID:     info.DomainID,
@@ -275,7 +294,7 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 	if len(needHydration) > 0 {
 		remoteAdminClient, err := r.shard.GetService().GetClientBean().GetRemoteAdminClient(sourceCluster)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		response, err := remoteAdminClient.GetDLQReplicationMessages(
 			ctx,
@@ -284,18 +303,18 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 			},
 		)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		for _, task := range response.ReplicationTasks {
 			hydrated[task.SourceTaskID] = task
 		}
 	}
 
-	// Assemble both slices in the same loop so they always have equal length and matching order.
-	// Tasks missing from hydration (source workflow deleted) are skipped from both.
-	replicationTasks := make([]*types.ReplicationTask, 0, len(resp.Tasks))
-	taskInfo := make([]*types.ReplicationTaskInfo, 0, len(resp.Tasks))
-	for i, task := range resp.Tasks {
+	// Assemble both slices together so they always have equal length and matching order.
+	// Tasks missing from hydration (e.g. source workflow deleted) are omitted from both.
+	replicationTasks := make([]*types.ReplicationTask, 0, len(rawTasks))
+	taskInfo := make([]*types.ReplicationTaskInfo, 0, len(rawTasks))
+	for i, task := range rawTasks {
 		rt, ok := hydrated[task.Info.TaskID]
 		if !ok {
 			r.logger.Warn("replication task not found after hydration",
@@ -306,7 +325,7 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 		taskInfo = append(taskInfo, taskInfos[i])
 	}
 
-	return replicationTasks, taskInfo, resp.NextPageToken, nil
+	return replicationTasks, taskInfo, nil
 }
 
 func (r *dlqHandlerImpl) PurgeMessages(
