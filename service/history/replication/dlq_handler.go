@@ -256,7 +256,7 @@ func (r *dlqHandlerImpl) hydrateDLQTasks(
 ) ([]*types.ReplicationTask, []*types.ReplicationTaskInfo, error) {
 
 	hydrated := make(map[int64]*types.ReplicationTask, len(rawTasks))
-	taskInfos := make([]*types.ReplicationTaskInfo, 0, len(rawTasks)) // parallel to rawTasks
+	taskInfos := make([]*types.ReplicationTaskInfo, 0, len(rawTasks))
 	var needHydration []*types.ReplicationTaskInfo
 
 	for _, task := range rawTasks {
@@ -314,15 +314,15 @@ func (r *dlqHandlerImpl) hydrateDLQTasks(
 	// Tasks missing from hydration (e.g. source workflow deleted) are omitted from both.
 	replicationTasks := make([]*types.ReplicationTask, 0, len(rawTasks))
 	taskInfo := make([]*types.ReplicationTaskInfo, 0, len(rawTasks))
-	for i, task := range rawTasks {
-		rt, ok := hydrated[task.Info.TaskID]
+	for _, ti := range taskInfos {
+		rt, ok := hydrated[ti.TaskID]
 		if !ok {
 			r.logger.Warn("replication task not found after hydration",
-				tag.WorkflowDomainID(task.Info.DomainID), tag.WorkflowID(task.Info.WorkflowID), tag.WorkflowRunID(task.Info.RunID), tag.TaskID(task.Info.TaskID))
+				tag.WorkflowDomainID(ti.DomainID), tag.WorkflowID(ti.WorkflowID), tag.WorkflowRunID(ti.RunID), tag.TaskID(ti.TaskID))
 			continue
 		}
 		replicationTasks = append(replicationTasks, rt)
-		taskInfo = append(taskInfo, taskInfos[i])
+		taskInfo = append(taskInfo, ti)
 	}
 
 	return replicationTasks, taskInfo, nil
