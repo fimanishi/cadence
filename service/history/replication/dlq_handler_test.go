@@ -298,14 +298,18 @@ func (s *dlqHandlerSuite) TestReadMessages_OK() {
 	s.mockClientBean.EXPECT().GetRemoteAdminClient(s.sourceCluster).Return(s.adminClient, nil).AnyTimes()
 	s.adminClient.EXPECT().
 		GetDLQReplicationMessages(ctx, gomock.Any()).
-		Return(&types.GetDLQReplicationMessagesResponse{}, nil)
+		Return(&types.GetDLQReplicationMessagesResponse{
+			ReplicationTasks: []*types.ReplicationTask{{SourceTaskID: 1}},
+		}, nil)
 	tasks, info, token, err := s.messageHandler.ReadMessages(ctx, s.sourceCluster, lastMessageID, pageSize, pageToken)
 	s.NoError(err)
 	s.Nil(token)
+	s.Len(info, 1)
 	s.Equal(domainID, info[0].GetDomainID())
 	s.Equal(workflowID, info[0].GetWorkflowID())
 	s.Equal(runID, info[0].GetRunID())
-	s.Empty(tasks)
+	s.Len(tasks, 1)
+	s.Equal(int64(1), tasks[0].SourceTaskID)
 }
 
 func (s *dlqHandlerSuite) TestReadMessagesWithAckLevel_OK() {
@@ -545,7 +549,7 @@ func (s *dlqHandlerSuite) TestReadMessagesWithAckLevel_MixedLocalAndRemote() {
 }
 
 func (s *dlqHandlerSuite) TestReadMessagesWithAckLevel_MissingFromRemote() {
-	// Task has no blob and is not returned by the remote — should be skipped with a warning.
+	// Task has no blob and is not returned by the remote — replicationTasks[0] is nil, taskInfo[0] is still populated.
 	resp := &persistence.GetReplicationDLQTasksResponse{
 		Tasks: []*persistence.ReplicationDLQTask{
 			{
@@ -562,8 +566,10 @@ func (s *dlqHandlerSuite) TestReadMessagesWithAckLevel_MissingFromRemote() {
 	replicationTasks, taskInfo, _, err := s.messageHandler.readMessagesWithAckLevel(context.Background(), s.sourceCluster, 10, 12, nil)
 
 	s.NoError(err)
-	s.Empty(replicationTasks)
-	s.Empty(taskInfo) // task skipped from both slices when missing from remote
+	s.Len(replicationTasks, 1)
+	s.Nil(replicationTasks[0]) // task could not be hydrated
+	s.Len(taskInfo, 1)
+	s.Equal("domainID", taskInfo[0].GetDomainID())
 }
 
 func (s *dlqHandlerSuite) TestPurgeMessages() {

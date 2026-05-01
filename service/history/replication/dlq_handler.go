@@ -247,8 +247,8 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 // hydrateDLQTasks resolves the full replication task payload for each raw DLQ entry.
 // It first attempts local deserialization from the stored blob; tasks without a blob
 // or with a corrupt blob are fetched from the source cluster via GetDLQReplicationMessages.
-// Both returned slices are parallel and always have the same length — tasks that cannot
-// be resolved (source workflow deleted) are omitted from both.
+// Both returned slices are always the same length and parallel — replicationTasks[i] is nil
+// when the task could not be resolved (e.g. source workflow deleted).
 func (r *dlqHandlerImpl) hydrateDLQTasks(
 	ctx context.Context,
 	sourceCluster string,
@@ -310,22 +310,19 @@ func (r *dlqHandlerImpl) hydrateDLQTasks(
 		}
 	}
 
-	// Assemble both slices together so they always have equal length and matching order.
-	// Tasks missing from hydration (e.g. source workflow deleted) are omitted from both.
-	replicationTasks := make([]*types.ReplicationTask, 0, len(rawTasks))
-	taskInfo := make([]*types.ReplicationTaskInfo, 0, len(rawTasks))
-	for _, ti := range taskInfos {
+	// Build parallel slices of equal length. replicationTasks[i] is nil when the task
+	// could not be hydrated (e.g. source workflow deleted) — callers must check for nil.
+	replicationTasks := make([]*types.ReplicationTask, len(taskInfos))
+	for i, ti := range taskInfos {
 		rt, ok := hydrated[ti.TaskID]
 		if !ok {
 			r.logger.Warn("replication task not found after hydration",
 				tag.WorkflowDomainID(ti.DomainID), tag.WorkflowID(ti.WorkflowID), tag.WorkflowRunID(ti.RunID), tag.TaskID(ti.TaskID))
-			continue
 		}
-		replicationTasks = append(replicationTasks, rt)
-		taskInfo = append(taskInfo, ti)
+		replicationTasks[i] = rt // nil when not found
 	}
 
-	return replicationTasks, taskInfo, nil
+	return replicationTasks, taskInfos, nil
 }
 
 func (r *dlqHandlerImpl) PurgeMessages(
@@ -374,7 +371,9 @@ func (r *dlqHandlerImpl) MergeMessages(
 
 	replicationTasks := map[int64]*types.ReplicationTask{}
 	for _, task := range tasks {
-		replicationTasks[task.SourceTaskID] = task
+		if task != nil {
+			replicationTasks[task.SourceTaskID] = task
+		}
 	}
 
 	lastMessageID = defaultBeginningMessageID
