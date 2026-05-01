@@ -262,7 +262,16 @@ func (s *taskProcessorSuite) TestProcessorLoop_TaskExecuteFailed_PutDLQSuccess()
 	s.mockDomainCache.EXPECT().GetDomainName(testDomainID).Return(testDomainName, nil).AnyTimes()
 
 	// task will be put into dlq
-	s.mockShard.Resource.ExecutionMgr.On("PutReplicationTaskToDLQ", mock.Anything, mock.Anything).Return(nil).Times(1)
+	s.mockShard.Resource.ExecutionMgr.On("PutReplicationTaskToDLQ", mock.Anything, mock.MatchedBy(func(req *persistence.PutReplicationTaskToDLQRequest) bool {
+		return req.SourceClusterName == "standby" &&
+			req.TaskInfo.DomainID == testDomainID &&
+			req.TaskInfo.WorkflowID == testWorkflowID &&
+			req.TaskInfo.RunID == testRunID &&
+			req.TaskInfo.TaskType == persistence.ReplicationTaskTypeSyncActivity &&
+			req.TaskInfo.ScheduledID == testScheduleID &&
+			req.DomainName == testDomainName &&
+			req.Task != nil
+	})).Return(nil).Times(1)
 
 	// start the process loop
 	s.taskProcessor.wg.Add(1)
@@ -304,7 +313,16 @@ func (s *taskProcessorSuite) TestProcessorLoop_TaskExecuteFailed_PutDLQFailed() 
 	dqlRetryPolicy.SetMaximumAttempts(2)
 	s.taskProcessor.dlqRetryPolicy = dqlRetryPolicy
 	s.mockShard.Resource.ExecutionMgr.
-		On("PutReplicationTaskToDLQ", mock.Anything, mock.Anything).
+		On("PutReplicationTaskToDLQ", mock.Anything, mock.MatchedBy(func(req *persistence.PutReplicationTaskToDLQRequest) bool {
+			return req.SourceClusterName == "standby" &&
+				req.TaskInfo.DomainID == testDomainID &&
+				req.TaskInfo.WorkflowID == testWorkflowID &&
+				req.TaskInfo.RunID == testRunID &&
+				req.TaskInfo.TaskType == persistence.ReplicationTaskTypeSyncActivity &&
+				req.TaskInfo.ScheduledID == testScheduleID &&
+				req.DomainName == testDomainName &&
+				req.Task != nil
+		})).
 		Return(errors.New("failed to put to dlq")).
 		Times(3)
 
