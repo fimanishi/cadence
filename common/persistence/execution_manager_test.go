@@ -621,6 +621,7 @@ func TestGetReplicationTasksFromDLQ(t *testing.T) {
 					TaskID:     1,
 					TaskType:   ReplicationTaskTypeHistory,
 				},
+				Task: nil,
 			},
 		},
 		NextPageToken: []byte("test-token"),
@@ -631,6 +632,7 @@ func TestGetReplicationTasksFromDLQ(t *testing.T) {
 	res, err := manager.GetReplicationTasksFromDLQ(context.Background(), request)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, res)
+	assert.Nil(t, res.Tasks[0].Task)
 }
 
 func TestGetReplicationTasksFromDLQ_WithBlob(t *testing.T) {
