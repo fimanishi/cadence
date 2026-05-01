@@ -261,9 +261,12 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 		if task.Task != nil {
 			replicationTask, err := r.serializer.DeserializeReplicationDLQTask(task.Task)
 			if err != nil {
-				return nil, nil, nil, err
+				r.logger.Warn("failed to deserialize DLQ task blob, falling back to cross-cluster hydration",
+					tag.TaskID(info.TaskID), tag.Error(err))
+				needHydration = append(needHydration, ti)
+			} else {
+				hydrated[info.TaskID] = replicationTask
 			}
-			hydrated[info.TaskID] = replicationTask
 		} else {
 			needHydration = append(needHydration, ti)
 		}
