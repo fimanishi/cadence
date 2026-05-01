@@ -236,8 +236,8 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 		return nil, nil, nil, err
 	}
 
-	taskInfo := make([]*types.ReplicationTaskInfo, 0, len(resp.Tasks))
 	hydrated := make(map[int64]*types.ReplicationTask, len(resp.Tasks))
+	taskInfos := make([]*types.ReplicationTaskInfo, 0, len(resp.Tasks)) // parallel to resp.Tasks
 	var needHydration []*types.ReplicationTaskInfo
 
 	for _, task := range resp.Tasks {
@@ -256,7 +256,7 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 			NextEventID:  info.NextEventID,
 			ScheduledID:  info.ScheduledID,
 		}
-		taskInfo = append(taskInfo, ti)
+		taskInfos = append(taskInfos, ti)
 
 		if task.Task != nil {
 			replicationTask, err := r.serializer.DeserializeReplicationDLQTask(task.Task)
@@ -291,8 +291,11 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 		}
 	}
 
+	// Assemble both slices in the same loop so they always have equal length and matching order.
+	// Tasks missing from hydration (source workflow deleted) are skipped from both.
 	replicationTasks := make([]*types.ReplicationTask, 0, len(resp.Tasks))
-	for _, task := range resp.Tasks {
+	taskInfo := make([]*types.ReplicationTaskInfo, 0, len(resp.Tasks))
+	for i, task := range resp.Tasks {
 		rt, ok := hydrated[task.Info.TaskID]
 		if !ok {
 			r.logger.Warn("replication task not found after hydration",
@@ -300,6 +303,7 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 			continue
 		}
 		replicationTasks = append(replicationTasks, rt)
+		taskInfo = append(taskInfo, taskInfos[i])
 	}
 
 	return replicationTasks, taskInfo, resp.NextPageToken, nil

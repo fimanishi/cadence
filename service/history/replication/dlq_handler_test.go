@@ -563,7 +563,7 @@ func (s *dlqHandlerSuite) TestReadMessagesWithAckLevel_MissingFromRemote() {
 
 	s.NoError(err)
 	s.Empty(replicationTasks)
-	s.Len(taskInfo, 1) // taskInfo is always populated regardless
+	s.Empty(taskInfo) // task skipped from both slices when missing from remote
 }
 
 func (s *dlqHandlerSuite) TestPurgeMessages() {
