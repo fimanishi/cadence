@@ -633,6 +633,45 @@ func TestGetReplicationTasksFromDLQ(t *testing.T) {
 	assert.Equal(t, expected, res)
 }
 
+func TestGetReplicationTasksFromDLQ_WithBlob(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockedStore := NewMockExecutionStore(ctrl)
+	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), nil, &DynamicConfiguration{
+		SerializationEncoding: dynamicproperties.GetStringPropertyFn(string(constants.EncodingTypeThriftRW)),
+	})
+
+	request := &GetReplicationTasksFromDLQRequest{
+		SourceClusterName: "test-cluster",
+		ReadLevel:         1,
+		MaxReadLevel:      2,
+		BatchSize:         10,
+		NextPageToken:     nil,
+	}
+
+	blob := &DataBlob{Data: []byte("serialized-task"), Encoding: constants.EncodingTypeThriftRW}
+	expected := &GetReplicationDLQTasksResponse{
+		Tasks: []*ReplicationDLQTask{
+			{
+				Info: &ReplicationTaskInfo{
+					DomainID:   testDomainID,
+					WorkflowID: testWorkflowID,
+					TaskID:     1,
+					TaskType:   ReplicationTaskTypeHistory,
+				},
+				Task: blob,
+			},
+		},
+		NextPageToken: []byte("test-token"),
+	}
+
+	mockedStore.EXPECT().GetReplicationTasksFromDLQ(gomock.Any(), request).Return(expected, nil)
+
+	res, err := manager.GetReplicationTasksFromDLQ(context.Background(), request)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, res)
+	assert.Equal(t, blob, res.Tasks[0].Task)
+}
+
 func TestDeserializeChildExecutionInfos(t *testing.T) {
 	tests := []struct {
 		name         string
