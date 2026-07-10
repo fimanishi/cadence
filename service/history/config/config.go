@@ -246,6 +246,8 @@ type Config struct {
 	PendingActivitiesCountLimitError    dynamicproperties.IntPropertyFnWithDomainFilter
 	PendingActivitiesCountLimitWarn     dynamicproperties.IntPropertyFnWithDomainFilter
 	PendingActivityValidationEnabled    dynamicproperties.BoolPropertyFn
+	EnableActivityMapSentinelRewrite    dynamicproperties.BoolPropertyFn
+	EnableTimerMapSentinelRewrite       dynamicproperties.BoolPropertyFn
 	ActivityMapSentinelRewriteThreshold dynamicproperties.IntPropertyFn
 	TimerMapSentinelRewriteThreshold    dynamicproperties.IntPropertyFn
 
@@ -550,6 +552,8 @@ func New(dc *dynamicconfig.Collection, numberOfShards int, maxMessageSize int, i
 		PendingActivitiesCountLimitError:    dc.GetIntPropertyFilteredByDomain(dynamicproperties.PendingActivitiesCountLimitError),
 		PendingActivitiesCountLimitWarn:     dc.GetIntPropertyFilteredByDomain(dynamicproperties.PendingActivitiesCountLimitWarn),
 		PendingActivityValidationEnabled:    dc.GetBoolProperty(dynamicproperties.EnablePendingActivityValidation),
+		EnableActivityMapSentinelRewrite:    dc.GetBoolProperty(dynamicproperties.EnableActivityMapSentinelRewrite),
+		EnableTimerMapSentinelRewrite:       dc.GetBoolProperty(dynamicproperties.EnableTimerMapSentinelRewrite),
 		ActivityMapSentinelRewriteThreshold: dc.GetIntProperty(dynamicproperties.ActivityMapSentinelRewriteThreshold),
 		TimerMapSentinelRewriteThreshold:    dc.GetIntProperty(dynamicproperties.TimerMapSentinelRewriteThreshold),
 
