@@ -652,8 +652,8 @@ type (
 		ReplicationState    *ReplicationState // TODO: remove this after all 2DC workflows complete
 		Checksum            checksum.Checksum
 
-		ActivityMapSentinelCount int
-		TimerMapSentinelCount    int
+		ActivityMapDeleteCount int
+		TimerMapDeleteCount    int
 	}
 
 	// ActivityInfo details.
@@ -931,12 +931,10 @@ type (
 		DeleteActivityInfos       []int64
 		ResetActivityInfos        []*ActivityInfo
 		ResetActivityMap          bool // triggers full activity_map rewrite, even if ResetActivityInfos is empty
-		UseActivityMapSentinel    bool // when true, use sentinel writes instead of DELETE for activity_map
 		UpsertTimerInfos          []*TimerInfo
 		DeleteTimerInfos          []string
 		ResetTimerInfos           []*TimerInfo
 		ResetTimerMap             bool // triggers full timer_map rewrite, even if ResetTimerInfos is empty
-		UseTimerMapSentinel       bool // when true, use sentinel writes instead of DELETE for timer_map
 		UpsertChildExecutionInfos []*ChildExecutionInfo
 		DeleteChildExecutionInfos []int64
 		UpsertRequestCancelInfos  []*RequestCancelInfo
@@ -1862,6 +1860,9 @@ type (
 	ExecutionManager interface {
 		Closeable
 		GetName() string
+		GetShardID() int
+		GetActivityMapDeleteResetThreshold() int
+		GetTimerMapDeleteResetThreshold() int
 
 		CreateWorkflowExecution(ctx context.Context, request *CreateWorkflowExecutionRequest) (*CreateWorkflowExecutionResponse, error)
 		GetWorkflowExecution(ctx context.Context, request *GetWorkflowExecutionRequest) (*GetWorkflowExecutionResponse, error)
