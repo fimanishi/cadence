@@ -1860,7 +1860,6 @@ type (
 	ExecutionManager interface {
 		Closeable
 		GetName() string
-		GetShardID() int
 		GetActivityMapDeleteRewriteThreshold() int
 		GetTimerMapDeleteRewriteThreshold() int
 
