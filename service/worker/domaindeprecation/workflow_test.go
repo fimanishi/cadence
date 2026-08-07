@@ -22,11 +22,13 @@ package domaindeprecation
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber-go/tally"
+	"go.uber.org/cadence"
 	"go.uber.org/cadence/activity"
 	"go.uber.org/cadence/testsuite"
 	"go.uber.org/cadence/workflow"
@@ -159,13 +161,14 @@ func (s *domainDeprecationWorkflowTestSuite) TestWorkflow_CheckOpenWorkflows_Err
 }
 
 func (s *domainDeprecationWorkflowTestSuite) TestWorkflow_ActivePollers_Error() {
-	mockErr := errors.New("domain has active pollers")
-	s.workflowEnv.OnActivity(checkActivePollersActivity, mock.Anything, defaultParams).Return(mockErr)
+	pollerErr := cadence.NewCustomError(ErrActivePollersNonRetryable,
+		fmt.Sprintf("domain %s has active pollers on task lists: %v, use Force to override", testDomain, []string{"tl1"}))
+	s.workflowEnv.OnActivity(checkActivePollersActivity, mock.Anything, defaultParams).Return(pollerErr)
 
 	s.workflowEnv.ExecuteWorkflow(DomainDeprecationWorkflowTypeName, defaultParams)
 	s.True(s.workflowEnv.IsWorkflowCompleted())
 	s.Error(s.workflowEnv.GetWorkflowError())
-	s.ErrorContains(s.workflowEnv.GetWorkflowError(), mockErr.Error())
+	s.ErrorContains(s.workflowEnv.GetWorkflowError(), ErrActivePollersNonRetryable)
 }
 
 func (s *domainDeprecationWorkflowTestSuite) TestWorkflow_ActivePollers_SkippedWhenForced() {
