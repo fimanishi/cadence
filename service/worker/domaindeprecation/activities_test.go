@@ -32,6 +32,7 @@ import (
 	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
 	"github.com/uber/cadence/common/log/testlogger"
 	"github.com/uber/cadence/common/types"
+	"github.com/uber/cadence/service/worker/scheduler"
 )
 
 func TestDisableArchivalActivity(t *testing.T) {
@@ -259,6 +260,109 @@ func TestCheckOpenWorkflowsActivity(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.Equal(t, tt.expectedResult, hasOpenWorkflows)
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCheckActivePollersActivity(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := frontend.NewMockClient(ctrl)
+	mockClientBean := client.NewMockBean(ctrl)
+	mockClientBean.EXPECT().GetFrontendClient().Return(mockClient).AnyTimes()
+
+	deprecator := &domainDeprecator{
+		cfg: Config{
+			AdminOperationToken: dynamicproperties.GetStringPropertyFn(""),
+		},
+		clientBean: mockClientBean,
+		logger:     testlogger.New(t),
+	}
+
+	testDomain := "test-domain"
+
+	tests := []struct {
+		name          string
+		setupMocks    func()
+		expectedError bool
+	}{
+		{
+			name: "Success - no active pollers",
+			setupMocks: func() {
+				mockClient.EXPECT().GetTaskListsByDomain(gomock.Any(), gomock.Any()).Return(
+					&types.GetTaskListsByDomainResponse{
+						DecisionTaskListMap: map[string]*types.DescribeTaskListResponse{
+							"tl1": {Pollers: nil},
+						},
+						ActivityTaskListMap: map[string]*types.DescribeTaskListResponse{
+							"tl1": {Pollers: nil},
+						},
+					}, nil)
+			},
+			expectedError: false,
+		},
+		{
+			name: "Error - active decision pollers",
+			setupMocks: func() {
+				mockClient.EXPECT().GetTaskListsByDomain(gomock.Any(), gomock.Any()).Return(
+					&types.GetTaskListsByDomainResponse{
+						DecisionTaskListMap: map[string]*types.DescribeTaskListResponse{
+							"tl1": {Pollers: []*types.PollerInfo{{}}},
+						},
+						ActivityTaskListMap: map[string]*types.DescribeTaskListResponse{},
+					}, nil)
+			},
+			expectedError: true,
+		},
+		{
+			name: "Error - active activity pollers",
+			setupMocks: func() {
+				mockClient.EXPECT().GetTaskListsByDomain(gomock.Any(), gomock.Any()).Return(
+					&types.GetTaskListsByDomainResponse{
+						DecisionTaskListMap: map[string]*types.DescribeTaskListResponse{},
+						ActivityTaskListMap: map[string]*types.DescribeTaskListResponse{
+							"tl1": {Pollers: []*types.PollerInfo{{}}},
+						},
+					}, nil)
+			},
+			expectedError: true,
+		},
+		{
+			name: "Error - GetTaskListsByDomain fails",
+			setupMocks: func() {
+				mockClient.EXPECT().GetTaskListsByDomain(gomock.Any(), gomock.Any()).Return(nil, assert.AnError)
+			},
+			expectedError: true,
+		},
+		{
+			name: "Success - scheduler task list pollers are excluded",
+			setupMocks: func() {
+				mockClient.EXPECT().GetTaskListsByDomain(gomock.Any(), gomock.Any()).Return(
+					&types.GetTaskListsByDomainResponse{
+						DecisionTaskListMap: map[string]*types.DescribeTaskListResponse{
+							scheduler.TaskListName: {Pollers: []*types.PollerInfo{{}}},
+						},
+						ActivityTaskListMap: map[string]*types.DescribeTaskListResponse{
+							scheduler.TaskListName: {Pollers: []*types.PollerInfo{{}}},
+						},
+					}, nil)
+			},
+			expectedError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setupMocks()
+			err := deprecator.CheckActivePollersActivity(context.Background(), DomainDeprecationParams{
+				DomainName: testDomain,
+			})
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
 				assert.NoError(t, err)
 			}
 		})

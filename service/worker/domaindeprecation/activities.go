@@ -29,7 +29,50 @@ import (
 
 	"github.com/uber/cadence/common/log/tag"
 	"github.com/uber/cadence/common/types"
+	"github.com/uber/cadence/service/worker/scheduler"
 )
+
+// CheckActivePollersActivity checks if there are any active pollers for the domain's task lists.
+// Returns a non-retryable error if pollers are found, preventing deprecation.
+func (w *domainDeprecator) CheckActivePollersActivity(ctx context.Context, params DomainDeprecationParams) error {
+	client := w.clientBean.GetFrontendClient()
+
+	resp, err := client.GetTaskListsByDomain(ctx, &types.GetTaskListsByDomainRequest{
+		Domain: params.DomainName,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get task lists for domain %s: %v", params.DomainName, err)
+	}
+
+	var activeTaskLists []string
+	for name, tl := range resp.GetDecisionTaskListMap() {
+		if name == scheduler.TaskListName {
+			continue
+		}
+		if len(tl.GetPollers()) > 0 {
+			activeTaskLists = append(activeTaskLists, name)
+		}
+	}
+	for name, tl := range resp.GetActivityTaskListMap() {
+		if name == scheduler.TaskListName {
+			continue
+		}
+		if len(tl.GetPollers()) > 0 {
+			activeTaskLists = append(activeTaskLists, name)
+		}
+	}
+
+	if len(activeTaskLists) > 0 {
+		w.logger.Warn("Domain has active pollers",
+			tag.WorkflowDomainName(params.DomainName),
+			tag.Dynamic("active_task_lists", activeTaskLists))
+		return cadence.NewCustomError(ErrActivePollersNonRetryable,
+			fmt.Sprintf("domain %s has active pollers on task lists: %v, use Force to override", params.DomainName, activeTaskLists))
+	}
+
+	w.logger.Info("No active pollers found for domain", tag.WorkflowDomainName(params.DomainName))
+	return nil
+}
 
 // DisableArchivalActivity disables archival for the domain
 func (w *domainDeprecator) DisableArchivalActivity(ctx context.Context, params DomainDeprecationParams) error {
