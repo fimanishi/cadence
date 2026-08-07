@@ -121,7 +121,7 @@ func TestDisableArchivalActivity(t *testing.T) {
 			name: "Error - Domain does not exist",
 			setupMocks: func() {
 				mockClient.EXPECT().DescribeDomain(gomock.Any(), gomock.Any()).Return(
-					nil, types.EntityNotExistsError{},
+					nil, &types.EntityNotExistsError{},
 				)
 			},
 			expectedError: assert.AnError,
@@ -330,6 +330,16 @@ func TestCheckActivePollersActivity(t *testing.T) {
 			expectedError: false,
 		},
 		{
+			name: "Success - nil replication configuration",
+			setupMocks: func(mockClient *frontend.MockClient, mockClientBean *client.MockBean) {
+				mockClient.EXPECT().DescribeDomain(gomock.Any(), gomock.Any()).Return(
+					&types.DescribeDomainResponse{
+						ReplicationConfiguration: nil,
+					}, nil)
+			},
+			expectedError: false,
+		},
+		{
 			name: "Error - active decision pollers",
 			setupMocks: func(mockClient *frontend.MockClient, mockClientBean *client.MockBean) {
 				mockClient.EXPECT().DescribeDomain(gomock.Any(), gomock.Any()).Return(
@@ -375,7 +385,7 @@ func TestCheckActivePollersActivity(t *testing.T) {
 		{
 			name: "Error - domain does not exist",
 			setupMocks: func(mockClient *frontend.MockClient, mockClientBean *client.MockBean) {
-				mockClient.EXPECT().DescribeDomain(gomock.Any(), gomock.Any()).Return(nil, types.EntityNotExistsError{})
+				mockClient.EXPECT().DescribeDomain(gomock.Any(), gomock.Any()).Return(nil, &types.EntityNotExistsError{})
 			},
 			expectedError: true,
 		},

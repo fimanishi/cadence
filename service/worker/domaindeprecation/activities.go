@@ -48,6 +48,12 @@ func (w *domainDeprecator) CheckActivePollersActivity(ctx context.Context, param
 		return fmt.Errorf("failed to describe domain: %v", err)
 	}
 
+	if domainResp.ReplicationConfiguration == nil || len(domainResp.ReplicationConfiguration.Clusters) == 0 {
+		w.logger.Info("No replication configuration found for domain, skipping poller check",
+			tag.WorkflowDomainName(params.DomainName))
+		return nil
+	}
+
 	var activeTaskLists []string
 	for _, cluster := range domainResp.ReplicationConfiguration.Clusters {
 		clusterName := cluster.GetClusterName()
