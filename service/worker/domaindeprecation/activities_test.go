@@ -287,7 +287,30 @@ func TestCheckActivePollersActivity(t *testing.T) {
 		expectedError bool
 	}{
 		{
-			name: "Success - no active pollers",
+			name: "Success - no pollers in any cluster",
+			setupMocks: func(mockClient *frontend.MockClient, mockClientBean *client.MockBean) {
+				remoteClient := frontend.NewMockClient(gomock.NewController(t))
+				mockClient.EXPECT().DescribeDomain(gomock.Any(), gomock.Any()).Return(
+					&types.DescribeDomainResponse{
+						ReplicationConfiguration: multiClusterReplicationConfig,
+					}, nil)
+				mockClientBean.EXPECT().GetRemoteFrontendClient("cluster1").Return(mockClient, nil)
+				mockClient.EXPECT().GetTaskListsByDomain(gomock.Any(), gomock.Any()).Return(
+					&types.GetTaskListsByDomainResponse{
+						DecisionTaskListMap: map[string]*types.DescribeTaskListResponse{},
+						ActivityTaskListMap: map[string]*types.DescribeTaskListResponse{},
+					}, nil)
+				mockClientBean.EXPECT().GetRemoteFrontendClient("cluster2").Return(remoteClient, nil)
+				remoteClient.EXPECT().GetTaskListsByDomain(gomock.Any(), gomock.Any()).Return(
+					&types.GetTaskListsByDomainResponse{
+						DecisionTaskListMap: map[string]*types.DescribeTaskListResponse{},
+						ActivityTaskListMap: map[string]*types.DescribeTaskListResponse{},
+					}, nil)
+			},
+			expectedError: false,
+		},
+		{
+			name: "Success - scheduler task list pollers are excluded",
 			setupMocks: func(mockClient *frontend.MockClient, mockClientBean *client.MockBean) {
 				mockClient.EXPECT().DescribeDomain(gomock.Any(), gomock.Any()).Return(
 					&types.DescribeDomainResponse{
@@ -297,10 +320,10 @@ func TestCheckActivePollersActivity(t *testing.T) {
 				mockClient.EXPECT().GetTaskListsByDomain(gomock.Any(), gomock.Any()).Return(
 					&types.GetTaskListsByDomainResponse{
 						DecisionTaskListMap: map[string]*types.DescribeTaskListResponse{
-							"tl1": {Pollers: nil},
+							scheduler.TaskListName: {Pollers: []*types.PollerInfo{{}}},
 						},
 						ActivityTaskListMap: map[string]*types.DescribeTaskListResponse{
-							"tl1": {Pollers: nil},
+							scheduler.TaskListName: {Pollers: []*types.PollerInfo{{}}},
 						},
 					}, nil)
 			},
@@ -380,26 +403,6 @@ func TestCheckActivePollersActivity(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			name: "Success - scheduler task list pollers are excluded",
-			setupMocks: func(mockClient *frontend.MockClient, mockClientBean *client.MockBean) {
-				mockClient.EXPECT().DescribeDomain(gomock.Any(), gomock.Any()).Return(
-					&types.DescribeDomainResponse{
-						ReplicationConfiguration: singleClusterReplicationConfig,
-					}, nil)
-				mockClientBean.EXPECT().GetRemoteFrontendClient("cluster1").Return(mockClient, nil)
-				mockClient.EXPECT().GetTaskListsByDomain(gomock.Any(), gomock.Any()).Return(
-					&types.GetTaskListsByDomainResponse{
-						DecisionTaskListMap: map[string]*types.DescribeTaskListResponse{
-							scheduler.TaskListName: {Pollers: []*types.PollerInfo{{}}},
-						},
-						ActivityTaskListMap: map[string]*types.DescribeTaskListResponse{
-							scheduler.TaskListName: {Pollers: []*types.PollerInfo{{}}},
-						},
-					}, nil)
-			},
-			expectedError: false,
-		},
-		{
 			name: "Error - active pollers in remote cluster",
 			setupMocks: func(mockClient *frontend.MockClient, mockClientBean *client.MockBean) {
 				remoteClient := frontend.NewMockClient(gomock.NewController(t))
@@ -423,29 +426,6 @@ func TestCheckActivePollersActivity(t *testing.T) {
 					}, nil)
 			},
 			expectedError: true,
-		},
-		{
-			name: "Success - no pollers in any cluster",
-			setupMocks: func(mockClient *frontend.MockClient, mockClientBean *client.MockBean) {
-				remoteClient := frontend.NewMockClient(gomock.NewController(t))
-				mockClient.EXPECT().DescribeDomain(gomock.Any(), gomock.Any()).Return(
-					&types.DescribeDomainResponse{
-						ReplicationConfiguration: multiClusterReplicationConfig,
-					}, nil)
-				mockClientBean.EXPECT().GetRemoteFrontendClient("cluster1").Return(mockClient, nil)
-				mockClient.EXPECT().GetTaskListsByDomain(gomock.Any(), gomock.Any()).Return(
-					&types.GetTaskListsByDomainResponse{
-						DecisionTaskListMap: map[string]*types.DescribeTaskListResponse{},
-						ActivityTaskListMap: map[string]*types.DescribeTaskListResponse{},
-					}, nil)
-				mockClientBean.EXPECT().GetRemoteFrontendClient("cluster2").Return(remoteClient, nil)
-				remoteClient.EXPECT().GetTaskListsByDomain(gomock.Any(), gomock.Any()).Return(
-					&types.GetTaskListsByDomainResponse{
-						DecisionTaskListMap: map[string]*types.DescribeTaskListResponse{},
-						ActivityTaskListMap: map[string]*types.DescribeTaskListResponse{},
-					}, nil)
-			},
-			expectedError: false,
 		},
 	}
 
