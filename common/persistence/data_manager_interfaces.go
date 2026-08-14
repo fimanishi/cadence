@@ -1855,8 +1855,8 @@ type (
 	ExecutionManager interface {
 		Closeable
 		GetName() string
-		GetActivityMapRewriteProbabilityRate() int
-		GetTimerMapRewriteProbabilityRate() int
+		GetActivityMapRewriteSampleRate() int
+		GetTimerMapRewriteSampleRate() int
 
 		CreateWorkflowExecution(ctx context.Context, request *CreateWorkflowExecutionRequest) (*CreateWorkflowExecutionResponse, error)
 		GetWorkflowExecution(ctx context.Context, request *GetWorkflowExecutionRequest) (*GetWorkflowExecutionResponse, error)
