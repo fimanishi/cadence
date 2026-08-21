@@ -71,7 +71,7 @@ func TestHistoryInvalid_Check(t *testing.T) {
 			},
 		},
 		{
-			name:         "corrupted history",
+			name:         "corrupted history - sentinel error",
 			execution:    getOpenConcreteExecution(),
 			historyResps: []*persistence.ReadHistoryBranchResponse{nil},
 			historyErrs:  []error{persistence.ErrCorruptedHistory},
@@ -80,6 +80,18 @@ func TestHistoryInvalid_Check(t *testing.T) {
 				InvariantName:   HistoryInvalid,
 				Info:            "corrupt history",
 				InfoDetails:     persistence.ErrCorruptedHistory.Error(),
+			},
+		},
+		{
+			name:         "corrupted history - inline inconsistency error",
+			execution:    getOpenConcreteExecution(),
+			historyResps: []*persistence.ReadHistoryBranchResponse{nil},
+			historyErrs:  []error{&types.InternalDataInconsistencyError{Message: "corrupted event batch, empty events"}},
+			expectedResult: CheckResult{
+				CheckResultType: CheckResultTypeCorrupted,
+				InvariantName:   HistoryInvalid,
+				Info:            "corrupt history",
+				InfoDetails:     "corrupted event batch, empty events",
 			},
 		},
 		{

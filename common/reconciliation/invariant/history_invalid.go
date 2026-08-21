@@ -94,7 +94,8 @@ func (h *historyInvalid) Check(
 			DomainName:    domainName,
 		})
 		if readErr != nil {
-			if errors.Is(readErr, persistence.ErrCorruptedHistory) {
+			var inconsistencyErr *types.InternalDataInconsistencyError
+			if errors.As(readErr, &inconsistencyErr) {
 				return CheckResult{
 					CheckResultType: CheckResultTypeCorrupted,
 					InvariantName:   h.Name(),
