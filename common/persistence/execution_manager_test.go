@@ -356,10 +356,9 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 		deleteTimerInfos      []string
 		expectRewriteActivity bool
 		expectRewriteTimer    bool
-		expectDeletesCleared  bool
 	}{
 		{
-			name:         "rate 1 with deletes triggers rewrite and clears deletes",
+			name:         "rate 1 with deletes triggers rewrite and preserves deletes",
 			activityRate: 1,
 			timerRate:    1,
 			rewriteActivityInfos: []*ActivityInfo{
@@ -370,7 +369,6 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 			deleteTimerInfos:      []string{"t2"},
 			expectRewriteActivity: true,
 			expectRewriteTimer:    true,
-			expectDeletesCleared:  true,
 		},
 		{
 			name:         "rate 0 disables rewrite and preserves deletes",
@@ -384,7 +382,6 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 			deleteTimerInfos:      []string{"t2"},
 			expectRewriteActivity: false,
 			expectRewriteTimer:    false,
-			expectDeletesCleared:  false,
 		},
 		{
 			name:                  "nil rewrite infos skips rewrite even with rate 1",
@@ -396,10 +393,9 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 			deleteTimerInfos:      []string{"t2"},
 			expectRewriteActivity: false,
 			expectRewriteTimer:    false,
-			expectDeletesCleared:  false,
 		},
 		{
-			name:                  "all activities deleted triggers rewrite with empty map and no deletes",
+			name:                  "all activities deleted triggers rewrite with empty map",
 			activityRate:          1,
 			timerRate:             1,
 			rewriteActivityInfos:  []*ActivityInfo{},
@@ -408,7 +404,6 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 			deleteTimerInfos:      []string{"t2"},
 			expectRewriteActivity: true,
 			expectRewriteTimer:    true,
-			expectDeletesCleared:  true,
 		},
 	}
 
@@ -442,13 +437,8 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 					} else {
 						assert.Nil(t, mut.RewriteTimerInfos, "rewrite timer infos should be nil")
 					}
-					if tc.expectDeletesCleared {
-						assert.Nil(t, mut.DeleteActivityInfos, "delete activity infos should be cleared on rewrite")
-						assert.Nil(t, mut.DeleteTimerInfos, "delete timer infos should be cleared on rewrite")
-					} else {
-						assert.Equal(t, tc.deleteActivityInfos, mut.DeleteActivityInfos)
-						assert.Equal(t, tc.deleteTimerInfos, mut.DeleteTimerInfos)
-					}
+					assert.Equal(t, tc.deleteActivityInfos, mut.DeleteActivityInfos, "deletes should always be preserved")
+					assert.Equal(t, tc.deleteTimerInfos, mut.DeleteTimerInfos, "deletes should always be preserved")
 					return nil
 				}).Times(1)
 

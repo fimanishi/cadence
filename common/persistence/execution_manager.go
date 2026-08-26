@@ -713,8 +713,6 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 	}
 	var serializedRewriteActivityInfos []*InternalActivityInfo
 	var rewriteTimerInfos []*TimerInfo
-	deleteActivityInfos := input.DeleteActivityInfos
-	deleteTimerInfos := input.DeleteTimerInfos
 	var activityRate, timerRate int
 	if m.dc != nil && m.dc.ActivityMapRewriteSampleRate != nil {
 		activityRate = m.dc.ActivityMapRewriteSampleRate()
@@ -730,7 +728,6 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 		if serializedRewriteActivityInfos == nil {
 			serializedRewriteActivityInfos = []*InternalActivityInfo{}
 		}
-		deleteActivityInfos = nil
 		m.logger.Info("activity map rewrite triggered",
 			tag.WorkflowDomainID(input.ExecutionInfo.DomainID),
 			tag.WorkflowID(input.ExecutionInfo.WorkflowID),
@@ -740,7 +737,6 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 	}
 	if input.RewriteTimerInfos != nil && timerRate > 0 && rand.Intn(timerRate) == 0 {
 		rewriteTimerInfos = input.RewriteTimerInfos
-		deleteTimerInfos = nil
 		m.logger.Info("timer map rewrite triggered",
 			tag.WorkflowDomainID(input.ExecutionInfo.DomainID),
 			tag.WorkflowID(input.ExecutionInfo.WorkflowID),
@@ -780,10 +776,10 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 		LastWriteVersion: lastWriteVersion,
 
 		UpsertActivityInfos:       serializedUpsertActivityInfos,
-		DeleteActivityInfos:       deleteActivityInfos,
+		DeleteActivityInfos:       input.DeleteActivityInfos,
 		RewriteActivityInfos:      serializedRewriteActivityInfos,
 		UpsertTimerInfos:          input.UpsertTimerInfos,
-		DeleteTimerInfos:          deleteTimerInfos,
+		DeleteTimerInfos:          input.DeleteTimerInfos,
 		RewriteTimerInfos:         rewriteTimerInfos,
 		WorkflowTimerTasks:        m.syncTimerTaskTrackingKeys(input.TasksByCategory),
 		UpsertChildExecutionInfos: serializedUpsertChildExecutionInfos,
