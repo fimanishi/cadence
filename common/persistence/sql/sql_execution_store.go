@@ -129,14 +129,6 @@ func (m *sqlExecutionStore) txExecuteShardLocked(
 	})
 }
 
-func (m *sqlExecutionStore) GetActivityMapRewriteSampleRate() int {
-	return 0
-}
-
-func (m *sqlExecutionStore) GetTimerMapRewriteSampleRate() int {
-	return 0
-}
-
 func (m *sqlExecutionStore) CreateWorkflowExecution(
 	ctx context.Context,
 	request *p.InternalCreateWorkflowExecutionRequest,

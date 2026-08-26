@@ -69,14 +69,6 @@ func (m *executionManagerImpl) GetName() string {
 	return m.persistence.GetName()
 }
 
-func (m *executionManagerImpl) GetActivityMapRewriteSampleRate() int {
-	return m.persistence.GetActivityMapRewriteSampleRate()
-}
-
-func (m *executionManagerImpl) GetTimerMapRewriteSampleRate() int {
-	return m.persistence.GetTimerMapRewriteSampleRate()
-}
-
 // The below three APIs are related to serialization/deserialization
 
 func (m *executionManagerImpl) GetWorkflowExecution(
@@ -723,8 +715,13 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 	var rewriteTimerInfos []*TimerInfo
 	deleteActivityInfos := input.DeleteActivityInfos
 	deleteTimerInfos := input.DeleteTimerInfos
-	activityRate := m.persistence.GetActivityMapRewriteSampleRate()
-	timerRate := m.persistence.GetTimerMapRewriteSampleRate()
+	var activityRate, timerRate int
+	if m.dc != nil && m.dc.ActivityMapRewriteSampleRate != nil {
+		activityRate = m.dc.ActivityMapRewriteSampleRate()
+	}
+	if m.dc != nil && m.dc.TimerMapRewriteSampleRate != nil {
+		timerRate = m.dc.TimerMapRewriteSampleRate()
+	}
 	if input.RewriteActivityInfos != nil && activityRate > 0 && rand.Intn(activityRate) == 0 {
 		serializedRewriteActivityInfos, err = m.SerializeUpsertActivityInfos(input.RewriteActivityInfos, encoding)
 		if err != nil {
@@ -734,10 +731,22 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 			serializedRewriteActivityInfos = []*InternalActivityInfo{}
 		}
 		deleteActivityInfos = nil
+		m.logger.Info("activity map rewrite triggered",
+			tag.WorkflowDomainID(input.ExecutionInfo.DomainID),
+			tag.WorkflowID(input.ExecutionInfo.WorkflowID),
+			tag.WorkflowRunID(input.ExecutionInfo.RunID),
+			tag.Counter(len(serializedRewriteActivityInfos)),
+		)
 	}
 	if input.RewriteTimerInfos != nil && timerRate > 0 && rand.Intn(timerRate) == 0 {
 		rewriteTimerInfos = input.RewriteTimerInfos
 		deleteTimerInfos = nil
+		m.logger.Info("timer map rewrite triggered",
+			tag.WorkflowDomainID(input.ExecutionInfo.DomainID),
+			tag.WorkflowID(input.ExecutionInfo.WorkflowID),
+			tag.WorkflowRunID(input.ExecutionInfo.RunID),
+			tag.Counter(len(rewriteTimerInfos)),
+		)
 	}
 	serializedUpsertChildExecutionInfos, err := m.SerializeUpsertChildExecutionInfos(input.UpsertChildExecutionInfos, encoding)
 	if err != nil {

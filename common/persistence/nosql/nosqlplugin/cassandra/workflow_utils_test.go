@@ -1913,7 +1913,7 @@ func TestUpdateTimerInfos(t *testing.T) {
 					`} , last_updated_time = 2025-01-06T15:00:00Z WHERE ` +
 					`shard_id = 1000 and type = 1 and domain_id = domain1 and workflow_id = workflow1 and ` +
 					`run_id = runid1 and visibility_ts = 946684800000 and task_id = -10 `,
-				`UPDATE executions SET timer_map[ timer2 ] = {timer_id: ''} ` +
+				`UPDATE executions SET timer_map[ timer2 ] = {timer_id: } ` +
 					`, last_updated_time = 2025-01-06T15:00:00Z WHERE ` +
 					`shard_id = 1000 and type = 1 and domain_id = domain1 and workflow_id = workflow1 and ` +
 					`run_id = runid1 and visibility_ts = 946684800000 and task_id = -10 `,

@@ -3575,6 +3575,47 @@ func TestCloseTransactionAsMutation(t *testing.T) {
 			expectedEvent: nil,
 			expectedErr:   nil,
 		},
+		"CloseTransactionAsMutation sets empty rewrite maps when there are deletes but no pending infos": {
+			mutableStateSetup: func(ms *mutableStateBuilder) {
+				ms.executionInfo.DomainID = "some-domain-id"
+				ms.executionInfo.NextEventID = 10
+				ms.executionInfo.LastProcessedEvent = 5
+				ms.executionInfo.State = persistence.WorkflowStateRunning
+				ms.executionInfo.CloseStatus = persistence.WorkflowCloseStatusNone
+				ms.pendingActivityInfoIDs = map[int64]*persistence.ActivityInfo{}
+				ms.pendingActivityIDToEventID = map[string]int64{}
+				ms.pendingTimerInfoIDs = map[string]*persistence.TimerInfo{}
+				ms.pendingTimerEventIDToID = map[int64]string{}
+				ms.deleteActivityInfos = map[int64]struct{}{1: {}}
+				ms.deleteTimerInfos = map[string]struct{}{"timer-1": {}}
+			},
+			shardContextExpectations: func(mockCache *events.MockCache, shardContext *shardCtx.MockContext, mockDomainCache *cache.MockDomainCache) {
+				shardContext.EXPECT().GetConfig().Return(&config.Config{
+					NumberOfShards:                        2,
+					IsAdvancedVisConfigExist:              false,
+					MaxResponseSize:                       0,
+					MutableStateChecksumInvalidateBefore:  dynamicproperties.GetFloatPropertyFn(10),
+					MutableStateChecksumVerifyProbability: dynamicproperties.GetIntPropertyFilteredByDomain(0.0),
+					HostName:                              "test-host",
+					EnableReplicationTaskGeneration:       func(string, string) bool { return true },
+					MaximumBufferedEventsBatch:            func(...dynamicproperties.FilterOption) int { return 100 },
+				}).AnyTimes()
+
+				shardContext.EXPECT().GetDomainCache().Return(mockDomainCache).AnyTimes()
+				mockDomainCache.EXPECT().GetDomainByID("some-domain-id").Return(mockDomain, nil)
+			},
+			validateMutation: func(t *testing.T, mutation *persistence.WorkflowMutation) {
+				require.NotNil(t, mutation, "mutation should not be nil")
+				assert.Equal(t, []int64{1}, mutation.DeleteActivityInfos)
+				assert.Equal(t, []string{"timer-1"}, mutation.DeleteTimerInfos)
+				assert.NotNil(t, mutation.RewriteActivityInfos, "rewrite activity infos should be non-nil")
+				assert.Empty(t, mutation.RewriteActivityInfos, "rewrite activity infos should be empty")
+				assert.NotNil(t, mutation.RewriteTimerInfos, "rewrite timer infos should be non-nil")
+				assert.Empty(t, mutation.RewriteTimerInfos, "rewrite timer infos should be empty")
+			},
+			expectedEvent: nil,
+			expectedErr:   nil,
+		},
 		"with buffered events": {
 			mutableStateSetup: func(ms *mutableStateBuilder) {
 				ms.executionInfo.DomainID = "some-domain-id"

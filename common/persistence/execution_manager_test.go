@@ -292,9 +292,6 @@ func TestExecutionManager_UpdateWorkflowExecution(t *testing.T) {
 
 	expectedInfo := sampleInternalWorkflowMutation()
 
-	mockedStore.EXPECT().GetActivityMapRewriteSampleRate().Return(0).AnyTimes()
-	mockedStore.EXPECT().GetTimerMapRewriteSampleRate().Return(0).AnyTimes()
-
 	mockedSerializer.EXPECT().SerializeEvent(completionEvent(), constants.EncodingTypeThriftRW).Return(expectedInfo.ExecutionInfo.CompletionEvent, nil).Times(2)
 	mockedSerializer.EXPECT().SerializeEvent(activityStartedEvent(), constants.EncodingTypeThriftRW).Return(sampleEventData(), nil).Times(1)
 	mockedSerializer.EXPECT().SerializeEvent(activityScheduledEvent(), constants.EncodingTypeThriftRW).Return(sampleEventData(), nil).Times(1)
@@ -421,11 +418,10 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 			mockedStore := NewMockExecutionStore(ctrl)
 			mockedSerializer := NewMockPayloadSerializer(ctrl)
 
-			mockedStore.EXPECT().GetActivityMapRewriteSampleRate().Return(tc.activityRate).AnyTimes()
-			mockedStore.EXPECT().GetTimerMapRewriteSampleRate().Return(tc.timerRate).AnyTimes()
-
 			manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, &DynamicConfiguration{
-				SerializationEncoding: dynamicproperties.GetStringPropertyFn(string(constants.EncodingTypeThriftRW)),
+				SerializationEncoding:        dynamicproperties.GetStringPropertyFn(string(constants.EncodingTypeThriftRW)),
+				ActivityMapRewriteSampleRate: dynamicproperties.GetIntPropertyFn(tc.activityRate),
+				TimerMapRewriteSampleRate:    dynamicproperties.GetIntPropertyFn(tc.timerRate),
 			})
 
 			mockedSerializer.EXPECT().SerializeEvent(gomock.Any(), gomock.Any()).Return(sampleEventData(), nil).AnyTimes()
@@ -1286,8 +1282,6 @@ func TestConflictResolveWorkflowExecution(t *testing.T) {
 				CurrentWorkflowMutation: sampleWorkflowMutation(),
 			},
 			prepareMocks: func(mockedStore *MockExecutionStore, mockedSerializer *MockPayloadSerializer) {
-				mockedStore.EXPECT().GetActivityMapRewriteSampleRate().Return(0).AnyTimes()
-				mockedStore.EXPECT().GetTimerMapRewriteSampleRate().Return(0).AnyTimes()
 
 				expectedRequest := &InternalConflictResolveWorkflowExecutionRequest{
 					RangeID:                 1,
@@ -1895,8 +1889,6 @@ func TestUpdateWorkflowExecution_TimerTaskTracking(t *testing.T) {
 		},
 	}
 
-	mockedStore.EXPECT().GetActivityMapRewriteSampleRate().Return(0).AnyTimes()
-	mockedStore.EXPECT().GetTimerMapRewriteSampleRate().Return(0).AnyTimes()
 	mockedSerializer.EXPECT().SerializeEvent(gomock.Any(), gomock.Any()).Return(sampleEventData(), nil).AnyTimes()
 	mockedSerializer.EXPECT().SerializeResetPoints(gomock.Any(), gomock.Any()).Return(sampleEventData(), nil).AnyTimes()
 	mockedSerializer.EXPECT().SerializeChecksum(gomock.Any(), gomock.Any()).Return(sampleTestCheckSumData(), nil).AnyTimes()
@@ -2009,8 +2001,6 @@ func TestUpdateWorkflowExecution_TimerTaskTrackingFlagOff(t *testing.T) {
 		},
 	}
 
-	mockedStore.EXPECT().GetActivityMapRewriteSampleRate().Return(0).AnyTimes()
-	mockedStore.EXPECT().GetTimerMapRewriteSampleRate().Return(0).AnyTimes()
 	mockedSerializer.EXPECT().SerializeEvent(gomock.Any(), gomock.Any()).Return(sampleEventData(), nil).AnyTimes()
 	mockedSerializer.EXPECT().SerializeResetPoints(gomock.Any(), gomock.Any()).Return(sampleEventData(), nil).AnyTimes()
 	mockedSerializer.EXPECT().SerializeChecksum(gomock.Any(), gomock.Any()).Return(sampleTestCheckSumData(), nil).AnyTimes()
@@ -2116,8 +2106,6 @@ func TestConflictResolveWorkflowExecution_TimerTaskTracking(t *testing.T) {
 		HistoryTaskCategoryTimer: {makeTimerTask(newTaskID)},
 	}
 
-	mockedStore.EXPECT().GetActivityMapRewriteSampleRate().Return(0).AnyTimes()
-	mockedStore.EXPECT().GetTimerMapRewriteSampleRate().Return(0).AnyTimes()
 	mockedSerializer.EXPECT().SerializeEvent(gomock.Any(), gomock.Any()).Return(sampleEventData(), nil).AnyTimes()
 	mockedSerializer.EXPECT().SerializeVersionHistories(gomock.Any(), gomock.Any()).Return(sampleEventData(), nil).AnyTimes()
 	mockedSerializer.EXPECT().SerializeResetPoints(gomock.Any(), gomock.Any()).Return(sampleEventData(), nil).AnyTimes()

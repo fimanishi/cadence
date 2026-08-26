@@ -1023,6 +1023,7 @@ func writeTimerInfoSentinel(
 ) {
 	batch.Query(templateSentinelTimerInfoQuery,
 		timerID,
+		timerSentinelTimerID,
 		timeStamp,
 		shardID,
 		rowTypeExecution,
@@ -1243,6 +1244,7 @@ func writeActivityInfoSentinel(
 ) {
 	batch.Query(templateSentinelActivityInfoQuery,
 		scheduleEventID,
+		activitySentinelScheduleID,
 		timeStamp,
 		shardID,
 		rowTypeExecution,

@@ -386,7 +386,7 @@ const (
 		`and task_id = ? `
 
 	templateSentinelActivityInfoQuery = `UPDATE executions ` +
-		`SET activity_map[ ? ] = {schedule_id: -1} ` +
+		`SET activity_map[ ? ] = {schedule_id: ?} ` +
 		`, last_updated_time = ? ` +
 		`WHERE shard_id = ? ` +
 		`and type = ? ` +
@@ -419,7 +419,7 @@ const (
 		`and task_id = ? `
 
 	templateSentinelTimerInfoQuery = `UPDATE executions ` +
-		`SET timer_map[ ? ] = {timer_id: ''} ` +
+		`SET timer_map[ ? ] = {timer_id: ?} ` +
 		`, last_updated_time = ? ` +
 		`WHERE shard_id = ? ` +
 		`and type = ? ` +
