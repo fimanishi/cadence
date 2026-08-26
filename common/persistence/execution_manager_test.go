@@ -421,8 +421,8 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 			mockedStore.EXPECT().GetName().Return(tc.storeName).AnyTimes()
 			manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, &DynamicConfiguration{
 				SerializationEncoding:          dynamicproperties.GetStringPropertyFn(string(constants.EncodingTypeThriftRW)),
-				ActivityMapRewriteSampleRate:    dynamicproperties.GetIntPropertyFn(tc.activityRate),
-				TimerMapRewriteSampleRate:       dynamicproperties.GetIntPropertyFn(tc.timerRate),
+				ActivityMapRewriteSampleRate:   dynamicproperties.GetIntPropertyFn(tc.activityRate),
+				TimerMapRewriteSampleRate:      dynamicproperties.GetIntPropertyFn(tc.timerRate),
 				MapRewriteOptimizationBackends: dynamicproperties.GetListPropertyFn([]interface{}{"cassandra"}),
 			})
 
@@ -488,8 +488,8 @@ func FuzzRewriteSkippedForUnsupportedBackend(f *testing.F) {
 		mockedStore.EXPECT().GetName().Return(storeName).AnyTimes()
 		manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, &DynamicConfiguration{
 			SerializationEncoding:          dynamicproperties.GetStringPropertyFn(string(constants.EncodingTypeThriftRW)),
-			ActivityMapRewriteSampleRate:    dynamicproperties.GetIntPropertyFn(1),
-			TimerMapRewriteSampleRate:       dynamicproperties.GetIntPropertyFn(1),
+			ActivityMapRewriteSampleRate:   dynamicproperties.GetIntPropertyFn(1),
+			TimerMapRewriteSampleRate:      dynamicproperties.GetIntPropertyFn(1),
 			MapRewriteOptimizationBackends: dynamicproperties.GetListPropertyFn([]interface{}{"cassandra"}),
 		})
 

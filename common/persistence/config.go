@@ -44,7 +44,7 @@ type (
 		ErrorInjectionRate                       dynamicproperties.FloatPropertyFn
 		ActivityMapRewriteSampleRate             dynamicproperties.IntPropertyFn
 		TimerMapRewriteSampleRate                dynamicproperties.IntPropertyFn
-		MapRewriteOptimizationBackends          dynamicproperties.ListPropertyFn
+		MapRewriteOptimizationBackends           dynamicproperties.ListPropertyFn
 	}
 )
 
@@ -67,7 +67,7 @@ func NewDynamicConfiguration(dc *dynamicconfig.Collection) *DynamicConfiguration
 		ErrorInjectionRate:                       dc.GetFloat64Property(dynamicproperties.PersistenceErrorInjectionRate),
 		ActivityMapRewriteSampleRate:             dc.GetIntProperty(dynamicproperties.ActivityMapRewriteSampleRate),
 		TimerMapRewriteSampleRate:                dc.GetIntProperty(dynamicproperties.TimerMapRewriteSampleRate),
-		MapRewriteOptimizationBackends:          dc.GetListProperty(dynamicproperties.MapRewriteOptimizationBackends),
+		MapRewriteOptimizationBackends:           dc.GetListProperty(dynamicproperties.MapRewriteOptimizationBackends),
 	}
 }
 
