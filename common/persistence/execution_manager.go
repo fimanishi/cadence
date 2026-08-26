@@ -733,7 +733,7 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 	if m.dc != nil && m.dc.TimerMapRewriteSampleRate != nil {
 		timerRate = m.dc.TimerMapRewriteSampleRate()
 	}
-	if input.RewriteActivityInfos != nil && activityRate > 0 && m.isMapRewriteSupported() && rand.Intn(activityRate) == 0 {
+	if input.RewriteActivityInfos != nil && activityRate > 0 && rand.Intn(activityRate) == 0 && m.isMapRewriteSupported() {
 		serializedRewriteActivityInfos, err = m.SerializeUpsertActivityInfos(input.RewriteActivityInfos, encoding)
 		if err != nil {
 			return nil, err
@@ -748,7 +748,7 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 			tag.Counter(len(serializedRewriteActivityInfos)),
 		)
 	}
-	if input.RewriteTimerInfos != nil && timerRate > 0 && m.isMapRewriteSupported() && rand.Intn(timerRate) == 0 {
+	if input.RewriteTimerInfos != nil && timerRate > 0 && rand.Intn(timerRate) == 0 && m.isMapRewriteSupported() {
 		rewriteTimerInfos = input.RewriteTimerInfos
 		m.logger.Info("timer map rewrite triggered",
 			tag.WorkflowDomainID(input.ExecutionInfo.DomainID),
