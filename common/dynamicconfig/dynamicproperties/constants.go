@@ -3501,6 +3501,14 @@ const (
 	// Default value: forward all headers.  (this is a problematic value, and it will be changing as we reduce to a list of known values)
 	HeaderForwardingRules
 
+	// MapRewriteOptimizationBackends is the list of persistence backends that support
+	// the map rewrite optimization (sentinel writes + probabilistic full map rewrite).
+	// KeyName: history.mapRewriteOptimizationBackends
+	// Value type: []string
+	// Default value: ["cassandra"]
+	// Allowed filters: N/A
+	MapRewriteOptimizationBackends
+
 	LastListKey
 )
 
@@ -6185,6 +6193,11 @@ var ListKeys = map[ListKey]DynamicList{
 		KeyName:      "system.rateLimiterBypassCallerTypes",
 		Description:  "List of caller types that bypass rate limiters (both frontend and persistence)",
 		DefaultValue: []interface{}{},
+	},
+	MapRewriteOptimizationBackends: {
+		KeyName:      "history.mapRewriteOptimizationBackends",
+		Description:  "List of persistence backends that support the map rewrite optimization (sentinel writes + probabilistic rewrite).",
+		DefaultValue: []interface{}{"cassandra"},
 	},
 	DefaultIsolationGroupConfigStoreManagerGlobalMapping: {
 		KeyName: "system.defaultIsolationGroupConfigStoreManagerGlobalMapping",

@@ -348,6 +348,7 @@ func TestExecutionManager_UpdateWorkflowExecution(t *testing.T) {
 func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 	tests := []struct {
 		name                  string
+		storeName             string
 		activityRate          int
 		timerRate             int
 		rewriteActivityInfos  []*ActivityInfo
@@ -358,7 +359,8 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 		expectRewriteTimer    bool
 	}{
 		{
-			name:         "rate 1 with deletes triggers rewrite and preserves deletes",
+			name:         "cassandra with rate 1 triggers rewrite and preserves deletes",
+			storeName:    "cassandra",
 			activityRate: 1,
 			timerRate:    1,
 			rewriteActivityInfos: []*ActivityInfo{
@@ -371,7 +373,8 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 			expectRewriteTimer:    true,
 		},
 		{
-			name:         "rate 0 disables rewrite and preserves deletes",
+			name:         "cassandra with rate 0 disables rewrite",
+			storeName:    "cassandra",
 			activityRate: 0,
 			timerRate:    0,
 			rewriteActivityInfos: []*ActivityInfo{
@@ -384,7 +387,8 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 			expectRewriteTimer:    false,
 		},
 		{
-			name:                  "nil rewrite infos skips rewrite even with rate 1",
+			name:                  "cassandra with nil rewrite infos skips rewrite even with rate 1",
+			storeName:             "cassandra",
 			activityRate:          1,
 			timerRate:             1,
 			rewriteActivityInfos:  nil,
@@ -395,7 +399,8 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 			expectRewriteTimer:    false,
 		},
 		{
-			name:                  "all activities deleted triggers rewrite with empty map",
+			name:                  "cassandra with all activities deleted triggers rewrite with empty map",
+			storeName:             "cassandra",
 			activityRate:          1,
 			timerRate:             1,
 			rewriteActivityInfos:  []*ActivityInfo{},
@@ -413,10 +418,12 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 			mockedStore := NewMockExecutionStore(ctrl)
 			mockedSerializer := NewMockPayloadSerializer(ctrl)
 
+			mockedStore.EXPECT().GetName().Return(tc.storeName).AnyTimes()
 			manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, &DynamicConfiguration{
-				SerializationEncoding:        dynamicproperties.GetStringPropertyFn(string(constants.EncodingTypeThriftRW)),
-				ActivityMapRewriteSampleRate: dynamicproperties.GetIntPropertyFn(tc.activityRate),
-				TimerMapRewriteSampleRate:    dynamicproperties.GetIntPropertyFn(tc.timerRate),
+				SerializationEncoding:          dynamicproperties.GetStringPropertyFn(string(constants.EncodingTypeThriftRW)),
+				ActivityMapRewriteSampleRate:    dynamicproperties.GetIntPropertyFn(tc.activityRate),
+				TimerMapRewriteSampleRate:       dynamicproperties.GetIntPropertyFn(tc.timerRate),
+				MapRewriteOptimizationBackends: dynamicproperties.GetListPropertyFn([]interface{}{"cassandra"}),
 			})
 
 			mockedSerializer.EXPECT().SerializeEvent(gomock.Any(), gomock.Any()).Return(sampleEventData(), nil).AnyTimes()
@@ -457,6 +464,66 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func FuzzRewriteSkippedForUnsupportedBackend(f *testing.F) {
+	f.Add("mysql")
+	f.Add("postgres")
+	f.Add("dynamodb")
+	f.Add("mongodb")
+	f.Add("Cassandra")
+	f.Add("CASSANDRA")
+	f.Add("cassandra ")
+	f.Add("")
+
+	f.Fuzz(func(t *testing.T, storeName string) {
+		if storeName == "cassandra" {
+			t.Skip("cassandra is the supported backend")
+		}
+
+		ctrl := gomock.NewController(t)
+		mockedStore := NewMockExecutionStore(ctrl)
+		mockedSerializer := NewMockPayloadSerializer(ctrl)
+
+		mockedStore.EXPECT().GetName().Return(storeName).AnyTimes()
+		manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, &DynamicConfiguration{
+			SerializationEncoding:          dynamicproperties.GetStringPropertyFn(string(constants.EncodingTypeThriftRW)),
+			ActivityMapRewriteSampleRate:    dynamicproperties.GetIntPropertyFn(1),
+			TimerMapRewriteSampleRate:       dynamicproperties.GetIntPropertyFn(1),
+			MapRewriteOptimizationBackends: dynamicproperties.GetListPropertyFn([]interface{}{"cassandra"}),
+		})
+
+		mockedSerializer.EXPECT().SerializeEvent(gomock.Any(), gomock.Any()).Return(sampleEventData(), nil).AnyTimes()
+		mockedSerializer.EXPECT().SerializeResetPoints(gomock.Any(), gomock.Any()).Return(sampleResetPointsData(), nil).AnyTimes()
+		mockedSerializer.EXPECT().SerializeChecksum(gomock.Any(), gomock.Any()).Return(sampleCheckSumData(), nil).AnyTimes()
+		mockedSerializer.EXPECT().SerializeActiveClusterSelectionPolicy(gomock.Any(), gomock.Any()).Return(sampleActiveClusterSelectionPolicyData(), nil).AnyTimes()
+
+		mockedStore.EXPECT().UpdateWorkflowExecution(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, req *InternalUpdateWorkflowExecutionRequest) error {
+				mut := req.UpdateWorkflowMutation
+				assert.Nil(t, mut.RewriteActivityInfos, "unsupported backend %q must not trigger activity rewrite", storeName)
+				assert.Nil(t, mut.RewriteTimerInfos, "unsupported backend %q must not trigger timer rewrite", storeName)
+				assert.Equal(t, []int64{5}, mut.DeleteActivityInfos, "deletes must be preserved")
+				assert.Equal(t, []string{"t2"}, mut.DeleteTimerInfos, "deletes must be preserved")
+				return nil
+			}).Times(1)
+
+		mutation := sampleWorkflowMutation()
+		mutation.RewriteActivityInfos = []*ActivityInfo{
+			{Version: 1, ScheduleID: 10, ScheduledEvent: activityScheduledEvent(), StartedEvent: activityStartedEvent()},
+		}
+		mutation.RewriteTimerInfos = []*TimerInfo{{TimerID: "t1"}}
+		mutation.DeleteActivityInfos = []int64{5}
+		mutation.DeleteTimerInfos = []string{"t2"}
+
+		_, err := manager.UpdateWorkflowExecution(context.Background(), &UpdateWorkflowExecutionRequest{
+			RangeID:                1,
+			Mode:                   UpdateWorkflowModeBypassCurrent,
+			UpdateWorkflowMutation: *mutation,
+			Encoding:               constants.EncodingTypeThriftRW,
+		})
+		assert.NoError(t, err)
+	})
 }
 
 func TestSerializeWorkflowSnapshot(t *testing.T) {
@@ -1978,7 +2045,6 @@ func TestUpdateWorkflowExecution_TimerTaskTrackingFlagOff(t *testing.T) {
 	mockedStore := NewMockExecutionStore(ctrl)
 	mockedSerializer := NewMockPayloadSerializer(ctrl)
 
-	// EnableWorkflowTimerTaskCleanup is false by default
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, NewDefaultDynamicConfiguration())
 
 	mutation := sampleWorkflowMutation()

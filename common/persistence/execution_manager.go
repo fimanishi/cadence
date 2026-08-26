@@ -69,6 +69,19 @@ func (m *executionManagerImpl) GetName() string {
 	return m.persistence.GetName()
 }
 
+func (m *executionManagerImpl) isMapRewriteSupported() bool {
+	if m.persistence == nil || m.dc == nil || m.dc.MapRewriteOptimizationBackends == nil {
+		return false
+	}
+	name := m.persistence.GetName()
+	for _, b := range m.dc.MapRewriteOptimizationBackends() {
+		if s, ok := b.(string); ok && s == name {
+			return true
+		}
+	}
+	return false
+}
+
 // The below three APIs are related to serialization/deserialization
 
 func (m *executionManagerImpl) GetWorkflowExecution(
@@ -720,7 +733,7 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 	if m.dc != nil && m.dc.TimerMapRewriteSampleRate != nil {
 		timerRate = m.dc.TimerMapRewriteSampleRate()
 	}
-	if input.RewriteActivityInfos != nil && activityRate > 0 && rand.Intn(activityRate) == 0 {
+	if input.RewriteActivityInfos != nil && activityRate > 0 && m.isMapRewriteSupported() && rand.Intn(activityRate) == 0 {
 		serializedRewriteActivityInfos, err = m.SerializeUpsertActivityInfos(input.RewriteActivityInfos, encoding)
 		if err != nil {
 			return nil, err
@@ -735,7 +748,7 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 			tag.Counter(len(serializedRewriteActivityInfos)),
 		)
 	}
-	if input.RewriteTimerInfos != nil && timerRate > 0 && rand.Intn(timerRate) == 0 {
+	if input.RewriteTimerInfos != nil && timerRate > 0 && m.isMapRewriteSupported() && rand.Intn(timerRate) == 0 {
 		rewriteTimerInfos = input.RewriteTimerInfos
 		m.logger.Info("timer map rewrite triggered",
 			tag.WorkflowDomainID(input.ExecutionInfo.DomainID),
