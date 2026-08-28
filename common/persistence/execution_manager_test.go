@@ -1339,7 +1339,6 @@ func TestConflictResolveWorkflowExecution(t *testing.T) {
 				CurrentWorkflowMutation: sampleWorkflowMutation(),
 			},
 			prepareMocks: func(mockedStore *MockExecutionStore, mockedSerializer *MockPayloadSerializer) {
-
 				expectedRequest := &InternalConflictResolveWorkflowExecutionRequest{
 					RangeID:                 1,
 					Mode:                    ConflictResolveWorkflowModeBypassCurrent,
