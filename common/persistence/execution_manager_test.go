@@ -2044,6 +2044,7 @@ func TestUpdateWorkflowExecution_TimerTaskTrackingFlagOff(t *testing.T) {
 	mockedStore := NewMockExecutionStore(ctrl)
 	mockedSerializer := NewMockPayloadSerializer(ctrl)
 
+	// EnableWorkflowTimerTaskCleanup is false by default
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, NewDefaultDynamicConfiguration())
 
 	mutation := sampleWorkflowMutation()
