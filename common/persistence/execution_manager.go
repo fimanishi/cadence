@@ -82,6 +82,13 @@ func (m *executionManagerImpl) isMapRewriteSupported() bool {
 	return false
 }
 
+// shouldRewrite returns true with a 1-in-rate probability, used to
+// probabilistically trigger a full map rewrite that compacts sentinel
+// entries accumulated from previous deletes.
+func shouldRewrite(rate int) bool {
+	return rand.Intn(rate) == 0
+}
+
 // The below three APIs are related to serialization/deserialization
 
 func (m *executionManagerImpl) GetWorkflowExecution(
@@ -735,7 +742,7 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 	}
 	activitySentinelWriteEnabled := activityRate > 0 && m.isMapRewriteSupported()
 	timerSentinelWriteEnabled := timerRate > 0 && m.isMapRewriteSupported()
-	if input.RewriteActivityInfos != nil && activitySentinelWriteEnabled && rand.Intn(activityRate) == 0 {
+	if input.RewriteActivityInfos != nil && activitySentinelWriteEnabled && shouldRewrite(activityRate) {
 		serializedRewriteActivityInfos, err = m.SerializeUpsertActivityInfos(input.RewriteActivityInfos, encoding)
 		if err != nil {
 			return nil, err
@@ -750,7 +757,7 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 			tag.Counter(len(serializedRewriteActivityInfos)),
 		)
 	}
-	if input.RewriteTimerInfos != nil && timerSentinelWriteEnabled && rand.Intn(timerRate) == 0 {
+	if input.RewriteTimerInfos != nil && timerSentinelWriteEnabled && shouldRewrite(timerRate) {
 		rewriteTimerInfos = input.RewriteTimerInfos
 		m.logger.Info("timer map rewrite triggered",
 			tag.WorkflowDomainID(input.ExecutionInfo.DomainID),
