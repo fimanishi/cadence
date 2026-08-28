@@ -203,12 +203,14 @@ func (d *nosqlExecutionStore) prepareUpdateWorkflowExecutionRequestWithMapsAndEv
 			return nil, err
 		}
 	}
+	executionRequest.ActivitySentinelWriteEnabled = workflowMutation.ActivitySentinelWriteEnabled
 	if workflowMutation.RewriteTimerInfos != nil {
 		executionRequest.RewriteTimerInfos, err = d.prepareTimerInfosForWorkflowTxn(workflowMutation.RewriteTimerInfos)
 		if err != nil {
 			return nil, err
 		}
 	}
+	executionRequest.TimerSentinelWriteEnabled = workflowMutation.TimerSentinelWriteEnabled
 	executionRequest.ChildWorkflowInfoKeysToDelete = workflowMutation.DeleteChildExecutionInfos
 	executionRequest.RequestCancelInfoKeysToDelete = workflowMutation.DeleteRequestCancelInfos
 	executionRequest.SignalInfoKeysToDelete = workflowMutation.DeleteSignalInfos

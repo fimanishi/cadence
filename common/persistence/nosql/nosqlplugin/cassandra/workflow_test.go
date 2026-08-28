@@ -34,7 +34,6 @@ import (
 
 	"github.com/uber/cadence/common/config"
 	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
 	"github.com/uber/cadence/common/log/testlogger"
 	"github.com/uber/cadence/common/persistence"
 	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
@@ -515,7 +514,7 @@ func TestUpdateWorkflowExecutionWithTasks(t *testing.T) {
 func TestUpdateWorkflowExecutionWithTasks_SentinelBehavior(t *testing.T) {
 	tests := []struct {
 		name              string
-		threshold         int
+		sentinelEnabled   bool
 		activityDeletes   []int64
 		timerDeletes      []string
 		wantSentinelQuery string
@@ -523,25 +522,25 @@ func TestUpdateWorkflowExecutionWithTasks_SentinelBehavior(t *testing.T) {
 	}{
 		{
 			name:              "sentinel enabled - activity delete writes sentinel instead of deleting",
-			threshold:         100,
+			sentinelEnabled:   true,
 			activityDeletes:   []int64{10},
 			wantSentinelQuery: "SET activity_map",
 		},
 		{
 			name:            "sentinel disabled - activity delete uses regular delete",
-			threshold:       0,
+			sentinelEnabled: false,
 			activityDeletes: []int64{10},
 			wantDeleteQuery: "DELETE activity_map",
 		},
 		{
 			name:              "sentinel enabled - timer delete writes sentinel instead of deleting",
-			threshold:         100,
+			sentinelEnabled:   true,
 			timerDeletes:      []string{"timer-1"},
 			wantSentinelQuery: "SET timer_map",
 		},
 		{
 			name:            "sentinel disabled - timer delete uses regular delete",
-			threshold:       0,
+			sentinelEnabled: false,
 			timerDeletes:    []string{"timer-1"},
 			wantDeleteQuery: "DELETE timer_map",
 		},
@@ -557,19 +556,15 @@ func TestUpdateWorkflowExecutionWithTasks_SentinelBehavior(t *testing.T) {
 			client := gocql.NewMockClient(ctrl)
 			cfg := &config.NoSQL{}
 			logger := testlogger.New(t)
-			thresholdFn := func(...dynamicproperties.FilterOption) int { return tc.threshold }
-			dc := &persistence.DynamicConfiguration{
-				ActivityMapRewriteSampleRate: thresholdFn,
-				TimerMapRewriteSampleRate:    thresholdFn,
-			}
-
-			db := NewCassandraDBFromSession(cfg, session, logger, dc, DbWithClient(client))
+			db := NewCassandraDBFromSession(cfg, session, logger, nil, DbWithClient(client))
 
 			mutatedExecution := testdata.WFExecRequest(
 				testdata.WFExecRequestWithMapsWriteMode(nosqlplugin.WorkflowExecutionMapsWriteModeUpdate),
 			)
 			mutatedExecution.ActivityInfoKeysToDelete = tc.activityDeletes
 			mutatedExecution.TimerInfoKeysToDelete = tc.timerDeletes
+			mutatedExecution.ActivitySentinelWriteEnabled = tc.sentinelEnabled
+			mutatedExecution.TimerSentinelWriteEnabled = tc.sentinelEnabled
 
 			err := db.UpdateWorkflowExecutionWithTasks(
 				context.Background(),

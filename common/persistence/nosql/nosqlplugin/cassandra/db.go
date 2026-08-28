@@ -121,13 +121,6 @@ func (db *CDB) executeWithConsistencyAll(q gocql.Query) error {
 	return q.Exec()
 }
 
-func (db *CDB) activitySentinelWriteEnabled() bool {
-	return db.dc != nil && db.dc.ActivityMapRewriteSampleRate != nil && db.dc.ActivityMapRewriteSampleRate() > 0
-}
-
-func (db *CDB) timerSentinelWriteEnabled() bool {
-	return db.dc != nil && db.dc.TimerMapRewriteSampleRate != nil && db.dc.TimerMapRewriteSampleRate() > 0
-}
 
 func (db *CDB) executeBatchWithConsistencyAll(b gocql.Batch) error {
 	if db.dc != nil && db.dc.EnableCassandraAllConsistencyLevelDelete() {

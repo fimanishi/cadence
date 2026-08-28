@@ -590,12 +590,14 @@ type (
 		StartVersion     int64
 		LastWriteVersion int64
 
-		UpsertActivityInfos       []*InternalActivityInfo
-		DeleteActivityInfos       []int64
-		RewriteActivityInfos      []*InternalActivityInfo
-		UpsertTimerInfos          []*TimerInfo
-		DeleteTimerInfos          []string
-		RewriteTimerInfos         []*TimerInfo
+		UpsertActivityInfos            []*InternalActivityInfo
+		DeleteActivityInfos            []int64
+		RewriteActivityInfos           []*InternalActivityInfo
+		ActivitySentinelWriteEnabled   bool
+		UpsertTimerInfos               []*TimerInfo
+		DeleteTimerInfos               []string
+		RewriteTimerInfos              []*TimerInfo
+		TimerSentinelWriteEnabled      bool
 		WorkflowTimerTasks        []HistoryTaskKey
 		UpsertChildExecutionInfos []*InternalChildExecutionInfo
 		DeleteChildExecutionInfos []int64

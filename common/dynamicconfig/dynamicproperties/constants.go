@@ -1667,7 +1667,7 @@ const (
 	// is triggered on transactions with deletes. A value of N means a 1-in-N chance
 	// per transaction (e.g., 100 = rewrite roughly every 100th transaction).
 	// 0 disables the optimization. 1 means rewrite every time.
-	// Currently only implemented for Cassandra.
+	// Only applies to backends listed in MapRewriteOptimizationBackends.
 	// KeyName: history.activityMapRewriteSampleRate
 	// Value type: Int
 	// Default value: 0
@@ -1677,7 +1677,7 @@ const (
 	// is triggered on transactions with deletes. A value of N means a 1-in-N chance
 	// per transaction (e.g., 100 = rewrite roughly every 100th transaction).
 	// 0 disables the optimization. 1 means rewrite every time.
-	// Currently only implemented for Cassandra.
+	// Only applies to backends listed in MapRewriteOptimizationBackends.
 	// KeyName: history.timerMapRewriteSampleRate
 	// Value type: Int
 	// Default value: 0
@@ -3503,6 +3503,7 @@ const (
 
 	// MapRewriteOptimizationBackends is the list of persistence backends that support
 	// the map rewrite optimization (sentinel writes + probabilistic full map rewrite).
+	// Currently only Cassandra is known to need this optimization (to avoid tombstones).
 	// KeyName: history.mapRewriteOptimizationBackends
 	// Value type: []string
 	// Default value: ["cassandra"]
@@ -4630,12 +4631,12 @@ var IntKeys = map[IntKey]DynamicInt{
 	},
 	ActivityMapRewriteSampleRate: {
 		KeyName:      "history.activityMapRewriteSampleRate",
-		Description:  "How often a full activity map rewrite is triggered on transactions with deletes. N means 1-in-N chance (e.g. 100 = every ~100th transaction). 0 disables. Cassandra only.",
+		Description:  "How often a full activity map rewrite is triggered on transactions with deletes. N means 1-in-N chance (e.g. 100 = every ~100th transaction). 0 disables. Only applies to backends in MapRewriteOptimizationBackends.",
 		DefaultValue: 0,
 	},
 	TimerMapRewriteSampleRate: {
 		KeyName:      "history.timerMapRewriteSampleRate",
-		Description:  "How often a full timer map rewrite is triggered on transactions with deletes. N means 1-in-N chance (e.g. 100 = every ~100th transaction). 0 disables. Cassandra only.",
+		Description:  "How often a full timer map rewrite is triggered on transactions with deletes. N means 1-in-N chance (e.g. 100 = every ~100th transaction). 0 disables. Only applies to backends in MapRewriteOptimizationBackends.",
 		DefaultValue: 0,
 	},
 }
@@ -6196,7 +6197,7 @@ var ListKeys = map[ListKey]DynamicList{
 	},
 	MapRewriteOptimizationBackends: {
 		KeyName:      "history.mapRewriteOptimizationBackends",
-		Description:  "List of persistence backends that support the map rewrite optimization (sentinel writes + probabilistic rewrite).",
+		Description:  "List of persistence backends that support the map rewrite optimization (sentinel writes + probabilistic rewrite). Currently only Cassandra is known to need this (to avoid tombstones).",
 		DefaultValue: []interface{}{"cassandra"},
 	},
 	DefaultIsolationGroupConfigStoreManagerGlobalMapping: {
