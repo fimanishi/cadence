@@ -37,12 +37,13 @@ import (
 type (
 	// executionManagerImpl implements ExecutionManager based on ExecutionStore, statsComputer and PayloadSerializer
 	executionManagerImpl struct {
-		serializer    PayloadSerializer
-		persistence   ExecutionStore
-		statsComputer statsComputer
-		logger        log.Logger
-		timeSrc       clock.TimeSource
-		dc            *DynamicConfiguration
+		serializer          PayloadSerializer
+		persistence         ExecutionStore
+		statsComputer       statsComputer
+		logger              log.Logger
+		timeSrc             clock.TimeSource
+		dc                  *DynamicConfiguration
+		mapRewriteSupported bool
 	}
 )
 
@@ -56,12 +57,13 @@ func NewExecutionManagerImpl(
 	dc *DynamicConfiguration,
 ) ExecutionManager {
 	return &executionManagerImpl{
-		serializer:    serializer,
-		persistence:   persistence,
-		statsComputer: statsComputer{},
-		logger:        logger,
-		timeSrc:       clock.NewRealTimeSource(),
-		dc:            dc,
+		serializer:          serializer,
+		persistence:         persistence,
+		statsComputer:       statsComputer{},
+		logger:              logger,
+		timeSrc:             clock.NewRealTimeSource(),
+		dc:                  dc,
+		mapRewriteSupported: isMapRewriteSupported(persistence, dc),
 	}
 }
 
@@ -69,12 +71,12 @@ func (m *executionManagerImpl) GetName() string {
 	return m.persistence.GetName()
 }
 
-func (m *executionManagerImpl) isMapRewriteSupported() bool {
-	if m.persistence == nil || m.dc == nil || m.dc.MapRewriteOptimizationBackends == nil {
+func isMapRewriteSupported(store ExecutionStore, dc *DynamicConfiguration) bool {
+	if store == nil || dc == nil || dc.MapRewriteOptimizationBackends == nil {
 		return false
 	}
-	name := m.persistence.GetName()
-	for _, b := range m.dc.MapRewriteOptimizationBackends() {
+	name := store.GetName()
+	for _, b := range dc.MapRewriteOptimizationBackends() {
 		if s, ok := b.(string); ok && s == name {
 			return true
 		}
@@ -740,8 +742,8 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 	if m.dc != nil && m.dc.TimerMapRewriteSampleRate != nil {
 		timerRate = m.dc.TimerMapRewriteSampleRate()
 	}
-	activitySentinelWriteEnabled := activityRate > 0 && m.isMapRewriteSupported()
-	timerSentinelWriteEnabled := timerRate > 0 && m.isMapRewriteSupported()
+	activitySentinelWriteEnabled := activityRate > 0 && m.mapRewriteSupported
+	timerSentinelWriteEnabled := timerRate > 0 && m.mapRewriteSupported
 	if input.RewriteActivityInfos != nil && activitySentinelWriteEnabled && shouldRewrite(activityRate) {
 		serializedRewriteActivityInfos, err = m.SerializeUpsertActivityInfos(input.RewriteActivityInfos, encoding)
 		if err != nil {

@@ -67,7 +67,7 @@ func TestExecutionManager_ProxyStoreMethods(t *testing.T) {
 		{
 			method: "GetName",
 			prepareMocks: func(mockedStore *MockExecutionStore) {
-				mockedStore.EXPECT().GetName().Return("test").Times(1)
+				mockedStore.EXPECT().GetName().Return("test").AnyTimes()
 			},
 		},
 		{
@@ -141,6 +141,7 @@ func TestExecutionManager_ProxyStoreMethods(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			mockedStore := NewMockExecutionStore(ctrl)
 			tc.prepareMocks(mockedStore)
+			mockedStore.EXPECT().GetName().Return("").AnyTimes()
 			manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), nil, NewDefaultDynamicConfiguration())
 			v := reflect.ValueOf(manager)
 			method := v.MethodByName(tc.method)
@@ -175,6 +176,7 @@ func TestExecutionManager_GetWorkflowExecution(t *testing.T) {
 	mockedStore := NewMockExecutionStore(ctrl)
 	mockedSerializer := NewMockPayloadSerializer(ctrl)
 
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, NewDefaultDynamicConfiguration())
 
 	request := &GetWorkflowExecutionRequest{
@@ -265,6 +267,7 @@ func TestExecutionManager_GetWorkflowExecution_NoWorkflow(t *testing.T) {
 	mockedStore := NewMockExecutionStore(ctrl)
 	mockedSerializer := NewMockPayloadSerializer(ctrl)
 
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, NewDefaultDynamicConfiguration())
 
 	request := &GetWorkflowExecutionRequest{
@@ -288,6 +291,7 @@ func TestExecutionManager_UpdateWorkflowExecution(t *testing.T) {
 	mockedStore := NewMockExecutionStore(ctrl)
 	mockedSerializer := NewMockPayloadSerializer(ctrl)
 
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, NewDefaultDynamicConfiguration())
 
 	expectedInfo := sampleInternalWorkflowMutation()
@@ -733,6 +737,7 @@ func TestDeserializeBufferedEvents(t *testing.T) {
 func TestPutReplicationTaskToDLQ(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockedStore := NewMockExecutionStore(ctrl)
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), NewPayloadSerializer(), NewDefaultDynamicConfiguration())
 
 	now := time.Now().UTC()
@@ -765,6 +770,7 @@ func TestPutReplicationTaskToDLQ(t *testing.T) {
 func TestGetReplicationTasksFromDLQ(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockedStore := NewMockExecutionStore(ctrl)
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), NewPayloadSerializer(), NewDefaultDynamicConfiguration())
 
 	request := &GetReplicationTasksFromDLQRequest{
@@ -804,6 +810,7 @@ func TestGetReplicationTasksFromDLQ_WithBlob(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockedStore := NewMockExecutionStore(ctrl)
 	mockedSerializer := NewMockPayloadSerializer(ctrl)
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, NewDefaultDynamicConfiguration())
 
 	request := &GetReplicationTasksFromDLQRequest{
@@ -849,6 +856,7 @@ func TestGetReplicationTasksFromDLQ_CorruptBlob(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockedStore := NewMockExecutionStore(ctrl)
 	mockedSerializer := NewMockPayloadSerializer(ctrl)
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, NewDefaultDynamicConfiguration())
 
 	request := &GetReplicationTasksFromDLQRequest{
@@ -1131,6 +1139,7 @@ func TestListConcreteExecutions(t *testing.T) {
 
 			tc.prepareMocks(mockedStore, mockedSerializer)
 
+			mockedStore.EXPECT().GetName().Return("").AnyTimes()
 			manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, NewDefaultDynamicConfiguration())
 
 			res, err := manager.ListConcreteExecutions(context.Background(), request)
@@ -1246,6 +1255,7 @@ func TestCreateWorkflowExecution(t *testing.T) {
 				WorkflowRequestMode:      CreateWorkflowRequestModeReplicated,
 			}
 
+			mockedStore.EXPECT().GetName().Return("").AnyTimes()
 			manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, NewDefaultDynamicConfiguration())
 
 			res, err := manager.CreateWorkflowExecution(context.Background(), request)
@@ -1412,6 +1422,7 @@ func TestConflictResolveWorkflowExecution(t *testing.T) {
 
 			tc.prepareMocks(mockedStore, mockedSerializer)
 
+			mockedStore.EXPECT().GetName().Return("").AnyTimes()
 			manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, NewDefaultDynamicConfiguration())
 
 			res, err := manager.ConflictResolveWorkflowExecution(context.Background(), tc.request)
@@ -1424,6 +1435,7 @@ func TestConflictResolveWorkflowExecution(t *testing.T) {
 func TestCreateFailoverMarkerTasks(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockedStore := NewMockExecutionStore(ctrl)
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), nil, NewDefaultDynamicConfiguration())
 
 	req := &CreateFailoverMarkersRequest{
@@ -1515,6 +1527,7 @@ func TestGetActiveClusterSelectionPolicy(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			mockedStore := NewMockExecutionStore(ctrl)
 			mockedSerializer := NewMockPayloadSerializer(ctrl)
+			mockedStore.EXPECT().GetName().Return("").AnyTimes()
 			manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, NewDefaultDynamicConfiguration())
 
 			test.prepareMocks(mockedStore, mockedSerializer)
@@ -1566,6 +1579,7 @@ func TestDeleteActiveClusterSelectionPolicy(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			mockedStore := NewMockExecutionStore(ctrl)
+			mockedStore.EXPECT().GetName().Return("").AnyTimes()
 			manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), nil, NewDefaultDynamicConfiguration())
 
 			test.prepareMocks(mockedStore)
@@ -1929,6 +1943,7 @@ func TestUpdateWorkflowExecution_TimerTaskTracking(t *testing.T) {
 	dc := NewDefaultDynamicConfiguration()
 	dc.EnableWorkflowTimerTaskCleanup = dynamicproperties.GetBoolPropertyFn(true)
 	dc.WorkflowTimerTaskCleanupMinTTL = dynamicproperties.GetDurationPropertyFn(minTTL)
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, dc)
 
 	mutation := sampleWorkflowMutation()
@@ -1991,6 +2006,7 @@ func TestCreateWorkflowExecution_TimerTaskTracking(t *testing.T) {
 	dc := NewDefaultDynamicConfiguration()
 	dc.EnableWorkflowTimerTaskCleanup = dynamicproperties.GetBoolPropertyFn(true)
 	dc.WorkflowTimerTaskCleanupMinTTL = dynamicproperties.GetDurationPropertyFn(minTTL)
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, dc)
 
 	snapshot := sampleWorkflowSnapshot()
@@ -2045,6 +2061,7 @@ func TestUpdateWorkflowExecution_TimerTaskTrackingFlagOff(t *testing.T) {
 	mockedSerializer := NewMockPayloadSerializer(ctrl)
 
 	// EnableWorkflowTimerTaskCleanup is false by default
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, NewDefaultDynamicConfiguration())
 
 	mutation := sampleWorkflowMutation()
@@ -2085,6 +2102,7 @@ func TestCreateWorkflowExecution_TimerTaskTrackingFlagOff(t *testing.T) {
 	mockedSerializer := NewMockPayloadSerializer(ctrl)
 
 	// EnableWorkflowTimerTaskCleanup is false by default
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, NewDefaultDynamicConfiguration())
 
 	snapshot := sampleWorkflowSnapshot()
@@ -2134,6 +2152,7 @@ func TestConflictResolveWorkflowExecution_TimerTaskTracking(t *testing.T) {
 	dc := NewDefaultDynamicConfiguration()
 	dc.EnableWorkflowTimerTaskCleanup = dynamicproperties.GetBoolPropertyFn(true)
 	dc.WorkflowTimerTaskCleanupMinTTL = dynamicproperties.GetDurationPropertyFn(minTTL)
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, dc)
 
 	makeTimerTask := func(taskID int64) Task {
@@ -2206,6 +2225,7 @@ func TestConflictResolveWorkflowExecution_TimerTaskTrackingFlagOff(t *testing.T)
 	mockedStore := NewMockExecutionStore(ctrl)
 	mockedSerializer := NewMockPayloadSerializer(ctrl)
 
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, NewDefaultDynamicConfiguration())
 
 	makeTimerTask := func(taskID int64) Task {
@@ -2256,6 +2276,7 @@ func TestFetchWorkflowTimerTasksForCleanup_FiltersCorrectly(t *testing.T) {
 
 	dc := NewDefaultDynamicConfiguration()
 	dc.WorkflowTimerTaskCleanupMinTTL = dynamicproperties.GetDurationPropertyFn(minTTL)
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, dc)
 
 	shardID := 0
@@ -2289,6 +2310,7 @@ func TestFetchWorkflowTimerTasksForCleanup_EmptyMap(t *testing.T) {
 
 	dc := NewDefaultDynamicConfiguration()
 	dc.WorkflowTimerTaskCleanupMinTTL = dynamicproperties.GetDurationPropertyFn(time.Hour)
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, dc)
 
 	shardID := 0
@@ -2317,6 +2339,7 @@ func TestCompleteHistoryTasks(t *testing.T) {
 	taskID := int64(1)
 	visTS := time.Now().Add(48 * time.Hour)
 
+	mockedStore.EXPECT().GetName().Return("").AnyTimes()
 	manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, NewDefaultDynamicConfiguration())
 
 	shardID := 0
