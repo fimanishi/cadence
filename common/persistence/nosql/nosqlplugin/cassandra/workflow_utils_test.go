@@ -1892,7 +1892,8 @@ func TestUpdateTimerInfos(t *testing.T) {
 		wantQueries []string
 	}{
 		{
-			desc: "update and delete timer infos with sentinel", shardID: 1000,
+			desc:       "update and delete timer infos with sentinel",
+			shardID:    1000,
 			domainID:   "domain1",
 			workflowID: "workflow1",
 			runID:      "runid1",
