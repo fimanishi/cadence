@@ -71,6 +71,9 @@ func (m *executionManagerImpl) GetName() string {
 	return m.persistence.GetName()
 }
 
+// isMapRewriteSupported is evaluated once at construction and cached. Runtime changes to
+// MapRewriteOptimizationBackends require a process restart to take effect. The sample rate
+// configs remain dynamic, so setting them to 0 disables the feature without a restart.
 func isMapRewriteSupported(store ExecutionStore, dc *DynamicConfiguration) bool {
 	if store == nil || dc == nil || dc.MapRewriteOptimizationBackends == nil {
 		return false
