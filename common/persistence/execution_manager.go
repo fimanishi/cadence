@@ -739,15 +739,15 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 	var serializedRewriteActivityInfos []*InternalActivityInfo
 	var rewriteTimerInfos []*TimerInfo
 	var activityRate, timerRate int
-	if m.dc != nil && m.dc.ActivityMapRewriteSampleRate != nil {
-		activityRate = m.dc.ActivityMapRewriteSampleRate()
+	if m.mapRewriteSupported && m.dc != nil {
+		if m.dc.ActivityMapRewriteSampleRate != nil {
+			activityRate = m.dc.ActivityMapRewriteSampleRate()
+		}
+		if m.dc.TimerMapRewriteSampleRate != nil {
+			timerRate = m.dc.TimerMapRewriteSampleRate()
+		}
 	}
-	if m.dc != nil && m.dc.TimerMapRewriteSampleRate != nil {
-		timerRate = m.dc.TimerMapRewriteSampleRate()
-	}
-	activitySentinelWriteEnabled := activityRate > 0 && m.mapRewriteSupported
-	timerSentinelWriteEnabled := timerRate > 0 && m.mapRewriteSupported
-	if input.RewriteActivityInfos != nil && activitySentinelWriteEnabled && shouldRewrite(activityRate) {
+	if input.RewriteActivityInfos != nil && activityRate > 0 && shouldRewrite(activityRate) {
 		serializedRewriteActivityInfos, err = m.SerializeUpsertActivityInfos(input.RewriteActivityInfos, encoding)
 		if err != nil {
 			return nil, err
@@ -762,7 +762,7 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 			tag.Counter(len(serializedRewriteActivityInfos)),
 		)
 	}
-	if input.RewriteTimerInfos != nil && timerSentinelWriteEnabled && shouldRewrite(timerRate) {
+	if input.RewriteTimerInfos != nil && timerRate > 0 && shouldRewrite(timerRate) {
 		rewriteTimerInfos = input.RewriteTimerInfos
 		m.logger.Info("timer map rewrite triggered",
 			tag.WorkflowDomainID(input.ExecutionInfo.DomainID),
@@ -805,11 +805,11 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 		UpsertActivityInfos:          serializedUpsertActivityInfos,
 		DeleteActivityInfos:          input.DeleteActivityInfos,
 		RewriteActivityInfos:         serializedRewriteActivityInfos,
-		ActivitySentinelWriteEnabled: activitySentinelWriteEnabled,
+		ActivitySentinelWriteEnabled: activityRate > 0,
 		UpsertTimerInfos:             input.UpsertTimerInfos,
 		DeleteTimerInfos:             input.DeleteTimerInfos,
 		RewriteTimerInfos:            rewriteTimerInfos,
-		TimerSentinelWriteEnabled:    timerSentinelWriteEnabled,
+		TimerSentinelWriteEnabled:    timerRate > 0,
 		WorkflowTimerTasks:           m.syncTimerTaskTrackingKeys(input.TasksByCategory),
 		UpsertChildExecutionInfos:    serializedUpsertChildExecutionInfos,
 		DeleteChildExecutionInfos:    input.DeleteChildExecutionInfos,

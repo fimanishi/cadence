@@ -3504,6 +3504,8 @@ const (
 	// MapRewriteOptimizationBackends is the list of persistence backends that support
 	// the map rewrite optimization (sentinel writes + probabilistic full map rewrite).
 	// Currently only Cassandra is known to need this optimization (to avoid tombstones).
+	// Note: this value is read once at process startup and cached. Changes require a
+	// restart to take effect. Use the sample rate configs as a live kill switch instead.
 	// KeyName: history.mapRewriteOptimizationBackends
 	// Value type: []string
 	// Default value: ["cassandra"]
@@ -6197,7 +6199,7 @@ var ListKeys = map[ListKey]DynamicList{
 	},
 	MapRewriteOptimizationBackends: {
 		KeyName:      "history.mapRewriteOptimizationBackends",
-		Description:  "List of persistence backends that support the map rewrite optimization (sentinel writes + probabilistic rewrite). Currently only Cassandra is known to need this (to avoid tombstones).",
+		Description:  "List of persistence backends that support the map rewrite optimization (sentinel writes + probabilistic rewrite). Currently only Cassandra is known to need this (to avoid tombstones). Cached at startup; changes require restart. Use sample rate configs as a live kill switch.",
 		DefaultValue: []interface{}{"cassandra"},
 	},
 	DefaultIsolationGroupConfigStoreManagerGlobalMapping: {
