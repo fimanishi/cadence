@@ -1046,8 +1046,14 @@ func updateTimerInfos(
 	runID string,
 	timerInfos map[string]*persistence.TimerInfo,
 	deleteInfos []string,
+	rewriteInfos map[string]*persistence.TimerInfo,
+	sentinelWriteEnabled bool,
 	timeStamp time.Time,
 ) error {
+	if rewriteInfos != nil {
+		return resetTimerInfos(batch, shardID, domainID, workflowID, runID, rewriteInfos, timeStamp)
+	}
+
 	for _, timerInfo := range timerInfos {
 		batch.Query(templateUpdateTimerInfoQuery,
 			timerInfo.TimerID,
@@ -1066,18 +1072,48 @@ func updateTimerInfos(
 			rowTypeExecutionTaskID)
 	}
 
+	if len(deleteInfos) == 0 {
+		return nil
+	}
+
 	for _, deleteInfo := range deleteInfos {
-		batch.Query(templateDeleteTimerInfoQuery,
-			deleteInfo,
-			shardID,
-			rowTypeExecution,
-			domainID,
-			workflowID,
-			runID,
-			defaultVisibilityTimestamp,
-			rowTypeExecutionTaskID)
+		if sentinelWriteEnabled {
+			writeTimerInfoSentinel(batch, deleteInfo, shardID, domainID, workflowID, runID, timeStamp)
+		} else {
+			batch.Query(templateDeleteTimerInfoQuery,
+				deleteInfo,
+				shardID,
+				rowTypeExecution,
+				domainID,
+				workflowID,
+				runID,
+				defaultVisibilityTimestamp,
+				rowTypeExecutionTaskID)
+		}
 	}
 	return nil
+}
+
+func writeTimerInfoSentinel(
+	batch gocql.Batch,
+	timerID string,
+	shardID int,
+	domainID string,
+	workflowID string,
+	runID string,
+	timeStamp time.Time,
+) {
+	batch.Query(templateSentinelTimerInfoQuery,
+		timerID,
+		timerSentinelTimerID,
+		timeStamp,
+		shardID,
+		rowTypeExecution,
+		domainID,
+		workflowID,
+		runID,
+		defaultVisibilityTimestamp,
+		rowTypeExecutionTaskID)
 }
 
 // workflowTimerTaskTuple is the Cassandra tuple<timestamp, bigint> representation
@@ -1202,8 +1238,14 @@ func updateActivityInfos(
 	runID string,
 	activityInfos map[int64]*persistence.InternalActivityInfo,
 	deleteInfos []int64,
+	rewriteInfos map[int64]*persistence.InternalActivityInfo,
+	sentinelWriteEnabled bool,
 	timeStamp time.Time,
 ) error {
+	if rewriteInfos != nil {
+		return resetActivityInfos(batch, shardID, domainID, workflowID, runID, rewriteInfos, timeStamp)
+	}
+
 	for _, a := range activityInfos {
 		batch.Query(templateUpdateActivityInfoQuery,
 			a.ScheduleID,
@@ -1254,18 +1296,48 @@ func updateActivityInfos(
 			rowTypeExecutionTaskID)
 	}
 
+	if len(deleteInfos) == 0 {
+		return nil
+	}
+
 	for _, deleteInfo := range deleteInfos {
-		batch.Query(templateDeleteActivityInfoQuery,
-			deleteInfo,
-			shardID,
-			rowTypeExecution,
-			domainID,
-			workflowID,
-			runID,
-			defaultVisibilityTimestamp,
-			rowTypeExecutionTaskID)
+		if sentinelWriteEnabled {
+			writeActivityInfoSentinel(batch, deleteInfo, shardID, domainID, workflowID, runID, timeStamp)
+		} else {
+			batch.Query(templateDeleteActivityInfoQuery,
+				deleteInfo,
+				shardID,
+				rowTypeExecution,
+				domainID,
+				workflowID,
+				runID,
+				defaultVisibilityTimestamp,
+				rowTypeExecutionTaskID)
+		}
 	}
 	return nil
+}
+
+func writeActivityInfoSentinel(
+	batch gocql.Batch,
+	scheduleEventID int64,
+	shardID int,
+	domainID string,
+	workflowID string,
+	runID string,
+	timeStamp time.Time,
+) {
+	batch.Query(templateSentinelActivityInfoQuery,
+		scheduleEventID,
+		activitySentinelScheduleID,
+		timeStamp,
+		shardID,
+		rowTypeExecution,
+		domainID,
+		workflowID,
+		runID,
+		defaultVisibilityTimestamp,
+		rowTypeExecutionTaskID)
 }
 
 // NOTE: not sure we still need it. We keep the behavior for safe during refactoring
@@ -1303,11 +1375,11 @@ func createWorkflowExecutionWithMergeMaps(
 		return fmt.Errorf("should only support WorkflowExecutionMapsWriteModeCreate")
 	}
 
-	err = updateActivityInfos(batch, shardID, domainID, workflowID, execution.RunID, execution.ActivityInfos, nil, timeStamp)
+	err = updateActivityInfos(batch, shardID, domainID, workflowID, execution.RunID, execution.ActivityInfos, nil, nil, false, timeStamp)
 	if err != nil {
 		return err
 	}
-	err = updateTimerInfos(batch, shardID, domainID, workflowID, execution.RunID, execution.TimerInfos, nil, timeStamp)
+	err = updateTimerInfos(batch, shardID, domainID, workflowID, execution.RunID, execution.TimerInfos, nil, nil, false, timeStamp)
 	if err != nil {
 		return err
 	}
@@ -1439,6 +1511,8 @@ func updateWorkflowExecutionAndEventBufferWithMergeAndDeleteMaps(
 	domainID string,
 	workflowID string,
 	execution *nosqlplugin.WorkflowExecutionRequest,
+	activitySentinelWriteEnabled bool,
+	timerSentinelWriteEnabled bool,
 	timeStamp time.Time,
 ) error {
 	err := updateWorkflowExecution(batch, shardID, domainID, workflowID, execution, timeStamp)
@@ -1464,11 +1538,11 @@ func updateWorkflowExecutionAndEventBufferWithMergeAndDeleteMaps(
 
 	// In certain cases, some of the execution update cycles update particular columns asynchronously before reaching the final cycle.
 	// Each of these functions are updating a non-frozen column type in Cassandra table.
-	err = updateActivityInfos(batch, shardID, domainID, workflowID, execution.RunID, execution.ActivityInfos, execution.ActivityInfoKeysToDelete, timeStamp)
+	err = updateActivityInfos(batch, shardID, domainID, workflowID, execution.RunID, execution.ActivityInfos, execution.ActivityInfoKeysToDelete, execution.RewriteActivityInfos, activitySentinelWriteEnabled, timeStamp)
 	if err != nil {
 		return err
 	}
-	err = updateTimerInfos(batch, shardID, domainID, workflowID, execution.RunID, execution.TimerInfos, execution.TimerInfoKeysToDelete, timeStamp)
+	err = updateTimerInfos(batch, shardID, domainID, workflowID, execution.RunID, execution.TimerInfos, execution.TimerInfoKeysToDelete, execution.RewriteTimerInfos, timerSentinelWriteEnabled, timeStamp)
 	if err != nil {
 		return err
 	}
