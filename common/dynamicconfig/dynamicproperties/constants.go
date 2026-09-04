@@ -1674,6 +1674,13 @@ const (
 	// per transaction (e.g., 100 = rewrite roughly every 100th transaction).
 	// 0 disables the optimization. 1 means rewrite every time.
 	// Only applies to backends listed in MapRewriteOptimizationBackends.
+	//
+	// When enabled, deletes write sentinel entries instead of issuing database
+	// deletes, and full rewrites compact them. A rate too high means sentinels
+	// accumulate, growing the map. Larger maps increase read latency because
+	// sentinels must be filtered on every load — especially costly during shard
+	// movement or cache eviction when the full map is read from the database.
+	//
 	// KeyName: history.activityMapRewriteSampleRate
 	// Value type: Int
 	// Default value: 0
@@ -1684,6 +1691,13 @@ const (
 	// per transaction (e.g., 100 = rewrite roughly every 100th transaction).
 	// 0 disables the optimization. 1 means rewrite every time.
 	// Only applies to backends listed in MapRewriteOptimizationBackends.
+	//
+	// When enabled, deletes write sentinel entries instead of issuing database
+	// deletes, and full rewrites compact them. A rate too high means sentinels
+	// accumulate, growing the map. Larger maps increase read latency because
+	// sentinels must be filtered on every load — especially costly during shard
+	// movement or cache eviction when the full map is read from the database.
+	//
 	// KeyName: history.timerMapRewriteSampleRate
 	// Value type: Int
 	// Default value: 0
@@ -4664,12 +4678,12 @@ var IntKeys = map[IntKey]DynamicInt{
 	},
 	ActivityMapRewriteSampleRate: {
 		KeyName:      "history.activityMapRewriteSampleRate",
-		Description:  "How often a full activity map rewrite is triggered on transactions with deletes. N means 1-in-N chance (e.g. 100 = every ~100th transaction). 0 disables. Only applies to backends in MapRewriteOptimizationBackends.",
+		Description:  "How often a full activity map rewrite is triggered on transactions with deletes. N means 1-in-N chance (e.g. 100 = every ~100th transaction). 0 disables. Only applies to backends in MapRewriteOptimizationBackends. A rate too high causes sentinel accumulation, growing the map and increasing read latency on shard movement or cache eviction.",
 		DefaultValue: 0,
 	},
 	TimerMapRewriteSampleRate: {
 		KeyName:      "history.timerMapRewriteSampleRate",
-		Description:  "How often a full timer map rewrite is triggered on transactions with deletes. N means 1-in-N chance (e.g. 100 = every ~100th transaction). 0 disables. Only applies to backends in MapRewriteOptimizationBackends.",
+		Description:  "How often a full timer map rewrite is triggered on transactions with deletes. N means 1-in-N chance (e.g. 100 = every ~100th transaction). 0 disables. Only applies to backends in MapRewriteOptimizationBackends. A rate too high causes sentinel accumulation, growing the map and increasing read latency on shard movement or cache eviction.",
 		DefaultValue: 0,
 	},
 }
