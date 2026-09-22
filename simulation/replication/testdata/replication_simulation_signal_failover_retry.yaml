@@ -1,0 +1,70 @@
+# Test signal external workflow retry during failover.
+# A launcher workflow spawns 100 target child workflows.
+# A sender workflow signals all 100 targets after a delay.
+# A failover occurs while the sender is about to signal.
+# Without retry enabled, signals fail with EntityNotExistsError (target not yet replicated).
+# With retry enabled, signals are retried until targets replicate and complete.
+
+clusters:
+  cluster0:
+    grpcEndpoint: "cadence-cluster0:7833"
+  cluster1:
+    grpcEndpoint: "cadence-cluster1:7833"
+
+primaryCluster: "cluster0"
+
+domains:
+  test-domain:
+    activeClusterName: cluster0
+
+operations:
+  # Start launcher that spawns 100 target child workflows
+  - op: start_workflow
+    at: 0s
+    workflowType: child-workflow-loop
+    workflowID: target-launcher
+    cluster: cluster0
+    domain: test-domain
+    workflowExecutionStartToCloseTimeout: 120s
+    childWorkflowID: target-wf
+    childWorkflowCount: 100
+    childWorkflowTimeout: 60s
+    childWorkflowDuration: 30s
+
+  # Start sender that signals all 100 targets after 5s delay
+  - op: start_workflow
+    at: 0s
+    workflowType: signal-external-workflow
+    workflowID: sender-wf
+    cluster: cluster0
+    domain: test-domain
+    workflowExecutionStartToCloseTimeout: 120s
+    targetWorkflowID: target-wf
+    targetWorkflowCount: 100
+    signalName: custom-signal
+    signalData: hello-from-sender
+    delay: 5s
+
+  # Failover at 5s
+  - op: change_active_clusters
+    at: 5s
+    domain: test-domain
+    newActiveCluster: cluster1
+
+  # Validate sender completed (all signals delivered)
+  - op: validate
+    at: 60s
+    workflowID: sender-wf
+    cluster: cluster1
+    domain: test-domain
+    want:
+      status: completed
+
+  # Validate launcher completed (all children finished)
+  - op: validate
+    at: 90s
+    workflowID: target-launcher
+    cluster: cluster1
+    domain: test-domain
+    want:
+      status: completed

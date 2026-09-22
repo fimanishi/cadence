@@ -115,6 +115,10 @@ func (e *historyEngineImpl) getMutableState(
 		WorkflowCloseState:                   common.Int32Ptr(int32(workflowCloseState)),
 		IsStickyTaskListEnabled:              mutableState.IsStickyTaskListEnabled(),
 		HistorySize:                          mutableState.GetHistorySize(),
+		ParentDomainID:                       executionInfo.ParentDomainID,
+		ParentWorkflowID:                     executionInfo.ParentWorkflowID,
+		ParentRunID:                          executionInfo.ParentRunID,
+		ParentInitiatedID:                    executionInfo.InitiatedID,
 	}
 	versionHistories := mutableState.GetVersionHistories()
 	if versionHistories != nil {

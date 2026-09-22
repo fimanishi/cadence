@@ -144,6 +144,10 @@ type GetMutableStateResponse struct {
 	VersionHistories                     *VersionHistories  `json:"versionHistories,omitempty"`
 	IsStickyTaskListEnabled              bool               `json:"isStickyTaskListEnabled,omitempty"`
 	HistorySize                          int64              `json:"historySize,omitempty"`
+	ParentDomainID                       string             `json:"parentDomainId,omitempty"`
+	ParentWorkflowID                     string             `json:"parentWorkflowId,omitempty"`
+	ParentRunID                          string             `json:"parentRunId,omitempty"`
+	ParentInitiatedID                    int64              `json:"parentInitiatedId,omitempty"`
 }
 
 // GetNextEventID is an internal getter (TBD...)
@@ -230,6 +234,38 @@ func (v *GetMutableStateResponse) GetVersionHistories() (o *VersionHistories) {
 func (v *GetMutableStateResponse) GetIsStickyTaskListEnabled() (o bool) {
 	if v != nil {
 		return v.IsStickyTaskListEnabled
+	}
+	return
+}
+
+// GetParentDomainID is an internal getter (TBD...)
+func (v *GetMutableStateResponse) GetParentDomainID() (o string) {
+	if v != nil {
+		return v.ParentDomainID
+	}
+	return
+}
+
+// GetParentWorkflowID is an internal getter (TBD...)
+func (v *GetMutableStateResponse) GetParentWorkflowID() (o string) {
+	if v != nil {
+		return v.ParentWorkflowID
+	}
+	return
+}
+
+// GetParentRunID is an internal getter (TBD...)
+func (v *GetMutableStateResponse) GetParentRunID() (o string) {
+	if v != nil {
+		return v.ParentRunID
+	}
+	return
+}
+
+// GetParentInitiatedID is an internal getter (TBD...)
+func (v *GetMutableStateResponse) GetParentInitiatedID() (o int64) {
+	if v != nil {
+		return v.ParentInitiatedID
 	}
 	return
 }

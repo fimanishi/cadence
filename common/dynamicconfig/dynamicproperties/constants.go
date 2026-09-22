@@ -1977,6 +1977,18 @@ const (
 	// Default value: false
 	// Allowed filters: DomainName
 	EnableCrossClusterOperationsForDomain
+	// EnableCrossWorkflowChildIdempotentAdoption enables idempotent adoption of child workflows on AlreadyStartedError during failover
+	// KeyName: history.enableCrossWorkflowChildIdempotentAdoption
+	// Value type: Bool
+	// Default value: false
+	// Allowed filters: DomainName
+	EnableCrossWorkflowChildIdempotentAdoption
+	// EnableCrossWorkflowTargetNotFoundRetry enables retry of signal/cancel on EntityNotExistsError during failover
+	// KeyName: history.enableCrossWorkflowTargetNotFoundRetry
+	// Value type: Bool
+	// Default value: false
+	// Allowed filters: DomainName
+	EnableCrossWorkflowTargetNotFoundRetry
 	// EnableHistoryCorruptionCheck enables additional sanity check for corrupted history. This allows early catches of DB corruptions but potiantally increased latency.
 	// KeyName: history.enableHistoryCorruptionCheck
 	// Value type: Bool
@@ -2993,6 +3005,12 @@ const (
 	// Default value: 24h (24*time.Hour)
 	// Allowed filters: DomainName
 	ResurrectionCheckMinDelay
+	// CrossWorkflowTargetNotFoundRetryGracePeriod is the duration after failover during which EntityNotExistsError is retried for signal/cancel
+	// KeyName: history.crossWorkflowTargetNotFoundRetryGracePeriod
+	// Value type: Duration
+	// Default value: 10s (10*time.Second)
+	// Allowed filters: DomainName
+	CrossWorkflowTargetNotFoundRetryGracePeriod
 	// QueueProcessorSplitLookAheadDurationByDomainID is the look ahead duration when spliting a domain to a new processing queue
 	// KeyName: history.queueProcessorSplitLookAheadDurationByDomainID
 	// Value type: Duration
@@ -4929,6 +4947,18 @@ var BoolKeys = map[BoolKey]DynamicBool{
 		Description:  "EnableCrossClusterOperationsForDomain indicates if cross cluster operations can be scheduled for a domain",
 		DefaultValue: false,
 	},
+	EnableCrossWorkflowChildIdempotentAdoption: {
+		KeyName:      "history.enableCrossWorkflowChildIdempotentAdoption",
+		Filters:      []Filter{DomainName},
+		Description:  "EnableCrossWorkflowChildIdempotentAdoption enables idempotent adoption of child workflows on AlreadyStartedError during failover",
+		DefaultValue: false,
+	},
+	EnableCrossWorkflowTargetNotFoundRetry: {
+		KeyName:      "history.enableCrossWorkflowTargetNotFoundRetry",
+		Filters:      []Filter{DomainName},
+		Description:  "EnableCrossWorkflowTargetNotFoundRetry enables retry of signal/cancel on EntityNotExistsError during failover",
+		DefaultValue: false,
+	},
 	EnableHistoryCorruptionCheck: {
 		KeyName:      "history.enableHistoryCorruptionCheck",
 		Filters:      []Filter{DomainName},
@@ -5789,6 +5819,12 @@ var DurationKeys = map[DurationKey]DynamicDuration{
 		Filters:      []Filter{DomainName},
 		Description:  "ResurrectionCheckMinDelay is the minimal timer processing delay before scanning history to see if there's a resurrected timer/activity",
 		DefaultValue: time.Hour * 24,
+	},
+	CrossWorkflowTargetNotFoundRetryGracePeriod: {
+		KeyName:      "history.crossWorkflowTargetNotFoundRetryGracePeriod",
+		Filters:      []Filter{DomainName},
+		Description:  "CrossWorkflowTargetNotFoundRetryGracePeriod is the duration after failover during which EntityNotExistsError is retried for signal/cancel",
+		DefaultValue: 10 * time.Second,
 	},
 	QueueProcessorSplitLookAheadDurationByDomainID: {
 		KeyName:      "history.queueProcessorSplitLookAheadDurationByDomainID",

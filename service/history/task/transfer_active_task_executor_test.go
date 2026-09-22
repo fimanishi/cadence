@@ -1308,7 +1308,7 @@ func (s *transferActiveTaskExecutorSuite) TestProcessSignalExecution_Failure() {
 		},
 		"NotExistsErr": {
 			Err:          &types.EntityNotExistsError{},
-			ExpectedLogs: nil,
+			ExpectedLogs: []string{"signal external workflow execution target not found"},
 		},
 		"WorkflowExecutionAlreadyCompleted": {
 			Err:          &types.WorkflowExecutionAlreadyCompletedError{},

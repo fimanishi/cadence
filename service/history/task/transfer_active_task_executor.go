@@ -63,9 +63,10 @@ var (
 )
 
 var (
-	errUnknownTransferTask = errors.New("unknown transfer task")
-	errWorkflowBusy        = errors.New("unable to get workflow execution lock within specified timeout")
-	errWorkflowRateLimited = errors.New("workflow is being rate limited for making too many requests")
+	errUnknownTransferTask            = errors.New("unknown transfer task")
+	errWorkflowBusy                   = errors.New("unable to get workflow execution lock within specified timeout")
+	errWorkflowRateLimited            = errors.New("workflow is being rate limited for making too many requests")
+	errTargetWorkflowNotYetReplicated = errors.New("target workflow not yet replicated, retryable")
 )
 
 type (
@@ -165,6 +166,24 @@ func (t *transferActiveTaskExecutor) Execute(task Task) (ExecuteResponse, error)
 
 // Empty func for now
 func (t *transferActiveTaskExecutor) Stop() {}
+
+func (t *transferActiveTaskExecutor) shouldRetryEntityNotExistsError(
+	domainEntry *cache.DomainCacheEntry,
+	taskVersion int64,
+	taskVisibilityTimestamp time.Time,
+) bool {
+	domainName := domainEntry.GetInfo().Name
+	if !t.config.EnableCrossWorkflowTargetNotFoundRetry(domainName) {
+		return false
+	}
+	// Task version < domain failover version means a failover happened after this
+	// task was created, so the target may still be replicating. When versions match,
+	// no failover occurred and the target genuinely does not exist.
+	if taskVersion >= domainEntry.GetFailoverVersion() {
+		return false
+	}
+	return t.shard.GetTimeSource().Now().Sub(taskVisibilityTimestamp) < t.config.CrossWorkflowTargetNotFoundRetryGracePeriod(domainName)
+}
 
 func (t *transferActiveTaskExecutor) processActivityTask(
 	ctx context.Context,
@@ -622,6 +641,21 @@ func (t *transferActiveTaskExecutor) processCancelExecution(
 			// for retryable error just return
 			return err
 		}
+		if common.IsEntityNotExistsError(err) {
+			if t.shouldRetryEntityNotExistsError(mutableState.GetDomainEntry(), task.Version, task.GetVisibilityTimestamp()) {
+				return errTargetWorkflowNotYetReplicated
+			}
+			t.logger.Warn("cancel external workflow execution target not found",
+				tag.WorkflowDomainID(task.DomainID),
+				tag.WorkflowID(task.WorkflowID),
+				tag.WorkflowRunID(task.RunID),
+				tag.TargetWorkflowDomainID(task.TargetDomainID),
+				tag.TargetWorkflowID(task.TargetWorkflowID),
+				tag.TargetWorkflowRunID(task.TargetRunID),
+				tag.Dynamic("task-version", task.Version),
+				tag.FailoverVersion(mutableState.GetDomainEntry().GetFailoverVersion()),
+			)
+		}
 		return requestCancelExternalExecutionFailed(
 			ctx,
 			t.logger,
@@ -741,6 +775,21 @@ func (t *transferActiveTaskExecutor) processSignalExecution(
 		if common.IsServiceTransientError(err) || common.IsContextTimeoutError(err) {
 			// for retryable error just return
 			return err
+		}
+		if common.IsEntityNotExistsError(err) {
+			if t.shouldRetryEntityNotExistsError(mutableState.GetDomainEntry(), task.Version, task.GetVisibilityTimestamp()) {
+				return errTargetWorkflowNotYetReplicated
+			}
+			t.logger.Warn("signal external workflow execution target not found",
+				tag.WorkflowDomainID(task.DomainID),
+				tag.WorkflowID(task.WorkflowID),
+				tag.WorkflowRunID(task.RunID),
+				tag.TargetWorkflowDomainID(task.TargetDomainID),
+				tag.TargetWorkflowID(task.TargetWorkflowID),
+				tag.TargetWorkflowRunID(task.TargetRunID),
+				tag.Dynamic("task-version", task.Version),
+				tag.FailoverVersion(mutableState.GetDomainEntry().GetFailoverVersion()),
+			)
 		}
 		return signalExternalExecutionFailed(
 			ctx,
@@ -896,6 +945,42 @@ func (t *transferActiveTaskExecutor) processStartChildExecution(
 		// but we probably need to introduce a new error type for DomainNotExists,
 		// for now when getting an EntityNotExists error, we can't tell if it's domain or workflow.
 		case *types.WorkflowExecutionAlreadyStartedError:
+			alreadyStartedErr := err.(*types.WorkflowExecutionAlreadyStartedError)
+			domainName := mutableState.GetDomainEntry().GetInfo().Name
+
+			if t.config.EnableCrossWorkflowChildIdempotentAdoption(domainName) {
+				childMutableState, getMutableStateErr := t.historyClient.GetMutableState(ctx, &types.GetMutableStateRequest{
+					DomainUUID: task.TargetDomainID,
+					Execution: &types.WorkflowExecution{
+						WorkflowID: attributes.WorkflowID,
+						RunID:      alreadyStartedErr.RunID,
+					},
+				})
+				if getMutableStateErr == nil &&
+					childMutableState.ParentDomainID == task.DomainID &&
+					childMutableState.ParentWorkflowID == task.WorkflowID &&
+					childMutableState.ParentRunID == task.RunID &&
+					childMutableState.ParentInitiatedID == childInfo.InitiatedID {
+					t.logger.Info("adopting already-started child workflow",
+						tag.WorkflowDomainID(task.DomainID),
+						tag.WorkflowID(task.WorkflowID),
+						tag.WorkflowRunID(task.RunID),
+						tag.TargetWorkflowDomainID(task.TargetDomainID),
+						tag.TargetWorkflowID(attributes.WorkflowID),
+						tag.TargetWorkflowRunID(alreadyStartedErr.RunID),
+					)
+					err = recordChildExecutionStarted(ctx, t.logger, task, wfContext, attributes, alreadyStartedErr.RunID, t.shard.GetTimeSource().Now())
+					if err != nil {
+						return err
+					}
+					release(nil)
+					return createFirstDecisionTask(ctx, t.historyClient, task.TargetDomainID, &types.WorkflowExecution{
+						WorkflowID: attributes.WorkflowID,
+						RunID:      alreadyStartedErr.RunID,
+					})
+				}
+			}
+
 			t.logger.Info("workflow has already started",
 				tag.WorkflowDomainID(task.DomainID),
 				tag.WorkflowID(task.WorkflowID),

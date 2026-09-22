@@ -1,0 +1,44 @@
+# Test child workflow idempotent adoption during failover.
+# A parent workflow spawns multiple child workflows in parallel.
+# A failover occurs while children are running.
+# Without adoption enabled, AlreadyStartedError causes StartChildWorkflowExecutionFailed.
+# With adoption enabled, the parent adopts the replicated children and completes.
+
+clusters:
+  cluster0:
+    grpcEndpoint: "cadence-cluster0:7833"
+  cluster1:
+    grpcEndpoint: "cadence-cluster1:7833"
+
+primaryCluster: "cluster0"
+
+domains:
+  test-domain:
+    activeClusterName: cluster0
+
+operations:
+  - op: start_workflow
+    at: 0s
+    workflowType: child-workflow-loop
+    workflowID: parent-wf
+    cluster: cluster0
+    domain: test-domain
+    workflowExecutionStartToCloseTimeout: 120s
+    childWorkflowID: child-wf
+    childWorkflowCount: 100
+    childWorkflowTimeout: 60s
+    childWorkflowDuration: 20s
+    delay: 5s
+
+  - op: change_active_clusters
+    at: 5s
+    domain: test-domain
+    newActiveCluster: cluster1
+
+  - op: validate
+    at: 90s
+    workflowID: parent-wf
+    cluster: cluster1
+    domain: test-domain
+    want:
+      status: completed

@@ -341,6 +341,10 @@ func FromHistoryGetMutableStateResponse(t *types.GetMutableStateResponse) *histo
 		VersionHistories:                     FromVersionHistories(t.VersionHistories),
 		IsStickyTaskListEnabled:              t.IsStickyTaskListEnabled,
 		HistorySize:                          t.HistorySize,
+		ParentDomainId:                       t.ParentDomainID,
+		ParentWorkflowId:                     t.ParentWorkflowID,
+		ParentRunId:                          t.ParentRunID,
+		ParentInitiatedId:                    t.ParentInitiatedID,
 	}
 }
 
@@ -368,6 +372,10 @@ func ToHistoryGetMutableStateResponse(t *historyv1.GetMutableStateResponse) *typ
 		IsStickyTaskListEnabled:              t.IsStickyTaskListEnabled,
 		IsWorkflowRunning:                    t.WorkflowState == sharedv1.WorkflowState_WORKFLOW_STATE_RUNNING,
 		HistorySize:                          t.HistorySize,
+		ParentDomainID:                       t.ParentDomainId,
+		ParentWorkflowID:                     t.ParentWorkflowId,
+		ParentRunID:                          t.ParentRunId,
+		ParentInitiatedID:                    t.ParentInitiatedId,
 	}
 }
 
