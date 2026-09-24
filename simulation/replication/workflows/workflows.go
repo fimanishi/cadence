@@ -3,6 +3,7 @@ package workflows
 import (
 	"github.com/uber/cadence/simulation/replication/workflows/activityloop"
 	"github.com/uber/cadence/simulation/replication/workflows/childactivityloop"
+	"github.com/uber/cadence/simulation/replication/workflows/childworkflowloop"
 	"github.com/uber/cadence/simulation/replication/workflows/query"
 	"github.com/uber/cadence/simulation/replication/workflows/retryactivityfailover"
 	"github.com/uber/cadence/simulation/replication/workflows/timeractivityloop"
@@ -17,6 +18,7 @@ var (
 			"activity-loop-workflow":           activityloop.Workflow,
 			"query-workflow":                   queryWFRunner.Workflow,
 			"child-activity-loop-workflow":     childactivityloop.Workflow,
+			"child-workflow-loop":              childworkflowloop.Workflow,
 			"activity-retry-failover-workflow": retryactivityfailover.Workflow,
 		}
 	}

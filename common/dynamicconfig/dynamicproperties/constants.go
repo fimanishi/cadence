@@ -1977,6 +1977,12 @@ const (
 	// Default value: false
 	// Allowed filters: DomainName
 	EnableCrossClusterOperationsForDomain
+	// EnableCrossWorkflowChildIdempotentAdoption enables idempotent adoption of child workflows on AlreadyStartedError during failover
+	// KeyName: history.enableCrossWorkflowChildIdempotentAdoption
+	// Value type: Bool
+	// Default value: false
+	// Allowed filters: DomainName
+	EnableCrossWorkflowChildIdempotentAdoption
 	// EnableHistoryCorruptionCheck enables additional sanity check for corrupted history. This allows early catches of DB corruptions but potiantally increased latency.
 	// KeyName: history.enableHistoryCorruptionCheck
 	// Value type: Bool
@@ -4927,6 +4933,12 @@ var BoolKeys = map[BoolKey]DynamicBool{
 		KeyName:      "history.enableCrossClusterOperations",
 		Filters:      []Filter{DomainName},
 		Description:  "EnableCrossClusterOperationsForDomain indicates if cross cluster operations can be scheduled for a domain",
+		DefaultValue: false,
+	},
+	EnableCrossWorkflowChildIdempotentAdoption: {
+		KeyName:      "history.enableCrossWorkflowChildIdempotentAdoption",
+		Filters:      []Filter{DomainName},
+		Description:  "EnableCrossWorkflowChildIdempotentAdoption enables idempotent adoption of child workflows on AlreadyStartedError during failover",
 		DefaultValue: false,
 	},
 	EnableHistoryCorruptionCheck: {

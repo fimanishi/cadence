@@ -143,10 +143,13 @@ func startWorkflow(
 	}
 
 	input := mustJSON(t, &simTypes.WorkflowInput{
-		Duration:             op.WorkflowDuration,
-		ActivityCount:        op.ActivityCount,
-		ChildWorkflowID:      op.ChildWorkflowID,
-		ChildWorkflowTimeout: op.ChildWorkflowTimeout,
+		Duration:              op.WorkflowDuration,
+		ActivityCount:         op.ActivityCount,
+		ChildWorkflowID:       op.ChildWorkflowID,
+		ChildWorkflowTimeout:  op.ChildWorkflowTimeout,
+		ChildWorkflowCount:    op.ChildWorkflowCount,
+		ChildWorkflowDuration: op.ChildWorkflowDuration,
+		Delay:                 op.Delay,
 	})
 	workflowIDReusePolicy := types.WorkflowIDReusePolicyAllowDuplicate.Ptr()
 	if op.WorkflowIDReusePolicy != nil {

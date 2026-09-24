@@ -896,6 +896,42 @@ func (t *transferActiveTaskExecutor) processStartChildExecution(
 		// but we probably need to introduce a new error type for DomainNotExists,
 		// for now when getting an EntityNotExists error, we can't tell if it's domain or workflow.
 		case *types.WorkflowExecutionAlreadyStartedError:
+			alreadyStartedErr := err.(*types.WorkflowExecutionAlreadyStartedError)
+			domainName := mutableState.GetDomainEntry().GetInfo().Name
+
+			if t.config.EnableCrossWorkflowChildIdempotentAdoption(domainName) {
+				childMutableState, getMutableStateErr := t.historyClient.GetMutableState(ctx, &types.GetMutableStateRequest{
+					DomainUUID: task.TargetDomainID,
+					Execution: &types.WorkflowExecution{
+						WorkflowID: attributes.WorkflowID,
+						RunID:      alreadyStartedErr.RunID,
+					},
+				})
+				if getMutableStateErr == nil &&
+					childMutableState.ParentDomainID == task.DomainID &&
+					childMutableState.ParentWorkflowID == task.WorkflowID &&
+					childMutableState.ParentRunID == task.RunID &&
+					childMutableState.ParentInitiatedID == childInfo.InitiatedID {
+					t.logger.Info("adopting already-started child workflow",
+						tag.WorkflowDomainID(task.DomainID),
+						tag.WorkflowID(task.WorkflowID),
+						tag.WorkflowRunID(task.RunID),
+						tag.TargetWorkflowDomainID(task.TargetDomainID),
+						tag.TargetWorkflowID(attributes.WorkflowID),
+						tag.TargetWorkflowRunID(alreadyStartedErr.RunID),
+					)
+					err = recordChildExecutionStarted(ctx, t.logger, task, wfContext, attributes, alreadyStartedErr.RunID, t.shard.GetTimeSource().Now())
+					if err != nil {
+						return err
+					}
+					release(nil)
+					return createFirstDecisionTask(ctx, t.historyClient, task.TargetDomainID, &types.WorkflowExecution{
+						WorkflowID: attributes.WorkflowID,
+						RunID:      alreadyStartedErr.RunID,
+					})
+				}
+			}
+
 			t.logger.Info("workflow has already started",
 				tag.WorkflowDomainID(task.DomainID),
 				tag.WorkflowID(task.WorkflowID),
