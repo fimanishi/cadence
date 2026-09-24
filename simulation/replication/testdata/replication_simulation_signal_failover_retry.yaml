@@ -1,0 +1,77 @@
+# Test signal external workflow retry during failover.
+# A few target workflows are started directly in cluster0.
+# A sender workflow signals all targets after a delay.
+# A failover occurs while the sender is about to signal.
+# Without retry enabled, signals fail with EntityNotExistsError (target not yet replicated).
+# With retry enabled, signals are retried until targets replicate and the signal is delivered.
+
+clusters:
+  cluster0:
+    grpcEndpoint: "cadence-cluster0:7833"
+  cluster1:
+    grpcEndpoint: "cadence-cluster1:7833"
+
+primaryCluster: "cluster0"
+
+domains:
+  test-domain:
+    activeClusterName: cluster0
+
+operations:
+  # Start 3 target workflows that each wait on the "custom-signal" signal channel
+  # for up to 90s before completing.
+  - op: start_workflow
+    at: 0s
+    workflowType: timer-activity-loop-workflow
+    workflowID: target-wf-0
+    cluster: cluster0
+    domain: test-domain
+    workflowExecutionStartToCloseTimeout: 120s
+    workflowDuration: 90s
+
+  - op: start_workflow
+    at: 0s
+    workflowType: timer-activity-loop-workflow
+    workflowID: target-wf-1
+    cluster: cluster0
+    domain: test-domain
+    workflowExecutionStartToCloseTimeout: 120s
+    workflowDuration: 90s
+
+  - op: start_workflow
+    at: 0s
+    workflowType: timer-activity-loop-workflow
+    workflowID: target-wf-2
+    cluster: cluster0
+    domain: test-domain
+    workflowExecutionStartToCloseTimeout: 120s
+    workflowDuration: 90s
+
+  # Start sender that signals all 3 targets after a 5s delay
+  - op: start_workflow
+    at: 0s
+    workflowType: signal-external-workflow
+    workflowID: sender-wf
+    cluster: cluster0
+    domain: test-domain
+    workflowExecutionStartToCloseTimeout: 120s
+    targetWorkflowID: target-wf
+    targetWorkflowCount: 3
+    signalName: custom-signal
+    signalData: hello-from-sender
+    delay: 5s
+
+  # Failover at 5s, right when the sender is about to signal
+  - op: change_active_clusters
+    at: 5s
+    domain: test-domain
+    newActiveCluster: cluster1
+
+  # Validate sender completed (all signals delivered despite the failover)
+  - op: validate
+    at: 60s
+    workflowID: sender-wf
+    cluster: cluster1
+    domain: test-domain
+    want:
+      status: completed

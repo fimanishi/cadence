@@ -147,6 +147,11 @@ func startWorkflow(
 		ActivityCount:        op.ActivityCount,
 		ChildWorkflowID:      op.ChildWorkflowID,
 		ChildWorkflowTimeout: op.ChildWorkflowTimeout,
+		Delay:                op.Delay,
+		TargetWorkflowID:     op.TargetWorkflowID,
+		TargetWorkflowCount:  op.TargetWorkflowCount,
+		SignalName:           op.SignalName,
+		SignalData:           op.SignalData,
 	})
 	workflowIDReusePolicy := types.WorkflowIDReusePolicyAllowDuplicate.Ptr()
 	if op.WorkflowIDReusePolicy != nil {

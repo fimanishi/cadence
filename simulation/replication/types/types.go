@@ -40,6 +40,11 @@ type WorkflowInput struct {
 	ActivityCount        int
 	ChildWorkflowID      string
 	ChildWorkflowTimeout time.Duration
+	Delay                time.Duration
+	TargetWorkflowID     string
+	TargetWorkflowCount  int
+	SignalName           string
+	SignalData           string
 }
 
 type WorkflowOutput struct {

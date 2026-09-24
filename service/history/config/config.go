@@ -311,7 +311,9 @@ type Config struct {
 	// EnableContextHeaderInVisibility whether to enable indexing context header in visibility
 	EnableContextHeaderInVisibility dynamicproperties.BoolPropertyFnWithDomainFilter
 
-	EnableCrossClusterOperationsForDomain dynamicproperties.BoolPropertyFnWithDomainFilter
+	EnableCrossClusterOperationsForDomain       dynamicproperties.BoolPropertyFnWithDomainFilter
+	EnableCrossWorkflowTargetNotFoundRetry      dynamicproperties.BoolPropertyFnWithDomainFilter
+	CrossWorkflowTargetNotFoundRetryGracePeriod dynamicproperties.DurationPropertyFnWithDomainFilter
 
 	// Data integrity check related config knobs
 	MutableStateChecksumGenProbability    dynamicproperties.IntPropertyFnWithDomainFilter
@@ -599,15 +601,17 @@ func New(dc *dynamicconfig.Collection, numberOfShards int, maxMessageSize int, i
 		WorkflowIDExternalRPS: dc.GetIntPropertyFilteredByDomain(dynamicproperties.WorkflowIDExternalRPS),
 		WorkflowIDInternalRPS: dc.GetIntPropertyFilteredByDomain(dynamicproperties.WorkflowIDInternalRPS),
 
-		EnableConsistentQuery:                 dc.GetBoolProperty(dynamicproperties.EnableConsistentQuery),
-		EnableConsistentQueryByDomain:         dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableConsistentQueryByDomain),
-		EnableContextHeaderInVisibility:       dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableContextHeaderInVisibility),
-		EnableCrossClusterOperationsForDomain: dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableCrossClusterOperationsForDomain),
-		MaxBufferedQueryCount:                 dc.GetIntProperty(dynamicproperties.MaxBufferedQueryCount),
-		MutableStateChecksumGenProbability:    dc.GetIntPropertyFilteredByDomain(dynamicproperties.MutableStateChecksumGenProbability),
-		MutableStateChecksumVerifyProbability: dc.GetIntPropertyFilteredByDomain(dynamicproperties.MutableStateChecksumVerifyProbability),
-		MutableStateChecksumInvalidateBefore:  dc.GetFloat64Property(dynamicproperties.MutableStateChecksumInvalidateBefore),
-		EnableWorkflowTimerTaskCleanup:        dc.GetBoolProperty(dynamicproperties.EnableWorkflowTimerTaskCleanup),
+		EnableConsistentQuery:                       dc.GetBoolProperty(dynamicproperties.EnableConsistentQuery),
+		EnableConsistentQueryByDomain:               dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableConsistentQueryByDomain),
+		EnableContextHeaderInVisibility:             dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableContextHeaderInVisibility),
+		EnableCrossClusterOperationsForDomain:       dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableCrossClusterOperationsForDomain),
+		EnableCrossWorkflowTargetNotFoundRetry:      dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableCrossWorkflowTargetNotFoundRetry),
+		CrossWorkflowTargetNotFoundRetryGracePeriod: dc.GetDurationPropertyFilteredByDomain(dynamicproperties.CrossWorkflowTargetNotFoundRetryGracePeriod),
+		MaxBufferedQueryCount:                       dc.GetIntProperty(dynamicproperties.MaxBufferedQueryCount),
+		MutableStateChecksumGenProbability:          dc.GetIntPropertyFilteredByDomain(dynamicproperties.MutableStateChecksumGenProbability),
+		MutableStateChecksumVerifyProbability:       dc.GetIntPropertyFilteredByDomain(dynamicproperties.MutableStateChecksumVerifyProbability),
+		MutableStateChecksumInvalidateBefore:        dc.GetFloat64Property(dynamicproperties.MutableStateChecksumInvalidateBefore),
+		EnableWorkflowTimerTaskCleanup:              dc.GetBoolProperty(dynamicproperties.EnableWorkflowTimerTaskCleanup),
 
 		EnableCorruptionAutoRepair:             dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableCorruptionAutoRepair),
 		CorruptionRepairTimeout:                dc.GetDurationPropertyFilteredByDomain(dynamicproperties.CorruptionRepairTimeout),
