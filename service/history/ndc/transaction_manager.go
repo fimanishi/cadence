@@ -32,6 +32,7 @@ import (
 	"github.com/uber/cadence/common/activecluster"
 	"github.com/uber/cadence/common/cluster"
 	"github.com/uber/cadence/common/constants"
+	"github.com/uber/cadence/common/definition"
 	"github.com/uber/cadence/common/log"
 	"github.com/uber/cadence/common/log/tag"
 	"github.com/uber/cadence/common/metrics"
@@ -325,6 +326,19 @@ func (r *transactionManagerImpl) backfillWorkflowEventsReapply(
 		domainID := baseMutableState.GetExecutionInfo().DomainID
 		workflowID := baseMutableState.GetExecutionInfo().WorkflowID
 		baseRunID := baseMutableState.GetExecutionInfo().RunID
+
+		// only signals not yet applied are reapplied, so without any the reset would
+		// just create a new run that repeats the last decision of the closed workflow
+		reapplyEvents := getReapplicableEvents(baseMutableState, targetWorkflowEvents.Events, baseRunID)
+		if len(reapplyEvents) == 0 {
+			r.logger.Debug("skip reset of finished workflow, no events to reapply",
+				tag.WorkflowDomainID(domainID),
+				tag.WorkflowID(workflowID),
+				tag.WorkflowRunID(baseRunID),
+			)
+			return persistence.UpdateWorkflowModeBypassCurrent, execution.TransactionPolicyPassive, nil
+		}
+
 		resetRunID := uuid.New()
 		baseRebuildLastEventID := baseMutableState.GetPreviousStartedEventID()
 
@@ -367,7 +381,7 @@ func (r *transactionManagerImpl) backfillWorkflowEventsReapply(
 			uuid.New(),
 			targetWorkflow,
 			EventsReapplicationResetWorkflowReason,
-			targetWorkflowEvents.Events,
+			reapplyEvents,
 			false,
 		); err != nil {
 			return 0, execution.TransactionPolicyActive, err
@@ -389,6 +403,26 @@ func (r *transactionManagerImpl) backfillWorkflowEventsReapply(
 		return persistence.UpdateWorkflowModeUpdateCurrent, execution.TransactionPolicyPassive, nil
 	}
 	return persistence.UpdateWorkflowModeBypassCurrent, execution.TransactionPolicyPassive, nil
+}
+
+// getReapplicableEvents returns the signal events not yet reapplied to the given run
+func getReapplicableEvents(
+	mutableState execution.MutableState,
+	events []*types.HistoryEvent,
+	runID string,
+) []*types.HistoryEvent {
+	var reapplyEvents []*types.HistoryEvent
+	for _, event := range events {
+		if event.GetEventType() != types.EventTypeWorkflowExecutionSignaled {
+			continue
+		}
+		dedupResource := definition.NewEventReappliedID(runID, event.ID, event.Version)
+		if mutableState.IsResourceDuplicated(dedupResource) {
+			continue
+		}
+		reapplyEvents = append(reapplyEvents, event)
+	}
+	return reapplyEvents
 }
 
 func (r *transactionManagerImpl) checkWorkflowExists(
