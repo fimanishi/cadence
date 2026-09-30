@@ -336,7 +336,8 @@ func (r *transactionManagerImpl) backfillWorkflowEventsReapply(
 				tag.WorkflowID(workflowID),
 				tag.WorkflowRunID(baseRunID),
 			)
-			return persistence.UpdateWorkflowModeBypassCurrent, execution.TransactionPolicyPassive, nil
+			// no reset happened, so target workflow is still the current workflow
+			return persistence.UpdateWorkflowModeUpdateCurrent, execution.TransactionPolicyPassive, nil
 		}
 
 		resetRunID := uuid.New()
@@ -350,7 +351,8 @@ func (r *transactionManagerImpl) backfillWorkflowEventsReapply(
 				tag.WorkflowID(workflowID),
 			)
 			r.metricsClient.IncCounter(metrics.HistoryReapplyEventsScope, metrics.EventReapplySkippedCount)
-			return persistence.UpdateWorkflowModeBypassCurrent, execution.TransactionPolicyPassive, nil
+			// no reset happened, so target workflow is still the current workflow
+			return persistence.UpdateWorkflowModeUpdateCurrent, execution.TransactionPolicyPassive, nil
 		}
 
 		baseVersionHistories := baseMutableState.GetVersionHistories()

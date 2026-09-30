@@ -34,6 +34,7 @@ import (
 	"github.com/uber/cadence/common"
 	"github.com/uber/cadence/common/cache"
 	"github.com/uber/cadence/common/cluster"
+	commonconstants "github.com/uber/cadence/common/constants"
 	"github.com/uber/cadence/common/definition"
 	"github.com/uber/cadence/common/log"
 	"github.com/uber/cadence/common/mocks"
@@ -266,61 +267,82 @@ func (s *transactionManagerSuite) TestBackfillWorkflow_CurrentWorkflow_Active_Cl
 	s.True(releaseCalled)
 }
 
-func (s *transactionManagerSuite) TestBackfillWorkflow_CurrentWorkflow_Active_Closed_NoReapplicableEvents() {
-	ctx := ctx.Background()
-	now := time.Now()
-
+func (s *transactionManagerSuite) TestBackfillWorkflow_CurrentWorkflow_Active_Closed_SkipReset() {
 	domainID := "some random domain ID"
 	workflowID := "some random workflow ID"
 	runID := "some random run ID"
 	domainName := "some random domainName"
 
-	releaseCalled := false
+	signal := &types.HistoryEvent{ID: 2, Version: 1, EventType: types.EventTypeWorkflowExecutionSignaled.Ptr()}
+	batchEvents := []*types.HistoryEvent{
+		{ID: 1, Version: 1, EventType: types.EventTypeDecisionTaskCompleted.Ptr()},
+		signal,
+	}
 
-	workflow := execution.NewMockWorkflow(s.controller)
-	context := execution.NewMockContext(s.controller)
-	mutableState := execution.NewMockMutableState(s.controller)
-	var releaseFn execution.ReleaseFunc = func(error) { releaseCalled = true }
-
-	duplicatedSignal := &types.HistoryEvent{ID: 2, Version: 1, EventType: types.EventTypeWorkflowExecutionSignaled.Ptr()}
-	workflowEvents := &persistence.WorkflowEvents{
-		Events: []*types.HistoryEvent{
-			{ID: 1, Version: 1, EventType: types.EventTypeDecisionTaskCompleted.Ptr()},
-			duplicatedSignal,
+	tests := map[string]struct {
+		signalDuplicated bool
+		setupMock        func(mutableState *execution.MockMutableState)
+	}{
+		"no reapplicable events": {
+			signalDuplicated: true,
+			setupMock:        func(mutableState *execution.MockMutableState) {},
+		},
+		"no decision completed": {
+			signalDuplicated: false,
+			setupMock: func(mutableState *execution.MockMutableState) {
+				mutableState.EXPECT().GetPreviousStartedEventID().Return(commonconstants.EmptyEventID).Times(1)
+			},
 		},
 	}
 
-	workflow.EXPECT().GetContext().Return(context).AnyTimes()
-	workflow.EXPECT().GetMutableState().Return(mutableState).AnyTimes()
-	workflow.EXPECT().GetReleaseFn().Return(releaseFn).AnyTimes()
+	for name, tc := range tests {
+		s.Run(name, func() {
+			ctx := ctx.Background()
+			now := time.Now()
+			releaseCalled := false
 
-	mutableState.EXPECT().IsCurrentWorkflowGuaranteed().Return(false).AnyTimes()
-	mutableState.EXPECT().IsWorkflowExecutionRunning().Return(false).AnyTimes()
-	mutableState.EXPECT().GetDomainEntry().Return(s.domainEntry).AnyTimes()
-	mutableState.EXPECT().GetExecutionInfo().Return(&persistence.WorkflowExecutionInfo{
-		DomainID:   domainID,
-		WorkflowID: workflowID,
-		RunID:      runID,
-	}).AnyTimes()
-	mutableState.EXPECT().IsResourceDuplicated(definition.NewEventReappliedID(runID, duplicatedSignal.ID, duplicatedSignal.Version)).Return(true).Times(1)
+			workflow := execution.NewMockWorkflow(s.controller)
+			context := execution.NewMockContext(s.controller)
+			mutableState := execution.NewMockMutableState(s.controller)
+			var releaseFn execution.ReleaseFunc = func(error) { releaseCalled = true }
 
-	s.mockShard.Resource.DomainCache.EXPECT().GetDomainName(domainID).Return(domainName, nil).AnyTimes()
-	s.mockExecutionManager.On("GetCurrentExecution", mock.Anything, &persistence.GetCurrentExecutionRequest{
-		ShardID:    common.Ptr(10),
-		DomainID:   domainID,
-		WorkflowID: workflowID,
-		DomainName: domainName,
-	}).Return(&persistence.GetCurrentExecutionResponse{RunID: runID}, nil).Once()
+			workflowEvents := &persistence.WorkflowEvents{Events: batchEvents}
 
-	context.EXPECT().PersistNonStartWorkflowBatchEvents(gomock.Any(), workflowEvents).Return(events.PersistedBlob{}, nil).Times(1)
-	context.EXPECT().UpdateWorkflowExecutionWithNew(
-		gomock.Any(), now, persistence.UpdateWorkflowModeBypassCurrent, nil, nil, execution.TransactionPolicyPassive, (*execution.TransactionPolicy)(nil), persistence.CreateWorkflowRequestModeReplicated,
-	).Return(nil).Times(1)
+			workflow.EXPECT().GetContext().Return(context).AnyTimes()
+			workflow.EXPECT().GetMutableState().Return(mutableState).AnyTimes()
+			workflow.EXPECT().GetReleaseFn().Return(releaseFn).AnyTimes()
 
-	// no ResetWorkflow expectation: gomock fails the test if the reset is called
-	err := s.transactionManager.backfillWorkflow(ctx, now, workflow, workflowEvents)
-	s.NoError(err)
-	s.True(releaseCalled)
+			mutableState.EXPECT().IsCurrentWorkflowGuaranteed().Return(false).AnyTimes()
+			mutableState.EXPECT().IsWorkflowExecutionRunning().Return(false).AnyTimes()
+			mutableState.EXPECT().GetDomainEntry().Return(s.domainEntry).AnyTimes()
+			mutableState.EXPECT().GetExecutionInfo().Return(&persistence.WorkflowExecutionInfo{
+				DomainID:   domainID,
+				WorkflowID: workflowID,
+				RunID:      runID,
+			}).AnyTimes()
+			mutableState.EXPECT().IsResourceDuplicated(definition.NewEventReappliedID(runID, signal.ID, signal.Version)).Return(tc.signalDuplicated).Times(1)
+			tc.setupMock(mutableState)
+
+			s.mockShard.Resource.DomainCache.EXPECT().GetDomainName(domainID).Return(domainName, nil).AnyTimes()
+			s.mockExecutionManager.On("GetCurrentExecution", mock.Anything, &persistence.GetCurrentExecutionRequest{
+				ShardID:    common.Ptr(10),
+				DomainID:   domainID,
+				WorkflowID: workflowID,
+				DomainName: domainName,
+			}).Return(&persistence.GetCurrentExecutionResponse{RunID: runID}, nil).Once()
+
+			context.EXPECT().PersistNonStartWorkflowBatchEvents(gomock.Any(), workflowEvents).Return(events.PersistedBlob{}, nil).Times(1)
+			// no reset happened, so the target workflow is still current and the current record must be updated
+			context.EXPECT().UpdateWorkflowExecutionWithNew(
+				gomock.Any(), now, persistence.UpdateWorkflowModeUpdateCurrent, nil, nil, execution.TransactionPolicyPassive, (*execution.TransactionPolicy)(nil), persistence.CreateWorkflowRequestModeReplicated,
+			).Return(nil).Times(1)
+
+			// no ResetWorkflow expectation: gomock fails the test if the reset is called
+			err := s.transactionManager.backfillWorkflow(ctx, now, workflow, workflowEvents)
+			s.NoError(err)
+			s.True(releaseCalled)
+		})
+	}
 }
 
 func TestGetReapplicableEvents(t *testing.T) {
