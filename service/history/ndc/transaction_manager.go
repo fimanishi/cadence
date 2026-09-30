@@ -327,15 +327,10 @@ func (r *transactionManagerImpl) backfillWorkflowEventsReapply(
 		workflowID := baseMutableState.GetExecutionInfo().WorkflowID
 		baseRunID := baseMutableState.GetExecutionInfo().RunID
 
-		// only signals not yet applied are reapplied, so without any the reset would
-		// just create a new run that repeats the last decision of the closed workflow
-		reapplyEvents := getReapplicableEvents(baseMutableState, targetWorkflowEvents.Events, baseRunID)
-		if len(reapplyEvents) == 0 {
-			r.logger.Debug("skip reset of finished workflow, no events to reapply",
-				tag.WorkflowDomainID(domainID),
-				tag.WorkflowID(workflowID),
-				tag.WorkflowRunID(baseRunID),
-			)
+		// filter the batch to signals not yet applied to this run. If there are none, skip
+		// the reset, to prevent a new run that runs the last decision of the closed workflow again
+		eventsToReapply := getReapplicableEvents(baseMutableState, targetWorkflowEvents.Events, baseRunID)
+		if len(eventsToReapply) == 0 {
 			// no reset happened, so target workflow is still the current workflow
 			return persistence.UpdateWorkflowModeUpdateCurrent, execution.TransactionPolicyPassive, nil
 		}
@@ -383,7 +378,7 @@ func (r *transactionManagerImpl) backfillWorkflowEventsReapply(
 			uuid.New(),
 			targetWorkflow,
 			EventsReapplicationResetWorkflowReason,
-			reapplyEvents,
+			eventsToReapply,
 			false,
 		); err != nil {
 			return 0, execution.TransactionPolicyActive, err
@@ -413,7 +408,7 @@ func getReapplicableEvents(
 	events []*types.HistoryEvent,
 	runID string,
 ) []*types.HistoryEvent {
-	var reapplyEvents []*types.HistoryEvent
+	var eventsToReapply []*types.HistoryEvent
 	for _, event := range events {
 		if event.GetEventType() != types.EventTypeWorkflowExecutionSignaled {
 			continue
@@ -422,9 +417,9 @@ func getReapplicableEvents(
 		if mutableState.IsResourceDuplicated(dedupResource) {
 			continue
 		}
-		reapplyEvents = append(reapplyEvents, event)
+		eventsToReapply = append(eventsToReapply, event)
 	}
-	return reapplyEvents
+	return eventsToReapply
 }
 
 func (r *transactionManagerImpl) checkWorkflowExists(
