@@ -2507,8 +2507,10 @@ func TestCreateWorkflowExecutionWithMergeMaps(t *testing.T) {
 					CompletionEvent: &persistence.DataBlob{},
 					AutoResetPoints: &persistence.DataBlob{},
 				},
-				VersionHistories: &persistence.DataBlob{},
-				Checksums:        &checksum.Checksum{},
+				VersionHistories:             &persistence.DataBlob{},
+				Checksums:                    &checksum.Checksum{},
+				ActivitySentinelWriteEnabled: true,
+				TimerSentinelWriteEnabled:    true,
 				ActivityInfos: map[int64]*persistence.InternalActivityInfo{
 					1: {
 						Version: 1,

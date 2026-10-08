@@ -760,7 +760,7 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 		if serializedRewriteActivityInfos == nil {
 			serializedRewriteActivityInfos = []*InternalActivityInfo{}
 		}
-		m.logger.Info("activity map rewrite triggered",
+		m.logger.Debug("activity map rewrite triggered",
 			tag.WorkflowDomainID(input.ExecutionInfo.DomainID),
 			tag.WorkflowID(input.ExecutionInfo.WorkflowID),
 			tag.WorkflowRunID(input.ExecutionInfo.RunID),
@@ -769,7 +769,7 @@ func (m *executionManagerImpl) SerializeWorkflowMutation(
 	}
 	if input.RewriteTimerInfos != nil && timerRate > 0 && shouldRewrite(timerRate) {
 		rewriteTimerInfos = input.RewriteTimerInfos
-		m.logger.Info("timer map rewrite triggered",
+		m.logger.Debug("timer map rewrite triggered",
 			tag.WorkflowDomainID(input.ExecutionInfo.DomainID),
 			tag.WorkflowID(input.ExecutionInfo.WorkflowID),
 			tag.WorkflowRunID(input.ExecutionInfo.RunID),
