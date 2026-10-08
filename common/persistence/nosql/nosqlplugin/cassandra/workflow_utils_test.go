@@ -2809,12 +2809,12 @@ func TestUpdateWorkflowExecutionAndEventBufferWithMergeAndDeleteMaps(t *testing.
 					CompletionEvent: &persistence.DataBlob{},
 					AutoResetPoints: &persistence.DataBlob{},
 				},
-				VersionHistories:              &persistence.DataBlob{},
-				Checksums:                      &checksum.Checksum{},
-				ActivityInfoKeysToDelete:       []int64{10, 20},
-				ActivitySentinelWriteEnabled:   true,
-				TimerInfoKeysToDelete:          []string{"t1", "t2"},
-				TimerSentinelWriteEnabled:      true,
+				VersionHistories:             &persistence.DataBlob{},
+				Checksums:                    &checksum.Checksum{},
+				ActivityInfoKeysToDelete:     []int64{10, 20},
+				ActivitySentinelWriteEnabled: true,
+				TimerInfoKeysToDelete:        []string{"t1", "t2"},
+				TimerSentinelWriteEnabled:    true,
 			},
 			// expecting 6 queries:
 			// - 1 for execution record
