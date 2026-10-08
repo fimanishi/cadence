@@ -1963,6 +1963,7 @@ func TestUpdateTimerInfos(t *testing.T) {
 					TaskStatus: 1,
 				},
 			},
+			deleteInfos: []string{"timer2"},
 			rewriteInfos: map[string]*persistence.TimerInfo{
 				"timer1": {
 					TimerID:    "timer1",
@@ -2283,6 +2284,7 @@ func TestUpdateActivityInfos(t *testing.T) {
 					LastFailureReason:      "retry reason",
 				},
 			},
+			deleteInfos: []int64{2},
 			rewriteInfos: map[int64]*persistence.InternalActivityInfo{
 				1: {
 					Version: 1,
