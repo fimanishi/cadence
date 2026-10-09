@@ -563,8 +563,7 @@ func TestUpdateWorkflowExecutionWithTasks_SentinelBehavior(t *testing.T) {
 			)
 			mutatedExecution.ActivityInfoKeysToDelete = tc.activityDeletes
 			mutatedExecution.TimerInfoKeysToDelete = tc.timerDeletes
-			mutatedExecution.ActivitySentinelWriteEnabled = tc.sentinelEnabled
-			mutatedExecution.TimerSentinelWriteEnabled = tc.sentinelEnabled
+			mutatedExecution.SentinelWriteEnabled = tc.sentinelEnabled
 
 			err := db.UpdateWorkflowExecutionWithTasks(
 				context.Background(),

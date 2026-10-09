@@ -2509,10 +2509,9 @@ func TestCreateWorkflowExecutionWithMergeMaps(t *testing.T) {
 					CompletionEvent: &persistence.DataBlob{},
 					AutoResetPoints: &persistence.DataBlob{},
 				},
-				VersionHistories:             &persistence.DataBlob{},
-				Checksums:                    &checksum.Checksum{},
-				ActivitySentinelWriteEnabled: true,
-				TimerSentinelWriteEnabled:    true,
+				VersionHistories:     &persistence.DataBlob{},
+				Checksums:            &checksum.Checksum{},
+				SentinelWriteEnabled: true,
 				ActivityInfos: map[int64]*persistence.InternalActivityInfo{
 					1: {
 						Version: 1,
@@ -2813,12 +2812,11 @@ func TestUpdateWorkflowExecutionAndEventBufferWithMergeAndDeleteMaps(t *testing.
 					CompletionEvent: &persistence.DataBlob{},
 					AutoResetPoints: &persistence.DataBlob{},
 				},
-				VersionHistories:             &persistence.DataBlob{},
-				Checksums:                    &checksum.Checksum{},
-				ActivityInfoKeysToDelete:     []int64{10, 20},
-				ActivitySentinelWriteEnabled: true,
-				TimerInfoKeysToDelete:        []string{"t1", "t2"},
-				TimerSentinelWriteEnabled:    true,
+				VersionHistories:         &persistence.DataBlob{},
+				Checksums:                &checksum.Checksum{},
+				ActivityInfoKeysToDelete: []int64{10, 20},
+				SentinelWriteEnabled:     true,
+				TimerInfoKeysToDelete:    []string{"t1", "t2"},
 			},
 			// expecting 6 queries:
 			// - 1 for execution record
@@ -2833,7 +2831,7 @@ func TestUpdateWorkflowExecutionAndEventBufferWithMergeAndDeleteMaps(t *testing.
 		t.Run(tc.desc, func(t *testing.T) {
 			batch := &fakeBatch{}
 
-			err := updateWorkflowExecutionAndEventBufferWithMergeAndDeleteMaps(batch, tc.shardID, tc.domainID, tc.workflowID, tc.execution, false, false, FixedTime)
+			err := updateWorkflowExecutionAndEventBufferWithMergeAndDeleteMaps(batch, tc.shardID, tc.domainID, tc.workflowID, tc.execution, false, FixedTime)
 			gotErr := (err != nil)
 			if gotErr != tc.wantErr {
 				t.Fatalf("Got error: %v, want?: %v", err, tc.wantErr)

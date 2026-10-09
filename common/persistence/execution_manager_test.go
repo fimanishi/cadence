@@ -353,8 +353,7 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 	tests := []struct {
 		name                  string
 		storeName             string
-		activityRate          int
-		timerRate             int
+		rate                  int
 		rewriteActivityInfos  []*ActivityInfo
 		rewriteTimerInfos     []*TimerInfo
 		deleteActivityInfos   []int64
@@ -363,10 +362,9 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 		expectRewriteTimer    bool
 	}{
 		{
-			name:         "cassandra with rate 1 triggers rewrite and preserves deletes",
-			storeName:    "cassandra",
-			activityRate: 1,
-			timerRate:    1,
+			name:      "cassandra with rate 1 triggers rewrite and preserves deletes",
+			storeName: "cassandra",
+			rate:      1,
 			rewriteActivityInfos: []*ActivityInfo{
 				{Version: 1, ScheduleID: 10, ScheduledEvent: activityScheduledEvent(), StartedEvent: activityStartedEvent()},
 			},
@@ -377,10 +375,9 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 			expectRewriteTimer:    true,
 		},
 		{
-			name:         "cassandra with rate 0 disables rewrite",
-			storeName:    "cassandra",
-			activityRate: 0,
-			timerRate:    0,
+			name:      "cassandra with rate 0 disables rewrite",
+			storeName: "cassandra",
+			rate:      0,
 			rewriteActivityInfos: []*ActivityInfo{
 				{Version: 1, ScheduleID: 10, ScheduledEvent: activityScheduledEvent(), StartedEvent: activityStartedEvent()},
 			},
@@ -391,22 +388,20 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 			expectRewriteTimer:    false,
 		},
 		{
-			name:                  "cassandra with nil rewrite infos skips rewrite even with rate 1",
+			name:                  "cassandra with no deletes skips rewrite even with rate 1",
 			storeName:             "cassandra",
-			activityRate:          1,
-			timerRate:             1,
+			rate:                  1,
 			rewriteActivityInfos:  nil,
 			rewriteTimerInfos:     nil,
-			deleteActivityInfos:   []int64{5},
-			deleteTimerInfos:      []string{"t2"},
+			deleteActivityInfos:   nil,
+			deleteTimerInfos:      nil,
 			expectRewriteActivity: false,
 			expectRewriteTimer:    false,
 		},
 		{
-			name:                  "cassandra with all activities deleted triggers rewrite with empty map",
+			name:                  "cassandra with all activities deleted triggers rewrite with empty collection",
 			storeName:             "cassandra",
-			activityRate:          1,
-			timerRate:             1,
+			rate:                  1,
 			rewriteActivityInfos:  []*ActivityInfo{},
 			rewriteTimerInfos:     []*TimerInfo{},
 			deleteActivityInfos:   []int64{5},
@@ -424,10 +419,9 @@ func TestSerializeWorkflowMutation_RewriteProbability(t *testing.T) {
 
 			mockedStore.EXPECT().GetName().Return(tc.storeName).AnyTimes()
 			manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, &DynamicConfiguration{
-				SerializationEncoding:          dynamicproperties.GetStringPropertyFn(string(constants.EncodingTypeThriftRW)),
-				ActivityMapRewriteSampleRate:   dynamicproperties.GetIntPropertyFn(tc.activityRate),
-				TimerMapRewriteSampleRate:      dynamicproperties.GetIntPropertyFn(tc.timerRate),
-				MapRewriteOptimizationBackends: dynamicproperties.GetListPropertyFn([]interface{}{"cassandra"}),
+				SerializationEncoding:       dynamicproperties.GetStringPropertyFn(string(constants.EncodingTypeThriftRW)),
+				RewriteSampleRate:           dynamicproperties.GetIntPropertyFn(tc.rate),
+				RewriteOptimizationBackends: dynamicproperties.GetListPropertyFn([]interface{}{"cassandra"}),
 			})
 
 			mockedSerializer.EXPECT().SerializeEvent(gomock.Any(), gomock.Any()).Return(sampleEventData(), nil).AnyTimes()
@@ -491,10 +485,9 @@ func FuzzRewriteSkippedForUnsupportedBackend(f *testing.F) {
 
 		mockedStore.EXPECT().GetName().Return(storeName).AnyTimes()
 		manager := NewExecutionManagerImpl(mockedStore, testlogger.New(t), mockedSerializer, &DynamicConfiguration{
-			SerializationEncoding:          dynamicproperties.GetStringPropertyFn(string(constants.EncodingTypeThriftRW)),
-			ActivityMapRewriteSampleRate:   dynamicproperties.GetIntPropertyFn(1),
-			TimerMapRewriteSampleRate:      dynamicproperties.GetIntPropertyFn(1),
-			MapRewriteOptimizationBackends: dynamicproperties.GetListPropertyFn([]interface{}{"cassandra"}),
+			SerializationEncoding:       dynamicproperties.GetStringPropertyFn(string(constants.EncodingTypeThriftRW)),
+			RewriteSampleRate:           dynamicproperties.GetIntPropertyFn(1),
+			RewriteOptimizationBackends: dynamicproperties.GetListPropertyFn([]interface{}{"cassandra"}),
 		})
 
 		mockedSerializer.EXPECT().SerializeEvent(gomock.Any(), gomock.Any()).Return(sampleEventData(), nil).AnyTimes()
