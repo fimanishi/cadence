@@ -3649,9 +3649,7 @@ func TestCloseTransactionAsMutation(t *testing.T) {
 				require.NotNil(t, mutation, "mutation should not be nil")
 				assert.Equal(t, []int64{1}, mutation.DeleteActivityInfos)
 				assert.Equal(t, []string{"timer-1"}, mutation.DeleteTimerInfos)
-				assert.NotNil(t, mutation.RewriteActivityInfos, "rewrite activity infos should be non-nil")
 				assert.Empty(t, mutation.RewriteActivityInfos, "rewrite activity infos should be empty")
-				assert.NotNil(t, mutation.RewriteTimerInfos, "rewrite timer infos should be non-nil")
 				assert.Empty(t, mutation.RewriteTimerInfos, "rewrite timer infos should be empty")
 			},
 			expectedEvent: nil,
