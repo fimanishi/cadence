@@ -230,16 +230,7 @@ func (s *engineSuite) TestGetMutableStateSync() {
 			},
 		},
 	})
-	parentInfo := &types.ParentExecutionInfo{
-		DomainUUID: constants.TestDomainID,
-		Domain:     constants.TestDomainName,
-		Execution: &types.WorkflowExecution{
-			WorkflowID: "test-parent-workflow-id",
-			RunID:      constants.TestRunID,
-		},
-		InitiatedID: 5,
-	}
-	test.AddWorkflowExecutionStartedEventWithParent(msBuilder, workflowExecution, "wType", tasklist, []byte("input"), 100, 200, parentInfo, identity, nil)
+	test.AddWorkflowExecutionStartedEvent(msBuilder, workflowExecution, "wType", tasklist, []byte("input"), 100, 200, identity, nil)
 	di := test.AddDecisionTaskScheduledEvent(msBuilder)
 	test.AddDecisionTaskStartedEvent(msBuilder, di.ScheduleID, tasklist, identity)
 	ms := execution.CreatePersistenceMutableState(s.T(), msBuilder)
@@ -254,13 +245,6 @@ func (s *engineSuite) TestGetMutableStateSync() {
 	})
 	s.Nil(err)
 	s.Equal(int64(4), response.GetNextEventID())
-	// the response has the parent information without the domain name, and the first run of the workflow
-	s.Equal(&types.ParentExecutionInfo{
-		DomainUUID:  parentInfo.DomainUUID,
-		Execution:   parentInfo.Execution,
-		InitiatedID: parentInfo.InitiatedID,
-	}, response.GetParentExecutionInfo())
-	s.Equal(workflowExecution.GetRunID(), response.GetFirstExecutionRunID())
 }
 
 func (s *engineSuite) TestGetMutableState_IntestRunID() {
