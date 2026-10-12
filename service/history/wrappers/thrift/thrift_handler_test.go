@@ -105,6 +105,7 @@ func TestThriftHandler(t *testing.T) {
 			EventStoreVersion:       common.Int32Ptr(0),
 			IsStickyTaskListEnabled: common.BoolPtr(false),
 			HistorySize:             common.Int64Ptr(0),
+			FirstExecutionRunId:     common.StringPtr(""),
 		}, *resp)
 		assert.Equal(t, expectedErr, err)
 	})

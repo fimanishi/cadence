@@ -73,6 +73,8 @@ var (
 		VersionHistories:                     &VersionHistories,
 		IsStickyTaskListEnabled:              true,
 		HistorySize:                          HistorySizeInBytes,
+		ParentExecutionInfo:                  &ParentExecutionInfo,
+		FirstExecutionRunID:                  RunID1,
 	}
 	HistoryGetReplicationMessagesRequest  = AdminGetReplicationMessagesRequest
 	HistoryGetReplicationMessagesResponse = AdminGetReplicationMessagesResponse

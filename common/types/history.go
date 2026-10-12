@@ -125,25 +125,27 @@ func (v *GetMutableStateRequest) GetExpectedNextEventID() (o int64) {
 
 // GetMutableStateResponse is an internal type (TBD...)
 type GetMutableStateResponse struct {
-	Execution                            *WorkflowExecution `json:"execution,omitempty"`
-	WorkflowType                         *WorkflowType      `json:"workflowType,omitempty"`
-	NextEventID                          int64              `json:"NextEventId,omitempty"`
-	PreviousStartedEventID               *int64             `json:"PreviousStartedEventId,omitempty"`
-	LastFirstEventID                     int64              `json:"LastFirstEventId,omitempty"`
-	TaskList                             *TaskList          `json:"taskList,omitempty"`
-	StickyTaskList                       *TaskList          `json:"stickyTaskList,omitempty"`
-	ClientLibraryVersion                 string             `json:"clientLibraryVersion,omitempty"`
-	ClientFeatureVersion                 string             `json:"clientFeatureVersion,omitempty"`
-	ClientImpl                           string             `json:"clientImpl,omitempty"`
-	IsWorkflowRunning                    bool               `json:"isWorkflowRunning,omitempty"`
-	StickyTaskListScheduleToStartTimeout *int32             `json:"stickyTaskListScheduleToStartTimeout,omitempty"`
-	EventStoreVersion                    int32              `json:"eventStoreVersion,omitempty"`
-	CurrentBranchToken                   []byte             `json:"currentBranchToken,omitempty"`
-	WorkflowState                        *int32             `json:"workflowState,omitempty"`
-	WorkflowCloseState                   *int32             `json:"workflowCloseState,omitempty"`
-	VersionHistories                     *VersionHistories  `json:"versionHistories,omitempty"`
-	IsStickyTaskListEnabled              bool               `json:"isStickyTaskListEnabled,omitempty"`
-	HistorySize                          int64              `json:"historySize,omitempty"`
+	Execution                            *WorkflowExecution   `json:"execution,omitempty"`
+	WorkflowType                         *WorkflowType        `json:"workflowType,omitempty"`
+	NextEventID                          int64                `json:"NextEventId,omitempty"`
+	PreviousStartedEventID               *int64               `json:"PreviousStartedEventId,omitempty"`
+	LastFirstEventID                     int64                `json:"LastFirstEventId,omitempty"`
+	TaskList                             *TaskList            `json:"taskList,omitempty"`
+	StickyTaskList                       *TaskList            `json:"stickyTaskList,omitempty"`
+	ClientLibraryVersion                 string               `json:"clientLibraryVersion,omitempty"`
+	ClientFeatureVersion                 string               `json:"clientFeatureVersion,omitempty"`
+	ClientImpl                           string               `json:"clientImpl,omitempty"`
+	IsWorkflowRunning                    bool                 `json:"isWorkflowRunning,omitempty"`
+	StickyTaskListScheduleToStartTimeout *int32               `json:"stickyTaskListScheduleToStartTimeout,omitempty"`
+	EventStoreVersion                    int32                `json:"eventStoreVersion,omitempty"`
+	CurrentBranchToken                   []byte               `json:"currentBranchToken,omitempty"`
+	WorkflowState                        *int32               `json:"workflowState,omitempty"`
+	WorkflowCloseState                   *int32               `json:"workflowCloseState,omitempty"`
+	VersionHistories                     *VersionHistories    `json:"versionHistories,omitempty"`
+	IsStickyTaskListEnabled              bool                 `json:"isStickyTaskListEnabled,omitempty"`
+	HistorySize                          int64                `json:"historySize,omitempty"`
+	ParentExecutionInfo                  *ParentExecutionInfo `json:"parentExecutionInfo,omitempty"`
+	FirstExecutionRunID                  string               `json:"firstExecutionRunId,omitempty"`
 }
 
 // GetNextEventID is an internal getter (TBD...)
@@ -230,6 +232,22 @@ func (v *GetMutableStateResponse) GetVersionHistories() (o *VersionHistories) {
 func (v *GetMutableStateResponse) GetIsStickyTaskListEnabled() (o bool) {
 	if v != nil {
 		return v.IsStickyTaskListEnabled
+	}
+	return
+}
+
+// GetParentExecutionInfo is an internal getter (TBD...)
+func (v *GetMutableStateResponse) GetParentExecutionInfo() (o *ParentExecutionInfo) {
+	if v != nil && v.ParentExecutionInfo != nil {
+		return v.ParentExecutionInfo
+	}
+	return
+}
+
+// GetFirstExecutionRunID is an internal getter (TBD...)
+func (v *GetMutableStateResponse) GetFirstExecutionRunID() (o string) {
+	if v != nil {
+		return v.FirstExecutionRunID
 	}
 	return
 }
