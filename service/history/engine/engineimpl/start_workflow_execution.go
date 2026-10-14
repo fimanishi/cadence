@@ -1055,7 +1055,8 @@ func (e *historyEngineImpl) validateLastRunOfChain(startRequest *types.HistorySt
 			return nil
 		}
 		// only the cluster that closed the run sends the completion to the parent, and after a failover it does not
-		// send it, so the run can not be adopted. A new run would run the child a second time, so the start fails.
+		// send it, so the run can not be adopted. The start fails, because this request already started the chain of the
+		// run, and the reuse policy only applies to a new request.
 		e.logger.Info("Child start found a run with the same request ID closed by another cluster",
 			tag.WorkflowDomainID(startRequest.DomainUUID),
 			tag.WorkflowID(startRequest.StartRequest.GetWorkflowID()),
@@ -1073,10 +1074,8 @@ func (e *historyEngineImpl) validateLastRunOfChain(startRequest *types.HistorySt
 	}
 }
 
-// validateDuplicateChildRunAdoption returns an error when the run of a duplicate child start request can not be
-// adopted, because that run, or the last run of its chain, was closed by another cluster or by an unknown cluster,
-// or is corrupted. Only the active cluster sends a child's completion to the parent, so after a failover the parent
-// would never receive it, and a corrupted run does not send it.
+// validateDuplicateChildRunAdoption returns an error when the parent would not receive the completion of the run of a
+// duplicate child start request, so the run can not be adopted as it is.
 func (e *historyEngineImpl) validateDuplicateChildRunAdoption(
 	ctx context.Context,
 	startRequest *types.HistoryStartWorkflowExecutionRequest,
