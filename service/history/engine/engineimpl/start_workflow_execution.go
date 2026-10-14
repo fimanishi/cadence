@@ -1154,10 +1154,8 @@ func (e *historyEngineImpl) validateDuplicateChildRunAdoption(
 		// the current run is in the chain of the duplicate run, so it is the last run of the chain
 		return e.validateLastRunOfChain(startRequest, currentRun)
 	case !domainEntry.GetReplicationConfig().IsActiveActive() && duplicate.lastWriteVersion == currentRun.lastWriteVersion:
-		// the first run IDs are different, or the duplicate run has none, and both runs have the same version, so all
-		// runs between them were closed by the same cluster and the duplicate run is checked in place of the last run of
-		// the chain. In an active-active domain, each cluster attribute has its own versions, so the runs between them
-		// can have another version.
+		// in an active-passive domain, when the current run has the same version as the duplicate run, the chain of the
+		// duplicate run completed in the same cluster as the duplicate run
 		return e.validateLastRunOfChain(startRequest, duplicate)
 	default:
 		return e.childChainEndUnknownError(startRequest, duplicateRunID, current.RunID)
