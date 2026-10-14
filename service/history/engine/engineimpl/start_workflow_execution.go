@@ -1007,30 +1007,6 @@ func (e *historyEngineImpl) applyWorkflowIDReusePolicyHelper(
 	return nil
 }
 
-// isClosedByOtherCluster returns true when another cluster closed the child run. Only that cluster sends the
-// completion to the parent, so the run must not be returned as started, or the parent waits forever.
-func (e *historyEngineImpl) isClosedByOtherCluster(
-	startRequest *types.HistoryStartWorkflowExecutionRequest,
-	runID string,
-	closeVersion int64,
-) (bool, error) {
-	closingCluster, err := e.clusterMetadata.ClusterNameForFailoverVersion(closeVersion)
-	if err != nil {
-		return false, err
-	}
-	if closingCluster == e.currentClusterName {
-		return false, nil
-	}
-	e.logger.Info("Child start found a run with the same request ID closed by another cluster",
-		tag.WorkflowDomainID(startRequest.DomainUUID),
-		tag.WorkflowID(startRequest.StartRequest.GetWorkflowID()),
-		tag.WorkflowRunID(runID),
-		tag.WorkflowRequestID(startRequest.StartRequest.GetRequestID()),
-		tag.ClusterName(closingCluster),
-		tag.FailoverVersion(closeVersion))
-	return true, nil
-}
-
 // childChainEndUnknownError returns the error of a child start that can not determine which cluster closed the last
 // run of the chain of the duplicate run, so the run can not be adopted.
 func (e *historyEngineImpl) childChainEndUnknownError(
@@ -1070,19 +1046,28 @@ func (e *historyEngineImpl) validateLastRunOfChain(startRequest *types.HistorySt
 			RunID:          run.runID,
 		}
 	case run.state == persistence.WorkflowStateCompleted:
-		closedByOtherCluster, err := e.isClosedByOtherCluster(startRequest, run.runID, run.lastWriteVersion)
+		closingCluster, err := e.clusterMetadata.ClusterNameForFailoverVersion(run.lastWriteVersion)
 		if err != nil {
 			return err
 		}
-		if closedByOtherCluster {
-			// the run can not be adopted, and a new run would run the child a second time, so the start fails
-			return &types.WorkflowExecutionAlreadyStartedError{
-				Message:        childRunClosedByOtherClusterMsg,
-				StartRequestID: startRequest.StartRequest.GetRequestID(),
-				RunID:          run.runID,
-			}
+		if closingCluster == e.currentClusterName {
+			// the close transfer task of the run retries the completion until the parent records the start
+			return nil
 		}
-		return nil
+		// only the cluster that closed the run sends the completion to the parent, and after a failover it does not
+		// send it, so the run can not be adopted. A new run would run the child a second time, so the start fails.
+		e.logger.Info("Child start found a run with the same request ID closed by another cluster",
+			tag.WorkflowDomainID(startRequest.DomainUUID),
+			tag.WorkflowID(startRequest.StartRequest.GetWorkflowID()),
+			tag.WorkflowRunID(run.runID),
+			tag.WorkflowRequestID(startRequest.StartRequest.GetRequestID()),
+			tag.ClusterName(closingCluster),
+			tag.FailoverVersion(run.lastWriteVersion))
+		return &types.WorkflowExecutionAlreadyStartedError{
+			Message:        childRunClosedByOtherClusterMsg,
+			StartRequestID: startRequest.StartRequest.GetRequestID(),
+			RunID:          run.runID,
+		}
 	default:
 		return &types.InternalServiceError{Message: fmt.Sprintf("Child start found a run with the same request ID in an invalid state: %v.", run.state)}
 	}

@@ -1113,57 +1113,6 @@ func newChildStartRequest(reusePolicy *types.WorkflowIDReusePolicy) *types.Histo
 	}
 }
 
-func TestIsClosedByOtherCluster(t *testing.T) {
-	childStart := newChildStartRequest(nil)
-	currentClusterVersion := cluster.TestCurrentClusterInitialFailoverVersion + cluster.TestFailoverVersionIncrement
-	otherClusterVersion := cluster.TestAlternativeClusterInitialFailoverVersion + cluster.TestFailoverVersionIncrement
-	noClusterVersion := cluster.TestFailoverVersionIncrement + 9
-
-	tests := []struct {
-		name         string
-		request      *types.HistoryStartWorkflowExecutionRequest
-		closeVersion int64
-		want         bool
-		wantErr      error
-	}{
-		{
-			name:         "child closed by another cluster",
-			request:      childStart,
-			closeVersion: otherClusterVersion,
-			want:         true,
-		},
-		{
-			name:         "child closed by this cluster",
-			request:      childStart,
-			closeVersion: currentClusterVersion,
-		},
-		{
-			name:         "child of a local domain",
-			request:      childStart,
-			closeVersion: commonconstants.EmptyVersion,
-		},
-		{
-			name:         "closing cluster can not be determined",
-			request:      childStart,
-			closeVersion: noClusterVersion,
-			wantErr:      fmt.Errorf("failed to resolve failover version to a cluster: could not resolve failover version: %d", noClusterVersion),
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			eft := testdata.NewEngineForTest(t, NewEngineWithShardContext)
-			eft.Engine.Start()
-			defer eft.Engine.Stop()
-			engine := eft.Engine.(*historyEngineImpl)
-
-			got, err := engine.isClosedByOtherCluster(tc.request, "child-run-id", tc.closeVersion)
-			assert.Equal(t, tc.wantErr, err)
-			assert.Equal(t, tc.want, got)
-		})
-	}
-}
-
 // alreadyStartedError returns the error of a child start that can not adopt the run with the same request ID.
 func alreadyStartedError(msg string, runID string) error {
 	return &types.WorkflowExecutionAlreadyStartedError{
@@ -1269,6 +1218,14 @@ func TestValidateDuplicateChildRunAdoption(t *testing.T) {
 			request: childStart,
 			mockLoad: func(eft *testdata.EngineForTest) {
 				mockLoadChildRun(eft, childDuplicateRunID, persistence.WorkflowCloseStatusCompleted, currentClusterVersion, nil)
+			},
+		},
+		{
+			name:        "local domain, duplicate run closed",
+			request:     childStart,
+			domainEntry: constants.TestLocalDomainEntry,
+			mockLoad: func(eft *testdata.EngineForTest) {
+				mockLoadChildRun(eft, childDuplicateRunID, persistence.WorkflowCloseStatusCompleted, commonconstants.EmptyVersion, nil)
 			},
 		},
 		{
