@@ -1107,8 +1107,7 @@ func (e *historyEngineImpl) validateDuplicateChildRunAdoption(
 	if err != nil {
 		return err
 	}
-	// the duplicate run did not continue as new, so it is running, closed or corrupted, and it is the last run of
-	// its chain
+	// the duplicate run did not continue as new, so it is the last run of its chain
 	if duplicate.closeStatus != persistence.WorkflowCloseStatusContinuedAsNew {
 		return e.validateLastRunOfChain(startRequest, duplicate)
 	}
