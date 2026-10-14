@@ -1130,9 +1130,11 @@ func (e *historyEngineImpl) validateDuplicateChildRunAdoption(
 			case duplicate.firstRunID != "" && currentRun.firstRunID == duplicate.firstRunID:
 				// the current run is in the chain of the duplicate run
 				lastRunOfChain = currentRun
-			case duplicate.lastWriteVersion == currentRun.lastWriteVersion:
+			case !domainEntry.GetReplicationConfig().IsActiveActive() && duplicate.lastWriteVersion == currentRun.lastWriteVersion:
 				// the first run IDs are different, or the duplicate run has none, and both runs have the same version,
-				// so all runs between them were closed by the same cluster and only the duplicate run version is checked
+				// so all runs between them were closed by the same cluster and only the duplicate run version is checked.
+				// In an active-active domain, each cluster attribute has its own versions, so the runs between them can
+				// have another version.
 				closedByOtherCluster, err := e.isClosedByOtherCluster(startRequest, duplicateRunID, duplicate.lastWriteVersion)
 				if err != nil {
 					return err

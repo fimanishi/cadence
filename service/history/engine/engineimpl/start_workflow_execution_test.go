@@ -1232,14 +1232,22 @@ func TestValidateDuplicateChildRunAdoption(t *testing.T) {
 		}
 	}
 	unknownVersionErr := fmt.Errorf("failed to resolve failover version to a cluster: could not resolve failover version: %d", noClusterVersion)
+	// the active-active replication config with the domain ID of the mocked runs
+	activeActiveDomainEntry := cache.NewGlobalDomainCacheEntryForTest(
+		&persistence.DomainInfo{ID: constants.TestDomainID, Name: constants.TestDomainName},
+		constants.TestActiveActiveDomainEntry.GetConfig(),
+		constants.TestActiveActiveDomainEntry.GetReplicationConfig(),
+		constants.TestVersion,
+	)
 
 	tests := []struct {
-		name       string
-		request    *types.HistoryStartWorkflowExecutionRequest
-		current    *persistence.GetCurrentExecutionResponse
-		currentErr error
-		mockLoad   func(*testdata.EngineForTest)
-		wantErr    error
+		name        string
+		request     *types.HistoryStartWorkflowExecutionRequest
+		domainEntry *cache.DomainCacheEntry
+		current     *persistence.GetCurrentExecutionResponse
+		currentErr  error
+		mockLoad    func(*testdata.EngineForTest)
+		wantErr     error
 	}{
 		{
 			name:    "duplicate run is the current run, closed by another cluster",
@@ -1349,6 +1357,35 @@ func TestValidateDuplicateChildRunAdoption(t *testing.T) {
 			wantErr: alreadyStartedError(childChainEndUnknownMsg, childCurrentRunID),
 		},
 		{
+			// each cluster attribute has its own versions, so the same version does not bound the runs between them
+			name:        "active-active domain, duplicate run continued as new without a first run ID, same version as the current run, closing cluster can not be determined",
+			request:     childStart,
+			domainEntry: activeActiveDomainEntry,
+			current:     currentRun(childCurrentRunID, persistence.WorkflowStateRunning, currentClusterVersion),
+			mockLoad: func(eft *testdata.EngineForTest) {
+				mockLoadChildRunOfChain(eft, childDuplicateRunID, "", persistence.WorkflowStateCompleted, persistence.WorkflowCloseStatusContinuedAsNew, currentClusterVersion, nil)
+				mockLoadChildRunOfChain(eft, childCurrentRunID, "", persistence.WorkflowStateRunning, persistence.WorkflowCloseStatusNone, currentClusterVersion, nil)
+			},
+			wantErr: alreadyStartedError(childChainEndUnknownMsg, childCurrentRunID),
+		},
+		{
+			name:        "active-active domain, duplicate run is the current run, closed by another cluster",
+			request:     childStart,
+			domainEntry: activeActiveDomainEntry,
+			current:     currentRun(childDuplicateRunID, persistence.WorkflowStateCompleted, otherClusterVersion),
+			wantErr:     alreadyStartedError(childRunClosedByOtherClusterMsg, childDuplicateRunID),
+		},
+		{
+			name:        "active-active domain, duplicate run continued as new, current run of the chain closed by this cluster",
+			request:     childStart,
+			domainEntry: activeActiveDomainEntry,
+			current:     currentRun(childCurrentRunID, persistence.WorkflowStateCompleted, currentClusterVersion),
+			mockLoad: func(eft *testdata.EngineForTest) {
+				mockLoadChildRun(eft, childDuplicateRunID, persistence.WorkflowCloseStatusContinuedAsNew, otherClusterVersion, nil)
+				mockLoadChildRunOfChain(eft, childCurrentRunID, childDuplicateRunID, persistence.WorkflowStateCompleted, persistence.WorkflowCloseStatusCompleted, currentClusterVersion, nil)
+			},
+		},
+		{
 			name:    "duplicate run continued as new, current run not found",
 			request: childStart,
 			current: currentRun(childCurrentRunID, persistence.WorkflowStateRunning, currentClusterVersion),
@@ -1416,7 +1453,11 @@ func TestValidateDuplicateChildRunAdoption(t *testing.T) {
 			defer eft.Engine.Stop()
 			engine := eft.Engine.(*historyEngineImpl)
 
-			eft.ShardCtx.Resource.DomainCache.EXPECT().GetDomainByID(constants.TestDomainID).Return(constants.TestGlobalDomainEntry, nil).AnyTimes()
+			domainEntry := constants.TestGlobalDomainEntry
+			if tc.domainEntry != nil {
+				domainEntry = tc.domainEntry
+			}
+			eft.ShardCtx.Resource.DomainCache.EXPECT().GetDomainByID(constants.TestDomainID).Return(domainEntry, nil).AnyTimes()
 			eft.ShardCtx.Resource.DomainCache.EXPECT().GetDomainName(constants.TestDomainID).Return(constants.TestDomainName, nil).AnyTimes()
 			// loading a run of the child looks up the active cluster of the child
 			eft.ShardCtx.Resource.ActiveClusterMgr.EXPECT().GetActiveClusterInfoByWorkflow(gomock.Any(), constants.TestDomainID, "child-workflow-id", gomock.Any()).
@@ -1428,7 +1469,7 @@ func TestValidateDuplicateChildRunAdoption(t *testing.T) {
 				tc.mockLoad(eft)
 			}
 
-			err := engine.validateDuplicateChildRunAdoption(context.Background(), tc.request, constants.TestGlobalDomainEntry, childDuplicateRunID)
+			err := engine.validateDuplicateChildRunAdoption(context.Background(), tc.request, domainEntry, childDuplicateRunID)
 			assert.Equal(t, tc.wantErr, err)
 			// the duplicate run is loaded only when it is not the current run
 			assertChildRunsLoaded(t, eft)
