@@ -48,6 +48,7 @@ const (
 	childRunClosedByOtherClusterMsg = "Workflow execution already finished in another cluster."
 	childChainEndUnknownMsg         = "Workflow execution started by this request already finished, and the cluster that closed it can not be determined, so it can not be adopted."
 	childRunNotFoundMsg             = "Workflow execution was started by this request but no longer exists, so it can not be adopted."
+	childRunZombieMsg               = "Workflow execution started by this request is a zombie, so it can not be adopted."
 )
 
 // for startWorkflowHelper be reused by signalWithStart
@@ -1035,6 +1036,18 @@ func (e *historyEngineImpl) validateLastRunOfChain(startRequest *types.HistorySt
 	case run.state == persistence.WorkflowStateCorrupted:
 		// a corrupted run does not progress, but it is the run of this request, so it is adopted and linked to the parent
 		return nil
+	case run.state == persistence.WorkflowStateZombie:
+		// a zombie run does not run on this cluster, so it does not send the completion and can not be adopted
+		e.logger.Info("Child start found a zombie run with the same request ID",
+			tag.WorkflowDomainID(startRequest.DomainUUID),
+			tag.WorkflowID(startRequest.StartRequest.GetWorkflowID()),
+			tag.WorkflowRunID(run.runID),
+			tag.WorkflowRequestID(startRequest.StartRequest.GetRequestID()))
+		return &types.WorkflowExecutionAlreadyStartedError{
+			Message:        childRunZombieMsg,
+			StartRequestID: startRequest.StartRequest.GetRequestID(),
+			RunID:          run.runID,
+		}
 	case run.state == persistence.WorkflowStateCompleted:
 		closingCluster, err := e.clusterMetadata.ClusterNameForFailoverVersion(run.lastWriteVersion)
 		if err != nil {

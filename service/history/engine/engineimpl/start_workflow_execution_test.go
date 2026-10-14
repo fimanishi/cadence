@@ -1244,12 +1244,13 @@ func TestValidateDuplicateChildRunAdoption(t *testing.T) {
 			},
 		},
 		{
-			name:    "duplicate run in an invalid state",
+			// both clusters started the child with the same request ID, and conflict resolution made this run a zombie
+			name:    "duplicate run is a zombie",
 			request: childStart,
 			mockLoad: func(eft *testdata.EngineForTest) {
-				mockLoadChildRunOfChain(eft, childDuplicateRunID, childDuplicateRunID, persistence.WorkflowStateZombie, persistence.WorkflowCloseStatusNone, currentClusterVersion, nil)
+				mockLoadChildRunOfChain(eft, childDuplicateRunID, childDuplicateRunID, persistence.WorkflowStateZombie, persistence.WorkflowCloseStatusNone, otherClusterVersion, nil)
 			},
-			wantErr: &types.InternalServiceError{Message: fmt.Sprintf("Child start found a run with the same request ID in an invalid state: %v.", persistence.WorkflowStateZombie)},
+			wantErr: alreadyStartedError(childRunZombieMsg, childDuplicateRunID),
 		},
 		{
 			name:    "duplicate run not found",
