@@ -1272,6 +1272,28 @@ func TestValidateDuplicateChildRunAdoption(t *testing.T) {
 			wantErr: unknownVersionErr,
 		},
 		{
+			name:    "duplicate run is the current run, corrupted",
+			request: childStart,
+			current: currentRun(childDuplicateRunID, persistence.WorkflowStateCorrupted, currentClusterVersion),
+			wantErr: alreadyStartedError(childRunCorruptedMsg, childDuplicateRunID),
+		},
+		{
+			name:    "duplicate run is the current run, invalid state",
+			request: childStart,
+			current: currentRun(childDuplicateRunID, persistence.WorkflowStateVoid, currentClusterVersion),
+			wantErr: &types.InternalServiceError{Message: fmt.Sprintf("Child start found a run with the same request ID in an invalid state: %v.", persistence.WorkflowStateVoid)},
+		},
+		{
+			// a new start replaced the corrupted run, which stays corrupted
+			name:    "duplicate run corrupted, current run of another request running",
+			request: childStart,
+			current: currentRun(childCurrentRunID, persistence.WorkflowStateRunning, currentClusterVersion),
+			mockLoad: func(eft *testdata.EngineForTest) {
+				mockLoadChildRunOfChain(eft, childDuplicateRunID, childDuplicateRunID, persistence.WorkflowStateCorrupted, persistence.WorkflowCloseStatusNone, currentClusterVersion, nil)
+			},
+			wantErr: alreadyStartedError(childRunCorruptedMsg, childDuplicateRunID),
+		},
+		{
 			name:    "duplicate run closed by another cluster, current run of another request running",
 			request: childStart,
 			current: currentRun(childCurrentRunID, persistence.WorkflowStateRunning, currentClusterVersion),
@@ -1567,6 +1589,21 @@ func TestStartWorkflowExecution_ChildStartDedup(t *testing.T) {
 			wantNoGetCurrentExecution: true,
 		},
 		{
+			name:        "same request ID, child corrupted: already started",
+			reusePolicy: types.WorkflowIDReusePolicyAllowDuplicate.Ptr(),
+			setupMocks: func(eft *testdata.EngineForTest) {
+				eft.ShardCtx.Resource.ExecutionMgr.On("CreateWorkflowExecution", mock.Anything, createMode(persistence.CreateWorkflowModeBrandNew)).
+					Return(nil, &persistence.WorkflowExecutionAlreadyStartedError{
+						StartRequestID:   "child-request-id",
+						RunID:            childDuplicateRunID,
+						State:            persistence.WorkflowStateCorrupted,
+						LastWriteVersion: currentClusterVersion,
+					}).Once()
+			},
+			wantErr:                   alreadyStartedError(childRunCorruptedMsg, childDuplicateRunID),
+			wantNoGetCurrentExecution: true,
+		},
+		{
 			name:        "duplicate run is the current run, closed by another cluster: already started",
 			reusePolicy: types.WorkflowIDReusePolicyAllowDuplicate.Ptr(),
 			setupMocks: func(eft *testdata.EngineForTest) {
@@ -1689,6 +1726,22 @@ func TestStartWorkflowExecution_ChildStartDedup(t *testing.T) {
 			setupMocks: func(eft *testdata.EngineForTest) {
 				eft.ShardCtx.Resource.ExecutionMgr.On("CreateWorkflowExecution", mock.Anything, createMode(persistence.CreateWorkflowModeBrandNew)).
 					Return(nil, alreadyStarted(otherClusterVersion)).Once()
+			},
+			wantRunID:                 childDuplicateRunID,
+			wantNoGetCurrentExecution: true,
+		},
+		{
+			name:          "workflow without parent, same request ID, corrupted: returns the existing run",
+			reusePolicy:   types.WorkflowIDReusePolicyAllowDuplicate.Ptr(),
+			withoutParent: true,
+			setupMocks: func(eft *testdata.EngineForTest) {
+				eft.ShardCtx.Resource.ExecutionMgr.On("CreateWorkflowExecution", mock.Anything, createMode(persistence.CreateWorkflowModeBrandNew)).
+					Return(nil, &persistence.WorkflowExecutionAlreadyStartedError{
+						StartRequestID:   "child-request-id",
+						RunID:            childDuplicateRunID,
+						State:            persistence.WorkflowStateCorrupted,
+						LastWriteVersion: currentClusterVersion,
+					}).Once()
 			},
 			wantRunID:                 childDuplicateRunID,
 			wantNoGetCurrentExecution: true,
