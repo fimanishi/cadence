@@ -1031,31 +1031,6 @@ func (e *historyEngineImpl) isClosedByOtherCluster(
 	return true, nil
 }
 
-// childRunCorruptedError returns the error of a child start that found a corrupted run with the same request ID. A
-// corrupted run does not progress or close, so it does not send the completion to the parent.
-func (e *historyEngineImpl) childRunCorruptedError(startRequest *types.HistoryStartWorkflowExecutionRequest, runID string) error {
-	e.logger.Info("Child start found a corrupted run with the same request ID",
-		tag.WorkflowDomainID(startRequest.DomainUUID),
-		tag.WorkflowID(startRequest.StartRequest.GetWorkflowID()),
-		tag.WorkflowRunID(runID),
-		tag.WorkflowRequestID(startRequest.StartRequest.GetRequestID()))
-	return &types.WorkflowExecutionAlreadyStartedError{
-		Message:        childRunCorruptedMsg,
-		StartRequestID: startRequest.StartRequest.GetRequestID(),
-		RunID:          runID,
-	}
-}
-
-// childRunClosedByOtherClusterError returns the error of a child start that found a run with the same request ID closed
-// by another cluster. The run can not be adopted, and a new run would run the child a second time, so the start fails.
-func childRunClosedByOtherClusterError(startRequest *types.HistoryStartWorkflowExecutionRequest, runID string) error {
-	return &types.WorkflowExecutionAlreadyStartedError{
-		Message:        childRunClosedByOtherClusterMsg,
-		StartRequestID: startRequest.StartRequest.GetRequestID(),
-		RunID:          runID,
-	}
-}
-
 // childChainEndUnknownError returns the error of a child start that can not determine which cluster closed the last
 // run of the chain of the duplicate run, so the run can not be adopted.
 func (e *historyEngineImpl) childChainEndUnknownError(
@@ -1083,14 +1058,29 @@ func (e *historyEngineImpl) validateLastRunOfChain(startRequest *types.HistorySt
 		// the run is still open and sends the completion to the parent when it closes, so it can be adopted
 		return nil
 	case run.state == persistence.WorkflowStateCorrupted:
-		return e.childRunCorruptedError(startRequest, run.runID)
+		// a corrupted run does not progress or close, so it does not send the completion to the parent
+		e.logger.Info("Child start found a corrupted run with the same request ID",
+			tag.WorkflowDomainID(startRequest.DomainUUID),
+			tag.WorkflowID(startRequest.StartRequest.GetWorkflowID()),
+			tag.WorkflowRunID(run.runID),
+			tag.WorkflowRequestID(startRequest.StartRequest.GetRequestID()))
+		return &types.WorkflowExecutionAlreadyStartedError{
+			Message:        childRunCorruptedMsg,
+			StartRequestID: startRequest.StartRequest.GetRequestID(),
+			RunID:          run.runID,
+		}
 	case run.state == persistence.WorkflowStateCompleted:
 		closedByOtherCluster, err := e.isClosedByOtherCluster(startRequest, run.runID, run.lastWriteVersion)
 		if err != nil {
 			return err
 		}
 		if closedByOtherCluster {
-			return childRunClosedByOtherClusterError(startRequest, run.runID)
+			// the run can not be adopted, and a new run would run the child a second time, so the start fails
+			return &types.WorkflowExecutionAlreadyStartedError{
+				Message:        childRunClosedByOtherClusterMsg,
+				StartRequestID: startRequest.StartRequest.GetRequestID(),
+				RunID:          run.runID,
+			}
 		}
 		return nil
 	default:
@@ -1173,7 +1163,11 @@ func (e *historyEngineImpl) validateDuplicateChildRunAdoption(
 			return err
 		}
 		if closedByOtherCluster {
-			return childRunClosedByOtherClusterError(startRequest, duplicateRunID)
+			return &types.WorkflowExecutionAlreadyStartedError{
+				Message:        childRunClosedByOtherClusterMsg,
+				StartRequestID: requestID,
+				RunID:          duplicateRunID,
+			}
 		}
 		return nil
 	default:
