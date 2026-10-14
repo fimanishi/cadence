@@ -1139,7 +1139,7 @@ func (e *historyEngineImpl) validateDuplicateChildRunAdoption(
 		return e.validateLastRunOfChain(startRequest, currentRun)
 	case !domainEntry.GetReplicationConfig().IsActiveActive() && duplicate.lastWriteVersion == currentRun.lastWriteVersion:
 		// in an active-passive domain, when the current run has the same version as the duplicate run, the chain of the
-		// duplicate run completed in the same cluster as the duplicate run
+		// duplicate run completed in the same cluster as the current run
 		return e.validateLastRunOfChain(startRequest, duplicate)
 	default:
 		return e.childChainEndUnknownError(startRequest, duplicateRunID, current.RunID)
