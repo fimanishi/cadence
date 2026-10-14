@@ -1107,90 +1107,82 @@ func (e *historyEngineImpl) validateDuplicateChildRunAdoption(
 			RunID:          runID,
 		}
 	}
+	// validateLastRunOfChain returns an error when the last run of the chain, which sends the completion to the parent,
+	// can not be adopted
+	validateLastRunOfChain := func(run childRunInfo) error {
+		switch {
+		case persistence.IsWorkflowRunning(run.state):
+			// the run is still open and sends the completion to the parent when it closes, so it can be adopted
+			return nil
+		case run.state == persistence.WorkflowStateCorrupted:
+			return e.childRunCorruptedError(startRequest, run.runID)
+		case run.state == persistence.WorkflowStateCompleted:
+			closedByOtherCluster, err := e.isClosedByOtherCluster(startRequest, run.runID, run.lastWriteVersion)
+			if err != nil {
+				return err
+			}
+			if closedByOtherCluster {
+				return closedByOtherClusterError(run.runID)
+			}
+			return nil
+		default:
+			return &types.InternalServiceError{Message: fmt.Sprintf("Child start found a run with the same request ID in an invalid state: %v.", run.state)}
+		}
+	}
 
-	current, err := e.executionManager.GetCurrentExecution(ctx, &persistence.GetCurrentExecutionRequest{
-		DomainID:   domainID,
-		WorkflowID: workflowID,
-		DomainName: domainEntry.GetInfo().Name,
-		ShardID:    common.Ptr(e.shard.GetShardID()),
-	})
 	var notExistsErr *types.EntityNotExistsError
+	duplicate, err := e.loadChildRunInfo(ctx, domainID, workflowID, duplicateRunID)
 	if errors.As(err, &notExistsErr) {
 		return runNotFound(duplicateRunID)
 	}
 	if err != nil {
 		return err
 	}
-
-	// the last run of the chain of the duplicate run sends the completion to the parent
-	lastRunOfChain := childRunInfo{
-		runID:            current.RunID,
-		state:            current.State,
-		closeStatus:      current.CloseStatus,
-		lastWriteVersion: current.LastWriteVersion,
-	}
-	if current.RunID != duplicateRunID {
-		// the run of the duplicate request is not running, because only the current run can be running
-		duplicate, err := e.loadChildRunInfo(ctx, domainID, workflowID, duplicateRunID)
-		if errors.As(err, &notExistsErr) {
-			return runNotFound(duplicateRunID)
-		}
-		if err != nil {
-			return err
-		}
-
-		if duplicate.closeStatus != persistence.WorkflowCloseStatusContinuedAsNew {
-			lastRunOfChain = duplicate
-		} else {
-			// a run that continued as new does not send the completion, the last run of its chain does
-			currentRun, err := e.loadChildRunInfo(ctx, domainID, workflowID, current.RunID)
-			if errors.As(err, &notExistsErr) {
-				// without the current run, it is unknown whether the current run is in the chain of the duplicate run
-				return chainEndUnknown(current.RunID)
-			}
-			if err != nil {
-				return err
-			}
-			switch {
-			case duplicate.firstRunID != "" && currentRun.firstRunID == duplicate.firstRunID:
-				// the current run is in the chain of the duplicate run
-				lastRunOfChain = currentRun
-			case !domainEntry.GetReplicationConfig().IsActiveActive() && duplicate.lastWriteVersion == currentRun.lastWriteVersion:
-				// the first run IDs are different, or the duplicate run has none, and both runs have the same version,
-				// so all runs between them were closed by the same cluster and only the duplicate run version is checked.
-				// In an active-active domain, each cluster attribute has its own versions, so the runs between them can
-				// have another version.
-				closedByOtherCluster, err := e.isClosedByOtherCluster(startRequest, duplicateRunID, duplicate.lastWriteVersion)
-				if err != nil {
-					return err
-				}
-				if closedByOtherCluster {
-					return closedByOtherClusterError(duplicateRunID)
-				}
-				return nil
-			default:
-				return chainEndUnknown(current.RunID)
-			}
-		}
+	if duplicate.closeStatus != persistence.WorkflowCloseStatusContinuedAsNew {
+		return validateLastRunOfChain(duplicate)
 	}
 
+	// A run that continued as new does not send the completion, the last run of its chain does. The runs of a chain
+	// can not be listed, so the current run is checked as the last run of the chain.
+	current, err := e.executionManager.GetCurrentExecution(ctx, &persistence.GetCurrentExecutionRequest{
+		DomainID:   domainID,
+		WorkflowID: workflowID,
+		DomainName: domainEntry.GetInfo().Name,
+		ShardID:    common.Ptr(e.shard.GetShardID()),
+	})
+	if errors.As(err, &notExistsErr) {
+		return chainEndUnknown(duplicateRunID)
+	}
+	if err != nil {
+		return err
+	}
+	currentRun, err := e.loadChildRunInfo(ctx, domainID, workflowID, current.RunID)
+	if errors.As(err, &notExistsErr) {
+		// without the current run, it is unknown whether the current run is in the chain of the duplicate run
+		return chainEndUnknown(current.RunID)
+	}
+	if err != nil {
+		return err
+	}
 	switch {
-	case persistence.IsWorkflowRunning(lastRunOfChain.state):
-		// the current run is still open and sends the completion to the parent when it closes, so it can be adopted
-		return nil
-	case lastRunOfChain.state == persistence.WorkflowStateCorrupted:
-		return e.childRunCorruptedError(startRequest, lastRunOfChain.runID)
-	case lastRunOfChain.state == persistence.WorkflowStateCompleted:
-		closedByOtherCluster, err := e.isClosedByOtherCluster(startRequest, lastRunOfChain.runID, lastRunOfChain.lastWriteVersion)
+	case duplicate.firstRunID != "" && currentRun.firstRunID == duplicate.firstRunID:
+		// the current run is in the chain of the duplicate run, so it is the last run of the chain
+		return validateLastRunOfChain(currentRun)
+	case !domainEntry.GetReplicationConfig().IsActiveActive() && duplicate.lastWriteVersion == currentRun.lastWriteVersion:
+		// the first run IDs are different, or the duplicate run has none, and both runs have the same version,
+		// so all runs between them were closed by the same cluster and only the duplicate run version is checked.
+		// In an active-active domain, each cluster attribute has its own versions, so the runs between them can
+		// have another version.
+		closedByOtherCluster, err := e.isClosedByOtherCluster(startRequest, duplicateRunID, duplicate.lastWriteVersion)
 		if err != nil {
 			return err
 		}
 		if closedByOtherCluster {
-			return closedByOtherClusterError(lastRunOfChain.runID)
+			return closedByOtherClusterError(duplicateRunID)
 		}
 		return nil
 	default:
-		return &types.InternalServiceError{Message: fmt.Sprintf("Child start found a run with the same request ID in an invalid state: %v.", lastRunOfChain.state)}
+		return chainEndUnknown(current.RunID)
 	}
 }
 
