@@ -269,23 +269,16 @@ func (e *historyEngineImpl) startWorkflowHelper(
 	// handle already started error
 	if t, ok := err.(*persistence.WorkflowExecutionAlreadyStartedError); ok {
 		if t.StartRequestID == request.GetRequestID() {
-			if isChildStart && t.State == persistence.WorkflowStateCorrupted {
-				return nil, workflowExecution, historyBlob, e.childRunCorruptedError(startRequest, t.RunID)
-			}
 			if isChildStart {
-				switch t.CloseStatus {
-				case persistence.WorkflowCloseStatusCompleted,
-					persistence.WorkflowCloseStatusFailed,
-					persistence.WorkflowCloseStatusCanceled,
-					persistence.WorkflowCloseStatusTerminated,
-					persistence.WorkflowCloseStatusTimedOut:
-					closedByOtherCluster, err := e.isClosedByOtherCluster(startRequest, t.RunID, t.LastWriteVersion)
-					if err != nil {
-						return nil, workflowExecution, historyBlob, err
-					}
-					if closedByOtherCluster {
-						return nil, workflowExecution, historyBlob, childRunClosedByOtherClusterError(startRequest, t.RunID)
-					}
+				// t is the current run, so it is the last run of its chain
+				currentRun := childRunInfo{
+					runID:            t.RunID,
+					state:            t.State,
+					closeStatus:      t.CloseStatus,
+					lastWriteVersion: t.LastWriteVersion,
+				}
+				if err := e.validateLastRunOfChain(startRequest, currentRun); err != nil {
+					return nil, workflowExecution, historyBlob, err
 				}
 			}
 			return &types.StartWorkflowExecutionResponse{
@@ -1122,7 +1115,7 @@ func (e *historyEngineImpl) validateDuplicateChildRunAdoption(
 	var notExistsErr *types.EntityNotExistsError
 	duplicate, err := e.loadChildRunInfo(ctx, domainID, workflowID, duplicateRunID)
 	if errors.As(err, &notExistsErr) {
-		// A run that no longer exists, for example because an operator deleted it or the domain retention is 0 days,
+		// a run that no longer exists, for example because an operator deleted it or the domain retention is 0 days,
 		// can not send its completion to the parent, so it can not be adopted. The request row still blocks a new run
 		// with the same request ID, so the start fails.
 		e.logger.Info("Child start found a run with the same request ID that no longer exists",
@@ -1145,8 +1138,7 @@ func (e *historyEngineImpl) validateDuplicateChildRunAdoption(
 		return e.validateLastRunOfChain(startRequest, duplicate)
 	}
 
-	// A run that continued as new does not send the completion, the last run of its chain does. The runs of a chain
-	// can not be listed, so the current run is checked as the last run of the chain.
+	// a run that continued as new does not send the completion, the last run of its chain does
 	current, err := e.executionManager.GetCurrentExecution(ctx, &persistence.GetCurrentExecutionRequest{
 		DomainID:   domainID,
 		WorkflowID: workflowID,
