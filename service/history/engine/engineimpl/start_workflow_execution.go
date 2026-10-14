@@ -272,18 +272,24 @@ func (e *historyEngineImpl) startWorkflowHelper(
 			if isChildStart && t.State == persistence.WorkflowStateCorrupted {
 				return nil, workflowExecution, historyBlob, e.childRunCorruptedError(startRequest, t.RunID)
 			}
-			// the current run is not closed as continued as new, because the new run of a continue as new becomes the current run
-			if isChildStart && t.State == persistence.WorkflowStateCompleted {
-				closedByOtherCluster, err := e.isClosedByOtherCluster(startRequest, t.RunID, t.LastWriteVersion)
-				if err != nil {
-					return nil, workflowExecution, historyBlob, err
-				}
-				if closedByOtherCluster {
-					// the run can not be adopted, and a new run would run the child a second time
-					return nil, workflowExecution, historyBlob, &types.WorkflowExecutionAlreadyStartedError{
-						Message:        childRunClosedByOtherClusterMsg,
-						StartRequestID: request.GetRequestID(),
-						RunID:          t.RunID,
+			if isChildStart {
+				switch t.CloseStatus {
+				case persistence.WorkflowCloseStatusCompleted,
+					persistence.WorkflowCloseStatusFailed,
+					persistence.WorkflowCloseStatusCanceled,
+					persistence.WorkflowCloseStatusTerminated,
+					persistence.WorkflowCloseStatusTimedOut:
+					closedByOtherCluster, err := e.isClosedByOtherCluster(startRequest, t.RunID, t.LastWriteVersion)
+					if err != nil {
+						return nil, workflowExecution, historyBlob, err
+					}
+					if closedByOtherCluster {
+						// the run can not be adopted, and a new run would run the child a second time
+						return nil, workflowExecution, historyBlob, &types.WorkflowExecutionAlreadyStartedError{
+							Message:        childRunClosedByOtherClusterMsg,
+							StartRequestID: request.GetRequestID(),
+							RunID:          t.RunID,
+						}
 					}
 				}
 			}
@@ -1168,13 +1174,13 @@ func (e *historyEngineImpl) validateDuplicateChildRunAdoption(
 		}
 	}
 
-	switch lastRunOfChain.state {
-	case persistence.WorkflowStateCreated, persistence.WorkflowStateRunning:
+	switch {
+	case persistence.IsWorkflowRunning(lastRunOfChain.state):
 		// the current run is still open and sends the completion to the parent when it closes, so it can be adopted
 		return nil
-	case persistence.WorkflowStateCorrupted:
+	case lastRunOfChain.state == persistence.WorkflowStateCorrupted:
 		return e.childRunCorruptedError(startRequest, lastRunOfChain.runID)
-	case persistence.WorkflowStateCompleted:
+	case lastRunOfChain.state == persistence.WorkflowStateCompleted:
 		closedByOtherCluster, err := e.isClosedByOtherCluster(startRequest, lastRunOfChain.runID, lastRunOfChain.lastWriteVersion)
 		if err != nil {
 			return err
