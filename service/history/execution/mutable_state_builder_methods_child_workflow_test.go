@@ -330,8 +330,10 @@ func TestAddChildEvents(t *testing.T) {
 			StartChildWorkflowExecutionInitiatedEventAttributes: initiatedAttributes,
 		}
 	}
-	enableDeterministicRequestID := func(ctx *shard.TestContext) {
-		ctx.GetConfig().EnableDeterministicChildWorkflowRequestID = dynamicproperties.GetBoolPropertyFnFilteredByDomain(true)
+	setDeterministicRequestID := func(enabled bool) func(ctx *shard.TestContext) {
+		return func(ctx *shard.TestContext) {
+			ctx.GetConfig().EnableDeterministicChildWorkflowRequestID = dynamicproperties.GetBoolPropertyFnFilteredByDomain(enabled)
+		}
 	}
 	replicatedInitiatedID := int64(7)
 	// differs from the current version of the builder, so the test shows that the event version is used
@@ -357,9 +359,9 @@ func TestAddChildEvents(t *testing.T) {
 		expectedErr    error
 	}{
 		{
-			name: "StartChildWorkflowExecutionInitiated",
+			name: "StartChildWorkflowExecutionInitiated: deterministic request ID enabled",
 			mockAllowances: func(ctx *shard.TestContext) {
-				enableDeterministicRequestID(ctx)
+				setDeterministicRequestID(true)(ctx)
 				ctx.MockEventsCache.EXPECT().PutEvent(constants.TestDomainID, parentWfID, parentRunID, nextEventID, gomock.Any())
 			},
 			eventFn: func(builder *mutableStateBuilder) (*types.HistoryEvent, error) {
@@ -377,6 +379,7 @@ func TestAddChildEvents(t *testing.T) {
 		{
 			name: "StartChildWorkflowExecutionInitiated: deterministic request ID disabled",
 			mockAllowances: func(ctx *shard.TestContext) {
+				setDeterministicRequestID(false)(ctx)
 				ctx.MockEventsCache.EXPECT().PutEvent(constants.TestDomainID, parentWfID, parentRunID, nextEventID, gomock.Any())
 			},
 			eventFn: func(builder *mutableStateBuilder) (*types.HistoryEvent, error) {
@@ -402,8 +405,8 @@ func TestAddChildEvents(t *testing.T) {
 			expectedErr: ErrWorkflowFinished,
 		},
 		{
-			name:           "ReplicateStartChildWorkflowExecutionInitiated: request ID from the replicated event",
-			mockAllowances: enableDeterministicRequestID,
+			name:           "ReplicateStartChildWorkflowExecutionInitiated: deterministic request ID enabled",
+			mockAllowances: setDeterministicRequestID(true),
 			eventFn: func(builder *mutableStateBuilder) (*types.HistoryEvent, error) {
 				event := replicatedInitiatedEvent()
 				_, e := builder.ReplicateStartChildWorkflowExecutionInitiatedEvent(replicatedInitiatedID-1, event)
@@ -419,7 +422,8 @@ func TestAddChildEvents(t *testing.T) {
 			expectedEvent: replicatedInitiatedEvent(),
 		},
 		{
-			name: "ReplicateStartChildWorkflowExecutionInitiated: deterministic request ID disabled",
+			name:           "ReplicateStartChildWorkflowExecutionInitiated: deterministic request ID disabled",
+			mockAllowances: setDeterministicRequestID(false),
 			eventFn: func(builder *mutableStateBuilder) (*types.HistoryEvent, error) {
 				event := replicatedInitiatedEvent()
 				_, e := builder.ReplicateStartChildWorkflowExecutionInitiatedEvent(replicatedInitiatedID-1, event)

@@ -2344,8 +2344,9 @@ const (
 
 	// EnableDeterministicChildWorkflowRequestID derives the request ID that starts a child workflow from its initiated event,
 	// so all clusters start the child with the same request ID. Enable it on a cluster only after all hosts of the cluster
-	// run a release that checks which cluster closed a child run before adopting it. Before a rollback to a release without
-	// that check, disable it on the cluster and wait until the children initiated while it was enabled have started.
+	// run a release with https://github.com/cadence-workflow/cadence/pull/8644, which checks which cluster closed a child run
+	// before adopting it. Roll back only to a release with that change. To roll back to a release without it, disable the
+	// flag on the cluster, wait until the children initiated while it was enabled have started, then roll back.
 	// KeyName: history.enableDeterministicChildWorkflowRequestID
 	// Value type: Bool
 	// Default value: false
