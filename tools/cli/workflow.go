@@ -363,6 +363,42 @@ func newWorkflowCommands() []*cli.Command {
 			Action: ResetInBatch,
 		},
 		{
+			Name:    "export",
+			Aliases: []string{"exp"},
+			Usage:   "export workflow execution history to a file (proto binary by default, JSON with --export_format json)",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:    FlagWorkflowID,
+					Aliases: []string{"wid", "w"},
+					Usage:   "WorkflowID, required",
+				},
+				&cli.StringFlag{
+					Name:    FlagRunID,
+					Aliases: []string{"rid", "r"},
+					Usage:   "RunID, optional, default to the current/latest RunID",
+				},
+				&cli.StringFlag{
+					Name:    FlagOutputFilename,
+					Aliases: []string{"of"},
+					Usage:   "Output file path, required",
+				},
+				&cli.IntFlag{
+					Name:  FlagPageSize,
+					Usage: "Page size for paginated export (default: server decides)",
+				},
+				&cli.Int64Flag{
+					Name:  FlagLastEventID,
+					Usage: "Export history up to and including this event ID (default: export full history). It must be a DecisionTaskStarted, DecisionTaskTimedOut or DecisionTaskFailed event",
+				},
+				&cli.StringFlag{
+					Name:  FlagExportFormat,
+					Usage: "Export file format: proto (default) or json",
+					Value: "proto",
+				},
+			},
+			Action: ExportWorkflow,
+		},
+		{
 			Name:        "batch",
 			Usage:       "batch operation on a list of workflows from query.",
 			Subcommands: newBatchCommands(),

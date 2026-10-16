@@ -7124,3 +7124,25 @@ func ToExportWorkflowExecutionResponse(t *apiv1.ExportWorkflowExecutionResponse)
 		Version:        t.Version,
 	}
 }
+
+func FromWorkflowExportData(t *types.WorkflowExportData) *apiv1.WorkflowExportData {
+	if t == nil {
+		return nil
+	}
+	return &apiv1.WorkflowExportData{
+		Version:        t.Version,
+		Execution:      FromWorkflowExecution(t.Execution),
+		HistoryBatches: FromDataBlobArray(t.HistoryBatches),
+	}
+}
+
+func ToWorkflowExportData(t *apiv1.WorkflowExportData) *types.WorkflowExportData {
+	if t == nil {
+		return nil
+	}
+	return &types.WorkflowExportData{
+		Version:        t.Version,
+		Execution:      ToWorkflowExecution(t.Execution),
+		HistoryBatches: ToDataBlobArray(t.HistoryBatches),
+	}
+}

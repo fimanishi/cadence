@@ -3206,3 +3206,15 @@ func TestExportWorkflowExecutionResponseFuzz(t *testing.T) {
 		testutils.WithCustomFuncs(testutils.EncodingTypeFuzzer),
 	)
 }
+
+func TestWorkflowExportData(t *testing.T) {
+	for _, item := range []*types.WorkflowExportData{nil, {}, &testdata.WorkflowExportData} {
+		assert.Equal(t, item, ToWorkflowExportData(FromWorkflowExportData(item)))
+	}
+}
+
+func TestWorkflowExportDataFuzz(t *testing.T) {
+	testutils.RunMapperFuzzTest(t, FromWorkflowExportData, ToWorkflowExportData,
+		testutils.WithCustomFuncs(testutils.EncodingTypeFuzzer),
+	)
+}

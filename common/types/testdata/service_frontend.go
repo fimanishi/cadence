@@ -521,4 +521,9 @@ var (
 		NextPageToken:  NextPageToken,
 		Version:        1,
 	}
+	WorkflowExportData = types.WorkflowExportData{
+		Version:        1,
+		Execution:      &WorkflowExecution,
+		HistoryBatches: DataBlobArray,
+	}
 )

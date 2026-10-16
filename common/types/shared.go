@@ -10184,3 +10184,10 @@ func (v *ExportWorkflowExecutionResponse) GetVersion() (o int32) {
 	}
 	return
 }
+
+// WorkflowExportData is the file format for exported workflow data
+type WorkflowExportData struct {
+	Version        int32              `json:"version,omitempty"`
+	Execution      *WorkflowExecution `json:"execution,omitempty"`
+	HistoryBatches []*DataBlob        `json:"historyBatches,omitempty"`
+}

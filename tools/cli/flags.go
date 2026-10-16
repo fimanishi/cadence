@@ -113,6 +113,8 @@ const (
 	FlagSkipDestinationCheck           = "skip_destination_check"
 	FlagPageID                         = "page_id"
 	FlagPageSize                       = "pagesize"
+	FlagExportFormat                   = "export_format"
+	FlagLastEventID                    = "last_event_id"
 	FlagLimit                          = "limit"
 	FlagEarliestTime                   = "earliest_time"
 	FlagLatestTime                     = "latest_time"
