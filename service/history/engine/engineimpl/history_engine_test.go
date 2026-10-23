@@ -6233,6 +6233,35 @@ func TestRecordChildExecutionCompleted(t *testing.T) {
 			},
 		},
 		{
+			name: "pending child execution workflowID mismatch, so the first run ID is not compared",
+			request: &types.RecordChildExecutionCompletedRequest{
+				DomainUUID:  "58f7998e-9c00-4827-bbd3-6a891b3ca0ca",
+				InitiatedID: 10,
+				WorkflowExecution: &types.WorkflowExecution{
+					WorkflowID: "wid",
+					RunID:      "4353ddce-ca34-4c78-9785-dc0b83af4bbc",
+				},
+				CompletedExecution: &types.WorkflowExecution{
+					WorkflowID: "wid1",
+					RunID:      "312b2440-2859-4e50-a59f-d92a300a072d",
+				},
+				StartedID:           11,
+				FirstExecutionRunID: "312b2440-2859-4e50-a59f-d92a300a072d",
+			},
+			mockSetup: func(ms *execution.MockMutableState) {
+				ms.EXPECT().IsWorkflowExecutionRunning().Return(true)
+				ms.EXPECT().GetChildExecutionInfo(int64(10)).Return(&persistence.ChildExecutionInfo{
+					StartedID:         11,
+					StartedWorkflowID: "wid0",
+					StartedRunID:      "0c2b4a6e-34e5-4a6c-9a51-1b3b1a8d9a10",
+				}, true)
+			},
+			wantErr: true,
+			assertErr: func(t *testing.T, err error) {
+				assert.Equal(t, &types.EntityNotExistsError{Message: "Pending child execution workflowID mismatch."}, err)
+			},
+		},
+		{
 			name: "success - child workflow completed",
 			request: &types.RecordChildExecutionCompletedRequest{
 				DomainUUID:  "58f7998e-9c00-4827-bbd3-6a891b3ca0ca",
@@ -6294,7 +6323,7 @@ func TestRecordChildExecutionCompleted(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "pending child execution run mismatch",
+			name: "pending child execution started another run, so the completion is from another branch",
 			request: &types.RecordChildExecutionCompletedRequest{
 				DomainUUID:  "58f7998e-9c00-4827-bbd3-6a891b3ca0ca",
 				InitiatedID: 10,
@@ -6316,10 +6345,11 @@ func TestRecordChildExecutionCompleted(t *testing.T) {
 					StartedWorkflowID: "wid1",
 					StartedRunID:      "0c2b4a6e-34e5-4a6c-9a51-1b3b1a8d9a10",
 				}, true)
+				ms.EXPECT().GetNextEventID().Return(int64(12))
 			},
 			wantErr: true,
 			assertErr: func(t *testing.T, err error) {
-				assert.Equal(t, &types.EntityNotExistsError{Message: "Pending child execution run mismatch."}, err)
+				assert.Equal(t, &types.EntityNotExistsError{Message: "Pending child execution is from another branch of the parent."}, err)
 			},
 		},
 		{
@@ -6345,7 +6375,7 @@ func TestRecordChildExecutionCompleted(t *testing.T) {
 			},
 			wantErr: true,
 			assertErr: func(t *testing.T, err error) {
-				assert.Equal(t, &types.EntityNotExistsError{Message: "Pending child execution can not be on the current branch."}, err)
+				assert.Equal(t, &types.EntityNotExistsError{Message: "Pending child execution is from another branch of the parent."}, err)
 			},
 		},
 		{
@@ -6435,7 +6465,7 @@ func TestRecordChildExecutionCompleted(t *testing.T) {
 			},
 			wantErr: true,
 			assertErr: func(t *testing.T, err error) {
-				assert.Equal(t, &types.EntityNotExistsError{Message: "Pending child execution can not be on the current branch."}, err)
+				assert.Equal(t, &types.EntityNotExistsError{Message: "Pending child execution is from another branch of the parent."}, err)
 			},
 		},
 		{
