@@ -314,12 +314,12 @@ func (e *historyEngineImpl) startWorkflowHelper(
 
 		prevRunID = t.RunID
 		terminateRunning := shouldTerminateAndStart(startRequest, t.State)
-		// a child start replaces a running run from another branch of the parent. The run is loaded only when the parent
+		// a child start replaces a running run from a stale branch of the parent. The run is loaded only when the parent
 		// sends its current branch and the run has a deterministic request ID, because other runs can not be checked
-		checkOtherBranch := isChildStart && persistence.IsWorkflowRunning(t.State) &&
+		checkStaleBranch := isChildStart && persistence.IsWorkflowRunning(t.State) &&
 			len(startRequest.ParentVersionHistoryItems) > 0 &&
 			execution.IsDeterministicChildWorkflowCreateRequestID(t.StartRequestID) &&
-			e.config.EnableChildWorkflowOtherBranchReplacement(domain)
+			e.config.EnableReplaceChildWorkflowFromStaleParentBranch(domain)
 		var runningWFCtx workflow.Context
 		var terminateReason string
 		if terminateRunning {
@@ -330,18 +330,18 @@ func (e *historyEngineImpl) startWorkflowHelper(
 			defer func() { wfCtx.GetReleaseFn()(retError) }()
 			runningWFCtx = wfCtx
 			terminateReason = TerminateIfRunningReason
-		} else if checkOtherBranch {
+		} else if checkStaleBranch {
 			wfCtx, err := workflow.LoadOnce(ctx, e.executionCache, domainID, workflowID, prevRunID)
 			if err != nil {
 				return nil, workflowExecution, historyBlob, err
 			}
 			// the run is checked under its lock, so it can not change before it is terminated
 			runInfo := wfCtx.GetMutableState().GetExecutionInfo()
-			if isChildRunFromOtherBranch(startRequest, runInfo) {
+			if isChildRunFromStaleBranch(startRequest, runInfo) {
 				defer func() { wfCtx.GetReleaseFn()(retError) }()
 				runningWFCtx = wfCtx
-				terminateReason = ChildFromOtherBranchReplacedReason
-				e.logger.Info("Child start replaces a run from another branch of the parent",
+				terminateReason = ChildFromStaleBranchReplacedReason
+				e.logger.Info("Child start replaces a run from a stale branch of the parent",
 					tag.WorkflowDomainID(domainID),
 					tag.WorkflowID(workflowID),
 					tag.WorkflowRunID(prevRunID),
@@ -350,7 +350,7 @@ func (e *historyEngineImpl) startWorkflowHelper(
 					tag.Dynamic("new-run-id", workflowExecution.RunID),
 				)
 				e.metricsClient.Scope(metrics.HistoryStartWorkflowExecutionScope, metrics.DomainTag(domain)).
-					IncCounter(metrics.ChildWorkflowOtherBranchReplacedCounter)
+					IncCounter(metrics.ChildWorkflowStaleBranchReplacedCounter)
 			} else {
 				// the run was only read, so release it without an error to keep its state in the cache
 				wfCtx.GetReleaseFn()(nil)
@@ -1227,9 +1227,9 @@ func (e *historyEngineImpl) loadChildRunInfo(
 	}, nil
 }
 
-// isChildRunFromOtherBranch returns true when the parent that sends the start request started the run from an initiated
+// isChildRunFromStaleBranch returns true when the parent that sends the start request started the run from an initiated
 // event that is not on the current branch of the parent, for example after a failover.
-func isChildRunFromOtherBranch(startRequest *types.HistoryStartWorkflowExecutionRequest, run *persistence.WorkflowExecutionInfo) bool {
+func isChildRunFromStaleBranch(startRequest *types.HistoryStartWorkflowExecutionRequest, run *persistence.WorkflowExecutionInfo) bool {
 	parent := startRequest.ParentExecutionInfo
 	if parent == nil {
 		// a start request without a parent is not a child start
@@ -1248,7 +1248,7 @@ func isChildRunFromOtherBranch(startRequest *types.HistoryStartWorkflowExecution
 		return false
 	}
 	if !execution.IsDeterministicChildWorkflowCreateRequestID(run.CreateRequestID) {
-		// a run started without a deterministic request ID can not be checked, so it is not treated as from another branch
+		// a run started without a deterministic request ID can not be checked, so it is not treated as from a stale branch
 		return false
 	}
 	if len(startRequest.ParentVersionHistoryItems) == 0 {
@@ -1258,12 +1258,12 @@ func isChildRunFromOtherBranch(startRequest *types.HistoryStartWorkflowExecution
 	for _, item := range startRequest.ParentVersionHistoryItems {
 		if run.InitiatedID <= item.EventID {
 			// the request ID of the run matches only when the current branch has its initiated event, with the same ID and
-			// version, so a different request ID means the run is from another branch
+			// version, so a different request ID means the run is from a stale branch
 			return execution.NewChildWorkflowCreateRequestID(run.ParentRunID, run.InitiatedID, item.Version) != run.CreateRequestID
 		}
 	}
 	// the current branch does not have an event with the initiated ID of the run, so the initiated event that started
-	// the run is on another branch
+	// the run is on a stale branch
 	return true
 }
 

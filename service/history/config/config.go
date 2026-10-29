@@ -356,8 +356,8 @@ type Config struct {
 	EnableStrongIdempotency            dynamicproperties.BoolPropertyFnWithDomainFilter
 	EnableStrongIdempotencySanityCheck dynamicproperties.BoolPropertyFnWithDomainFilter
 
-	EnableDeterministicChildWorkflowRequestID dynamicproperties.BoolPropertyFnWithDomainFilter
-	EnableChildWorkflowOtherBranchReplacement dynamicproperties.BoolPropertyFnWithDomainFilter
+	EnableDeterministicChildWorkflowRequestID       dynamicproperties.BoolPropertyFnWithDomainFilter
+	EnableReplaceChildWorkflowFromStaleParentBranch dynamicproperties.BoolPropertyFnWithDomainFilter
 
 	// Global ratelimiter
 	GlobalRatelimiterNewDataWeight  dynamicproperties.FloatPropertyFn
@@ -648,8 +648,8 @@ func New(dc *dynamicconfig.Collection, numberOfShards int, maxMessageSize int, i
 		EnableStrongIdempotency:            dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableStrongIdempotency),
 		EnableStrongIdempotencySanityCheck: dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableStrongIdempotencySanityCheck),
 
-		EnableDeterministicChildWorkflowRequestID: dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableDeterministicChildWorkflowRequestID),
-		EnableChildWorkflowOtherBranchReplacement: dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableChildWorkflowOtherBranchReplacement),
+		EnableDeterministicChildWorkflowRequestID:       dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableDeterministicChildWorkflowRequestID),
+		EnableReplaceChildWorkflowFromStaleParentBranch: dc.GetBoolPropertyFilteredByDomain(dynamicproperties.EnableReplaceChildWorkflowFromStaleParentBranch),
 
 		GlobalRatelimiterNewDataWeight:  dc.GetFloat64Property(dynamicproperties.HistoryGlobalRatelimiterNewDataWeight),
 		GlobalRatelimiterUpdateInterval: dc.GetDurationProperty(dynamicproperties.GlobalRatelimiterUpdateInterval),

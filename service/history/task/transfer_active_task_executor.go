@@ -892,7 +892,7 @@ func (t *transferActiveTaskExecutor) processStartChildExecution(
 		return err
 	}
 
-	// the child start uses the current branch of the parent to find out if an existing child run is from another branch
+	// the child start uses the current branch of the parent to find out if an existing child run is from a stale branch
 	var parentVersionHistoryItems []*types.VersionHistoryItem
 	if versionHistories := mutableState.GetVersionHistories(); versionHistories != nil {
 		currentVersionHistory, err := versionHistories.GetCurrentVersionHistory()

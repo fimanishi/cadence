@@ -1761,7 +1761,7 @@ func TestStartWorkflowExecution_ChildStartDedup(t *testing.T) {
 	}
 }
 
-func TestIsChildRunFromOtherBranch(t *testing.T) {
+func TestIsChildRunFromStaleBranch(t *testing.T) {
 	// the current branch of the parent has events 1 to 4 at version 1 and events 5 to 7 at version 2
 	currentBranch := []*types.VersionHistoryItem{{EventID: 4, Version: 1}, {EventID: 7, Version: 2}}
 	// childRun returns a run of the child started by the initiated event with the ID and version
@@ -1787,13 +1787,13 @@ func TestIsChildRunFromOtherBranch(t *testing.T) {
 	}{
 		{
 			// after a failover, the current branch has another event with the initiated event ID
-			name: "initiated event on a losing branch: from another branch",
+			name: "initiated event on a losing branch: from a stale branch",
 			run:  childRun(6, 1),
 			want: true,
 		},
 		{
-			// the parent started the run from event 9 on another branch, and the current branch ends at event 7
-			name: "current branch does not have the initiated ID of the run: from another branch",
+			// the parent started the run from event 9 on a stale branch, and the current branch ends at event 7
+			name: "current branch does not have the initiated ID of the run: from a stale branch",
 			run:  childRun(9, 1),
 			want: true,
 		},
@@ -1814,43 +1814,43 @@ func TestIsChildRunFromOtherBranch(t *testing.T) {
 		},
 		{
 			// for example a child of the parent run before a reset or a continue as new
-			name:   "child of another run of the parent: not from another branch",
+			name:   "child of another run of the parent: not from a stale branch",
 			run:    childRun(6, 1),
 			modify: func(run *persistence.WorkflowExecutionInfo) { run.ParentRunID = "other-parent-run-id" },
 		},
 		{
-			name:   "child of another parent workflow: not from another branch",
+			name:   "child of another parent workflow: not from a stale branch",
 			run:    childRun(6, 1),
 			modify: func(run *persistence.WorkflowExecutionInfo) { run.ParentWorkflowID = "other-parent-workflow-id" },
 		},
 		{
-			name:   "child of a parent in another domain: not from another branch",
+			name:   "child of a parent in another domain: not from a stale branch",
 			run:    childRun(6, 1),
 			modify: func(run *persistence.WorkflowExecutionInfo) { run.ParentDomainID = "other-domain-id" },
 		},
 		{
-			name: "workflow without parent: not from another branch",
+			name: "workflow without parent: not from a stale branch",
 			run:  &persistence.WorkflowExecutionInfo{RunID: childCurrentRunID, FirstExecutionRunID: childCurrentRunID},
 		},
 		{
-			name:   "run that continued as new: not from another branch",
+			name:   "run that continued as new: not from a stale branch",
 			run:    childRun(6, 1),
 			modify: func(run *persistence.WorkflowExecutionInfo) { run.FirstExecutionRunID = childDuplicateRunID },
 		},
 		{
-			name: "run started without a deterministic request ID: not from another branch",
+			name: "run started without a deterministic request ID: not from a stale branch",
 			run:  childRun(6, 1),
 			modify: func(run *persistence.WorkflowExecutionInfo) {
 				run.CreateRequestID = "3f0c5e8a-6d2b-4c1e-9f7a-2b8d4e6c1a3f"
 			},
 		},
 		{
-			name:          "parent that does not send its current branch: not from another branch",
+			name:          "parent that does not send its current branch: not from a stale branch",
 			run:           childRun(6, 1),
 			withoutBranch: true,
 		},
 		{
-			name:          "start request without a parent: not from another branch",
+			name:          "start request without a parent: not from a stale branch",
 			run:           childRun(6, 1),
 			withoutParent: true,
 		},
@@ -1868,12 +1868,12 @@ func TestIsChildRunFromOtherBranch(t *testing.T) {
 			if tc.withoutParent {
 				request.ParentExecutionInfo = nil
 			}
-			assert.Equal(t, tc.want, isChildRunFromOtherBranch(request, tc.run))
+			assert.Equal(t, tc.want, isChildRunFromStaleBranch(request, tc.run))
 		})
 	}
 }
 
-func TestStartWorkflowExecution_ChildFromOtherBranchReplacement(t *testing.T) {
+func TestStartWorkflowExecution_ChildFromStaleBranchReplacement(t *testing.T) {
 	activeVersion := cluster.TestCurrentClusterInitialFailoverVersion + 2*cluster.TestFailoverVersionIncrement
 	otherClusterVersion := cluster.TestAlternativeClusterInitialFailoverVersion + cluster.TestFailoverVersionIncrement
 	// the current branch of the parent has events 1 to 4 at the version of the other cluster and events 5 to 7 at the
@@ -1891,7 +1891,7 @@ func TestStartWorkflowExecution_ChildFromOtherBranchReplacement(t *testing.T) {
 		{
 			// the other cluster started the child from event 6, and after the failover event 6 of the current branch is
 			// another event
-			name:             "running child from another branch: terminated and replaced",
+			name:             "running child from a stale branch: terminated and replaced",
 			flagEnabled:      true,
 			initiatedVersion: otherClusterVersion,
 			wantLoad:         true,
@@ -1904,7 +1904,7 @@ func TestStartWorkflowExecution_ChildFromOtherBranchReplacement(t *testing.T) {
 			wantLoad:         true,
 		},
 		{
-			name:             "running child from another branch, replacement disabled: already started",
+			name:             "running child from a stale branch, replacement disabled: already started",
 			initiatedVersion: otherClusterVersion,
 		},
 		{
@@ -1922,7 +1922,7 @@ func TestStartWorkflowExecution_ChildFromOtherBranchReplacement(t *testing.T) {
 			eft.Engine.Start()
 			defer eft.Engine.Stop()
 
-			eft.ShardCtx.GetConfig().EnableChildWorkflowOtherBranchReplacement = dynamicproperties.GetBoolPropertyFnFilteredByDomain(tc.flagEnabled)
+			eft.ShardCtx.GetConfig().EnableReplaceChildWorkflowFromStaleParentBranch = dynamicproperties.GetBoolPropertyFnFilteredByDomain(tc.flagEnabled)
 			eft.ShardCtx.Resource.DomainCache.EXPECT().GetDomainByID(constants.TestDomainID).Return(constants.TestGlobalDomainEntry, nil).AnyTimes()
 			eft.ShardCtx.Resource.DomainCache.EXPECT().GetDomainName(constants.TestDomainID).Return(constants.TestDomainName, nil).AnyTimes()
 			// the domain failed over to this cluster, so the loaded child run is active here
@@ -1977,7 +1977,7 @@ func TestStartWorkflowExecution_ChildFromOtherBranchReplacement(t *testing.T) {
 				}, nil).Once()
 			}
 			if tc.wantReplaced {
-				// the termination of the run from another branch and the new run are written together
+				// the termination of the run from a stale branch and the new run are written together
 				eft.ShardCtx.Resource.ExecutionMgr.On("UpdateWorkflowExecution", mock.Anything, mock.MatchedBy(func(req *persistence.UpdateWorkflowExecutionRequest) bool {
 					return req.UpdateWorkflowMutation.ExecutionInfo.RunID == childCurrentRunID &&
 						req.UpdateWorkflowMutation.ExecutionInfo.State == persistence.WorkflowStateCompleted &&

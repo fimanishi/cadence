@@ -1527,7 +1527,7 @@ func (s *transferActiveTaskExecutorSuite) TestProcessStartChildExecution_Success
 				s.mockShard.GetTimeSource().Now(),
 				mutableState.GetExecutionInfo().PartitionConfig,
 				mutableState.GetExecutionInfo().ActiveClusterSelectionPolicy,
-				// the parent sends its current branch, so the child start can find a run from another branch
+				// the parent sends its current branch, so the child start can find a run from a stale branch
 				currentVersionHistory.ToInternalType().Items,
 			)
 			require.NoError(s.T(), err)
@@ -1573,7 +1573,7 @@ func (s *transferActiveTaskExecutorSuite) TestProcessStartChildExecution_Failure
 				s.mockShard.GetTimeSource().Now(),
 				mutableState.GetExecutionInfo().PartitionConfig,
 				mutableState.GetExecutionInfo().ActiveClusterSelectionPolicy,
-				// the parent sends its current branch, so the child start can find a run from another branch
+				// the parent sends its current branch, so the child start can find a run from a stale branch
 				currentVersionHistory.ToInternalType().Items,
 			)
 			require.NoError(s.T(), err)
