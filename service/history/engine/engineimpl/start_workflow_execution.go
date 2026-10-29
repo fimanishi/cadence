@@ -1255,8 +1255,16 @@ func isChildRunFromStaleBranch(startRequest *types.HistoryStartWorkflowExecution
 		// a parent that does not send its current branch does not let the run be checked
 		return false
 	}
+	// the loop checks if the initiated event that started the run is on the current branch of the parent. If it is not,
+	// the run is from a stale branch. The event can be on the current branch with an ID that is not the initiated ID of
+	// the start request, when the parent starts two children with the same workflow ID and the first child is still
+	// running when the second child starts.
 	for _, item := range startRequest.ParentVersionHistoryItems {
+		// the items are the version history of the current branch of the parent, sorted by event ID. Each item has the
+		// last event ID of a range of events and the version of all events in that range. The range starts after the
+		// event ID of the item before it.
 		if run.InitiatedID <= item.EventID {
+			// this check finds the version that the initiated event would have on the current branch of the parent
 			// the request ID of the run matches only when the current branch has its initiated event, with the same ID and
 			// version, so a different request ID means the run is from a stale branch
 			return execution.NewChildWorkflowCreateRequestID(run.ParentRunID, run.InitiatedID, item.Version) != run.CreateRequestID
