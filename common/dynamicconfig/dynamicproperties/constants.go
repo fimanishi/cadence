@@ -2354,6 +2354,15 @@ const (
 	// Allowed filters: DomainName
 	EnableDeterministicChildWorkflowRequestID
 
+	// EnableReplaceChildWorkflowFromStaleParentBranch lets a child start terminate the running child and start a new run,
+	// when the running child was started by an initiated event of the parent that is not on the current branch of the
+	// parent. It applies only to children started when EnableDeterministicChildWorkflowRequestID was enabled.
+	// KeyName: history.enableReplaceChildWorkflowFromStaleParentBranch
+	// Value type: Bool
+	// Default value: false
+	// Allowed filters: DomainName
+	EnableReplaceChildWorkflowFromStaleParentBranch
+
 	// MatchingEnableClientAutoConfig enables auto config for domain and tasklist on client (worker) side
 	// KeyName: matching.enableClientAutoConfig
 	// Value type: Bool
@@ -5310,6 +5319,12 @@ var BoolKeys = map[BoolKey]DynamicBool{
 		KeyName:      "history.enableDeterministicChildWorkflowRequestID",
 		Filters:      []Filter{DomainName},
 		Description:  "EnableDeterministicChildWorkflowRequestID derives the request ID that starts a child workflow from its initiated event, so all clusters start the child with the same request ID",
+		DefaultValue: false,
+	},
+	EnableReplaceChildWorkflowFromStaleParentBranch: {
+		KeyName:      "history.enableReplaceChildWorkflowFromStaleParentBranch",
+		Filters:      []Filter{DomainName},
+		Description:  "EnableReplaceChildWorkflowFromStaleParentBranch lets a child start terminate the running child and start a new run, when the running child was started by an initiated event of the parent that is not on the current branch of the parent",
 		DefaultValue: false,
 	},
 	MatchingEnableClientAutoConfig: {
